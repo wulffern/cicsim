@@ -1,0 +1,14 @@
+
+
+spectre:
+  options:
+     -format psfascii
+  includes:
+    - $PROJECT/lib/spectre
+
+corner:
+  typical: |
+    include "common.scs" section=Gt
+    include "mos.scs" section=Mtt
+    include "cap.scs" section=Ct
+    include "res.scs" section=Rt
