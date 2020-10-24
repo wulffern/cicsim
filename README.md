@@ -8,7 +8,7 @@
 - [x] Add wrapper script for netlisting
 - [x] Add wrapper sript for generating corners based on YAML files
 - [x] Add script for simulating
-- [ ] Add hooks for adding custom python output output parsing
+- [ ] Add hooks for adding custom python output parsing
 - [ ] Add hooks to run a post python script per corner
 - [ ] Aggregate extracted parmeters and store in a dataframe
 - [ ] Write the scripts as easy as I can, and understandable as I can.
