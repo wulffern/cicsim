@@ -80,11 +80,9 @@ cadence:
 The tests/IVX1_CV/cicsim.yaml example also shows how you can add corners to
 include the spice file.
 
-# CICSIK commands
+# cicsim netlist
 
-## cicsim netlist
-
-## cicsim run
+# cicsim run
 
 
 
