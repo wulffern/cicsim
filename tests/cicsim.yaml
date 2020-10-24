@@ -1,14 +1,73 @@
 
+cadence:
+  cds_dir: $PROJECT/work/wulff
 
 spectre:
-  options:
+  options: 
      -format psfascii
   includes:
     - $PROJECT/lib/spectre
 
 corner:
-  typical: |
+  Gt: |
     include "common.scs" section=Gt
+
+# Mosfet corners
+  Mtt: |
     include "mos.scs" section=Mtt
-    include "cap.scs" section=Ct
+  Mff: |
+    include "mos.scs" section=Mff
+  Mss: |
+    include "mos.scs" section=Mss
+  Mfs: |
+    include "mos.scs" section=Mfs
+  Msf: |
+    include "mos.scs" section=Msf
+
+#Resistor corners
+  Rt: |
     include "res.scs" section=Rt
+  Rl: |
+    include "res.scs" section=Rl
+  Rh: |
+    include "res.scs" section=Rh
+
+#Capacitor corners
+  Ct: |
+    include "cap.scs" section=Ct
+  Cl: |
+    include "cap.scs" section=Cl
+  Ch: |
+    include "cap.scs" section=Ch
+
+# Temperature corners
+  Tt: |
+    include "temperature.scs" section=Tt
+  Tl: |
+    include "temperature.scs" section=Tl
+  Th: |
+    include "temperature.scs" section=Th
+
+# Voltage corners
+  Vt: |
+    include "supply.scs" section=Vt
+  Vl: |
+    include "supply.scs" section=Vl
+  Vh: |
+    include "supply.scs" section=Vh
+
+#diode corners
+  Dt: |
+    include "diode.scs" section=Dt
+  Df: |
+    include "diode.scs" section=Df
+  Ds: |
+    include "diode.scs" section=Ds
+
+#Bipolar corners
+  Bt: |
+    include "bjt.scs" section=Bt
+  Bf: |
+    include "bjt.scs" section=Bf
+  Bs: |
+    include "bjt.scs" section=Bs

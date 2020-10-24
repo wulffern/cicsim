@@ -1,0 +1,11 @@
+cadence:
+  library: AGNEZA_SAR9B_GF130N
+  cell: IVX1_CV
+#  view: schematic
+  view: lpe_c_only_coupled
+
+corner:
+  Sch: |
+    include "../IVX1_CV_schematic.scs"
+  Lay: |
+    include "../IVX1_CV_lpe_c_only_coupled.scs"

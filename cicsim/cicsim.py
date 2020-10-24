@@ -80,7 +80,7 @@ def run(cfg,testbench,oformat,run,corner):
     cm = cs.Command()
     filename = testbench + ".scs"
     if(not os.path.exists(filename)):
-        cm.Error("Testbench '{filename}' does not exists in this folder")
+        cm.error("Testbench '{filename}' does not exists in this folder")
         return
 
     
@@ -88,27 +88,44 @@ def run(cfg,testbench,oformat,run,corner):
     writeDutFile(cfg,oformat)
     rc = cs.RunConfig()
 
-    path = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "_".join(corner) + ".scs"
-    rc.makeSpectreFile(filename,corner,path)
-
-    rc.run()
-
-
-
+    permutations = rc.getPermutations(corner)
     
+    for p in permutations:
+        path = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "".join(p) + ".scs"
+        rc.makeSpectreFile(filename,p,path)
+        cm.comment("Running {p}")
+        rc.run()
+
 
 @cli.command()
-@click.argument("testbench")
+@click.argument("library",required=False)
+@click.argument("cell",required=False)
+@click.argument("view",required=False)
+def netlist(library,cell,view):
+    """Netlist from a cadence library. This command will look for cicsim.yaml in the current directory and expects to find.
 
-@click.option("--force/--no-force",default=False,help="Force testbench override")
-def tb(testbench,force):
-    cm = cs.Command()
-    if(not force and os.path.exists(testbench)):
+    cadence:\n
+      library: <library name>\n
+      cell: <cell name>\n
+      view: <view name>\n
 
-        cm.error(f"Error: {testbench} aready exists, don't want to override when force is off")
-        return
+    or, you can specify on the commandline.
 
-    cs.writeSpectreTestbench(testbench)
+    """
+    rc = cs.RunConfig()
+    rc.netlist(library,cell,view)
+    
+
+#@cli.command()
+#@click.argument("testbench")
+#@click.option("--force/--no-force",default=False,help="Force testbench override")
+#def tb(testbench,force):
+#    cm = cs.Command()
+#    if(not force and os.path.exists(testbench)):
+#        cm.error(f"Error: {testbench} aready exists, don't want to override when force is off")
+#        return
+
+#    cs.writeSpectreTestbench(testbench)
 
 if __name__ == "__main__":
     cli()
