@@ -19,10 +19,7 @@
 - Python > 3.6.6
 
 
-# Getting started:
-
-
-## Know what python you're running
+# Know what python you're running
 
 Python is great, however, python exists in many different versions, and you can
 never trust that the right version is installed on the system that you're going
@@ -51,7 +48,7 @@ following lines to your .bashrc file
   alias python3='/usr/local/bin/python3.8'
   alias pip3='/usr/local/bin/pip3.8'
 
-## Install this script
+# Install this script
 If you want to follow the latest and greatest
 ``` sh
 mkdir pro
@@ -61,7 +58,7 @@ cd cicsim
 pip3 install -r requirements.txt --user
 pip3 install --no-deps -e --user .
 ```
-## Get started with simulation
+# Get started with simulation
 For now, it requires some manual work to get started. See tests/ for how cicsim
 expects the simulation directory to be layed out.
 
