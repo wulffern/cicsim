@@ -1,7 +1,7 @@
 ######################################################################
 ##        Copyright (c) 2020 Carsten Wulff Software, Norway
 ## ###################################################################
-## Created       : wulff at 2020-10-16
+## Created       : wulff at 2020-10-25
 ## ###################################################################
 ##  The MIT License (MIT)
 ##
@@ -25,49 +25,25 @@
 ##
 ######################################################################
 
-import re
-import json
 
-class SpiceParser():
+template_make = """
+TB=tran
+VIEW=Sch
+#VIEW=Lay
 
-    def __init__(self):
-        pass
+netlist:
+	cicsim netlist
 
-    def fastGetPortsFromFile(self,spicefile,subckt):
-        cktbuff = []
-        ckts = []
-        with open(f"{spicefile}","r") as fi:
-            match = False
-            for line in fi:
-                if(match):
-                    cktbuff.append(line)
-                    if(not re.search(r"\s*[\+\\]\n?$",line)):
-                        match = False
+typical:
+	cicsim run ${TB} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bt
 
-                if(re.search(f"\s*.?SUBCKT\s+{subckt}",line,re.IGNORECASE)):
-                    match = True
-                    cktbuff.append(line)
-                m = re.search("\s*.?SUBCKT\s+([^\s]+)",line,re.IGNORECASE)
-                if(m is not None):
-                    ckts.append(m.group(1))
+slow:
+	cicsim run ${TB} ${VIEW} Gt Mss Rh Ch Bf Df "Th,Tl" Vl
 
-        if(cktbuff is None):
-            cktopt= difflib.get_close_matches(subckt,ckts)
-            print(f"Error: Could not find '{subckt}', maybe you meant " + str(cktopt))
-            return
+fast:
+	cicsim run ${TB} ${VIEW} Gt Mff Rl Cl Bs Ds "Th,Tl" Vh
 
-        cktstr = ""
-        for line in cktbuff:
-            line = re.sub(r"[\+\\]\n$","",line)
+tfs:
+	${MAKE} typical slow fast
 
-            cktstr += line
-
-        cktstr = re.sub("\s+"," ",cktstr)
-
-        ports = cktstr.split(" ")
-        #- Remove .SUBCKT
-        ports.pop(0)
-        #- Remove subckt name
-        ports.pop(0)
-
-        return ports
+"""

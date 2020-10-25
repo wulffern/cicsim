@@ -33,11 +33,13 @@ rcfg = "cicsim.yaml"
 
 class RunConfig:
 
-    def __init__(self):
+    def __init__(self,parentdirconf=True):
         self.config = None
         self.cm = cs.Command()
-        self.readYamlConfig(".." + os.path.sep + rcfg)
+        if(parentdirconf):
+            self.readYamlConfig(".." + os.path.sep + rcfg)
         self.readYamlConfig(rcfg)
+
         if("cadence" in self.config):
             self.cadence =  self.config["cadence"]
         else:
@@ -77,8 +79,36 @@ class RunConfig:
                     self.config = self.merge(self.config,ys)
                     
         else:
-            self.cm.Error(f"Could not find config file '{filename}'")
-                    
+            self.cm.error(f"Could not find config file '{filename}'")
+
+    def makeDirectory(self,library,cell,view):
+        library = self.getCadenceWithName(library,"library")
+        cell = self.getCadenceWithName(cell,"cell")
+        view = self.getCadenceWithName(view,"view")
+        cds_dir = os.path.expandvars(self.getCadence("cds_dir"))
+        self.spectrefile = f"{cell}_{view}.scs"
+        if(os.path.exists(cell)):
+            self.cm.error(f"I refuse to override the simulation directory '{cell}'. You should delete it.\nIf you'r trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
+            return False
+
+        os.makedirs(cell)
+
+        d = {
+            "cadence":{
+                "library": library,
+                "cell" : cell,
+                "view" : view,
+            },
+            "corner":{
+                "Sch": f"""include "../{cell}_{view}.scs"\n"""
+
+            }
+        }
+        with open(cell + os.path.sep + "cicsim.yaml","w") as fo:
+            yaml.dump(d,fo)
+        return True
+
+
     def makeSpectreFile(self,fsource,corner,fdest):
 
         ss = ""
@@ -158,7 +188,7 @@ class RunConfig:
         if(library is None or cell is None or view is None or cds_dir is None):
             return
 
-        tosubckt = ""
+        topsubckt = ""
         if(top):
             topsubckt = "envOption( 'setTopLevelAsSubckt  t )"
 
@@ -178,7 +208,9 @@ exit()
 
 
         os.system(f"cd {cds_dir};ocean -nograph < netlist.ocean")
-        fname = f"{cell}_{view}.scs"
+        fname =  f"{cell}_{view}.scs"
+        self.spectrefile = fname
+
         if(not os.path.exists(fname)):
             os.system(f"ln -s {cell}/spectre/{view}/netlist/netlist {fname}")
 

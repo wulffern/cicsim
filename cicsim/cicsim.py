@@ -63,9 +63,7 @@ def dutconf(spicefile,subckt):
 
     Default output filename will be tmp_sim.cfg
     """
-    sp = cs.SpiceParser()
-    ports = sp.fastGetPortsFromFile(spicefile,subckt)
-    sc = cs.getSimConf(subckt,ports)
+    sc = cs.getSimConf(spicefile,subckt)
     sc.toFile("tmp_sim.cfg")
 
 @cli.command()
@@ -83,8 +81,6 @@ def run(cfg,testbench,oformat,run,corner):
         cm.error("Testbench '{filename}' does not exists in this folder")
         return
 
-    
-
     writeDutFile(cfg,oformat)
     rc = cs.RunConfig()
 
@@ -93,7 +89,7 @@ def run(cfg,testbench,oformat,run,corner):
     for p in permutations:
         path = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "".join(p) + ".scs"
         rc.makeSpectreFile(filename,p,path)
-        cm.comment("Running {p}")
+        cm.comment(f"Running {p}")
         rc.run()
 
 
@@ -101,7 +97,27 @@ def run(cfg,testbench,oformat,run,corner):
 @click.argument("library",required=False)
 @click.argument("cell",required=False)
 @click.argument("view",required=False)
-def netlist(library,cell,view):
+@click.option("--tb/--no-tb", default=True, help="Top level is testbench")
+def simdir(library,cell,view,tb):
+    """Create a simulation directory.
+    """
+    rc = cs.RunConfig(parentdirconf=False)
+    if(rc.makeDirectory(library,cell,view)):
+        os.chdir(cell)
+        rc.netlist(library,cell,view,top=(not tb))
+        if(not tb):
+            sc = cs.getSimConf(rc.spectrefile,cell)
+            sc.toFile("dut.cfg")
+        cs.writeSpectreTestbench("tran.scs",tb=tb)
+        with open("Makefile","w") as fo:
+            fo.write(cs.template_make)
+
+@cli.command()
+@click.argument("library",required=False)
+@click.argument("cell",required=False)
+@click.argument("view",required=False)
+@click.option("--top/--no-top", default=False, help="Add subckt on top level")
+def netlist(library,cell,view,top):
     """Netlist from a cadence library. This command will look for cicsim.yaml in the current directory and expects to find.
 
     cadence:\n
@@ -113,19 +129,19 @@ def netlist(library,cell,view):
 
     """
     rc = cs.RunConfig()
-    rc.netlist(library,cell,view)
+    rc.netlist(library,cell,view,top=top)
     
 
-#@cli.command()
-#@click.argument("testbench")
-#@click.option("--force/--no-force",default=False,help="Force testbench override")
-#def tb(testbench,force):
-#    cm = cs.Command()
-#    if(not force and os.path.exists(testbench)):
-#        cm.error(f"Error: {testbench} aready exists, don't want to override when force is off")
-#        return
+@cli.command()
+@click.argument("testbench")
+@click.option("--force/--no-force",default=False,help="Force testbench override")
+def tb(testbench,force):
+    cm = cs.Command()
+    if(not force and os.path.exists(testbench)):
+        cm.error(f"Error: {testbench} aready exists, don't want to override when force is off")
+        return
 
-#    cs.writeSpectreTestbench(testbench)
+    cs.writeSpectreTestbench(testbench)
 
 if __name__ == "__main__":
     cli()

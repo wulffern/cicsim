@@ -1,0 +1,10 @@
+cadence:
+  cell: TB_ADC
+  library: AGNEZA_SAR9B_TB
+  view: config
+spectre:
+  options: ++aps
+corner:
+  Sch: 'include "../TB_ADC_config.scs"
+
+    '

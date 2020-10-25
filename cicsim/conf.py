@@ -26,9 +26,12 @@
 ######################################################################
 import re
 import json
+import cicsim as cs
+import yaml
 
-def getSimConf(subckt,ports):
-
+def getSimConf(spicefile,subckt):
+    sp = cs.SpiceParser()
+    ports = sp.fastGetPortsFromFile(spicefile,subckt)
     sc = SimConf(subckt)
     for p in ports:
         sc.addConf(p)
@@ -61,9 +64,8 @@ class SimConfPort:
             self.porttype = "ground"
         elif("VDD" in self.name):
             self.force["vdc"] = self.name.lower()
-
             self.porttype = "supply"
-        elif(re.search(r"(_\d+V\d+|_[CE]V)$|<\d+>",self.name)):
+        elif(re.search(r"(_\d+V\d+|_[CE]V)$|\\<\d+\\|^(CK|OSC|EN|PWR)",self.name)):
             self.force["resistance"] = "1M"
             self.force["capacitance"] = "10f"
             self.porttype = "digital"
@@ -105,6 +107,8 @@ class SimConf:
 
 
     def addConf(self,p):
+        if(not p):
+            return
         sp = SimConfPort(p,self)
         self.nodes.append(p)
         self.ports[sp.name]  = sp
@@ -140,6 +144,18 @@ class SimConf:
         data = self.toJson()
         with open(fname,"w") as fo:
             json.dump(data,fo,indent=4)
+
+    def toFileYaml(self,fname):
+        data = self.toJson()
+        with open(fname,"w") as fo:
+            yaml.dump(data,fo)
+
+    def fromFileYaml(self,fname):
+        with open(fname,"r") as fi:
+            data = yaml.load(fi,Loader=yaml.FullLoader)
+            self.fromJson(data)
+        return self
+
 
     def fromFile(self,fname):
         with open(fname,"r") as fi:

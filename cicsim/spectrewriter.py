@@ -85,11 +85,18 @@ class SpectreWriter:
         self.fo.write("xdut (" +" ".join(nodes) +  f") {subckt}\n")
 
 
-def writeSpectreTestbench(filename):
+def writeSpectreTestbench(filename,tb=False):
 
         stb = spectreTbTemplate
 
+
         stb = stb.replace("{name}",filename.replace(".scs",""))
+
+        if(tb):
+            stb = stb.replace("{top}","")
+        else:
+            stb = stb.replace("{top}","include \"../dut.scs\"")
+
 
 #        m = re.findall("\"(\w+\.scs)\"",stb)
 #        for mg in m:
@@ -102,7 +109,6 @@ def writeSpectreTestbench(filename):
 
 
 spectreTbTemplate="""
-{name}
 
 //-----------------------------------------------------------------
 // OPTIONS
@@ -122,7 +128,7 @@ pivrel=1e-3  checklimitdest=both
 //-----------------------------------------------------------------
 // DUT
 //-----------------------------------------------------------------
-include "../dut.scs"
+{top}
 
 //-----------------------------------------------------------------
 // FORCE
@@ -132,5 +138,5 @@ include "../dut.scs"
 //-----------------------------------------------------------------
 // ANALYSIS
 //-----------------------------------------------------------------
-
+tran tran start=0 stop=1u
 """
