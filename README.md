@@ -59,7 +59,7 @@ pip3 install -r requirements.txt --user
 pip3 install --no-deps -e --user .
 ```
 # Get started with simulation
-For now, it requires some manual work to get started. See tests/ for how cicsim
+See tests/ for how cicsim
 expects the simulation directory to be layed out.
 
 ### tests/cicsim.yaml
@@ -79,6 +79,59 @@ cadence:
 
 The tests/IVX1_CV/cicsim.yaml example also shows how you can add corners to
 include the spice file.
+
+# cicsim simdir
+There are two senarios for the simulation directory creation. 
+
+1. Top level is a cadence testbench, with sources etc
+2. Top level is the circuit top level (to testbench structures)
+
+If you'd like to do everything, include the testbench, in spectre, you want the
+first option. If you want to draw the testbench in cadence, choose the second
+
+## Barebone spectre
+
+Run cicsim simdir, for example
+``` sh
+cicsim simdir AGNEZA_SAR9B_GF130N SAR9B_CV schematic --no-tb
+```
+
+cicsim expects to be told via the cicsim.yaml where the cadence work directory
+is via the cicsim.yaml file
+
+``` yaml
+cadence:
+  cds_dir: $PROJECT/work/wulff
+```
+
+cicsim simdir will, as of the time of writing, generate
+- Directory from cell name
+- Netlist the schematic
+- Create a dut config (cell/dut.cfg)
+- Create default testbenc (cell/tran.scs)
+- Create default Makefile (cell/Makefile)
+- Create default YAML file (cell/cicsim.yaml)
+
+Once it's complete, you should be able to go into cell directory and run "make
+typical" and spectre will tell you what's missing
+
+## Cadence testbench
+Run cicsim simdir, for example
+``` sh
+cicsim simdir AGNEZA_SAR9B_GF130N TB_SAR9B_CV schematic
+```
+
+cicsim simdir will, as of the time of writing, generate
+- Directory from cell name
+- Netlist the schematic
+- Create default testbench (cell/tran.scs)
+- Create default Makefile (cell/Makefile)
+- Create default YAML file (cell/cicsim.yaml)
+
+Once it's complete, you should be able to go into cell directory and run "make
+typical" and spectre will tell you what's missing
+
+
 
 # cicsim netlist
 
