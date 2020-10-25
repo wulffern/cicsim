@@ -4,7 +4,7 @@ VIEW=Sch
 #VIEW=Lay
 
 netlist:
-	cicsim netlist
+	cicsim netlist --no-top
 
 typical:
 	cicsim run ${TB} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bt
