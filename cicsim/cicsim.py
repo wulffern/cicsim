@@ -56,15 +56,13 @@ def cli():
     pass
 
 @cli.command()
-@click.argument("spicefile")
-@click.argument("subckt")
-def dutconf(spicefile,subckt):
-    """Make a JSON configuration from a SPICEFILE and a SUBCKT
-
-    Default output filename will be tmp_sim.cfg
+@click.argument("spicefile",required=False)
+@click.argument("subckt",required=False)
+def dut(spicefile,subckt):
+    """Make a device under test file for SPICEFILE and SUBCKT
     """
-    sc = cs.getSimConf(spicefile,subckt)
-    sc.toFile("tmp_sim.cfg")
+    rc = cs.RunConfig()
+    rc.dut(spicefile,subckt)
 
 @cli.command()
 @click.argument("testbench")
@@ -92,25 +90,44 @@ def run(cfg,testbench,oformat,run,corner):
         cm.comment(f"Running {p}")
         rc.run()
 
+def simdir(library,cell,view,tb):
+    """
+    Create a simulation directory
+    """
+    rc = cs.RunConfig(library,cell,view)
+    if(rc.makeDirectory()):
+        os.chdir(cell)
+        rc.netlist(top=(not tb))
+        if(not tb):
+            sc = cs.getSimConf(rc.NetlistName(),cell)
+
+            #- Not sure I like the config concept anymore, maybe it's better just to
+            # generate the dut.scs
+            #sc.toFile("dut.cfg")
+            ss = cs.SpectreWriter(sc)
+            ss.write()
+        cs.writeSpectreTestbench("tran.scs",tb=tb)
+        with open("Makefile","w") as fo:
+            fo.write(cs.template_make)
 
 @cli.command()
 @click.argument("library",required=False)
 @click.argument("cell",required=False)
 @click.argument("view",required=False)
-@click.option("--tb/--no-tb", default=True, help="Top level is testbench")
-def simdir(library,cell,view,tb):
-    """Create a simulation directory.
+def simtb(library,cell,view):
+    """Create a simulation directory for a testbench
     """
-    rc = cs.RunConfig(parentdirconf=False)
-    if(rc.makeDirectory(library,cell,view)):
-        os.chdir(cell)
-        rc.netlist(library,cell,view,top=(not tb))
-        if(not tb):
-            sc = cs.getSimConf(rc.spectrefile,cell)
-            sc.toFile("dut.cfg")
-        cs.writeSpectreTestbench("tran.scs",tb=tb)
-        with open("Makefile","w") as fo:
-            fo.write(cs.template_make)
+    simdir(library,cell,view,True)
+
+@cli.command()
+@click.argument("library",required=False)
+@click.argument("cell",required=False)
+@click.argument("view",required=False)
+def simcell(library,cell,view):
+    """Create a simulation directory for a Cell
+    """
+    simdir(library,cell,view,False)
+
 
 @cli.command()
 @click.argument("library",required=False)
@@ -128,8 +145,8 @@ def netlist(library,cell,view,top):
     or, you can specify on the commandline.
 
     """
-    rc = cs.RunConfig()
-    rc.netlist(library,cell,view,top=top)
+    rc = cs.RunConfig(library,cell,view)
+    rc.netlist(top=top)
     
 
 @cli.command()

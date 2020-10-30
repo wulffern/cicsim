@@ -33,14 +33,14 @@ rcfg = "cicsim.yaml"
 
 class RunConfig:
 
-    def __init__(self,parentdirconf=True):
+    def __init__(self,library=None,cell=None,view=None):
         self.config = None
         self.cm = cs.Command()
-        if(parentdirconf):
-
-            pparent = ".." + os.path.sep + ".." + os.path.sep + rcfg
-            if(os.path.exists(pparent)):
-                self.readYamlConfig(pparent)
+        pparent = ".." + os.path.sep + ".." + os.path.sep + rcfg
+        if(os.path.exists(pparent)):
+            self.readYamlConfig(pparent)
+        parent = ".." + os.path.sep + rcfg
+        if(os.path.exists(parent)):
             self.readYamlConfig(".." + os.path.sep + rcfg)
         self.readYamlConfig(rcfg)
 
@@ -48,6 +48,37 @@ class RunConfig:
             self.cadence =  self.config["cadence"]
         else:
             self.cadence = {}
+
+
+        if(library):
+            self.cadence["library"] = library
+        if(cell):
+            self.cadence["cell"] = cell
+        if(view):
+            self.cadence["view"] = view
+        
+    def Library(self):
+        return self.getCadence("library")
+    def Cell(self):
+        return self.getCadence("cell")
+    def View(self):
+        return self.getCadence("view")
+    def NetlistName(self):
+        return self.Cell() + "_" + self.View() + ".scs"
+    def CdsDir(self):
+        return os.path.expandvars(self.getCadence("cds_dir"))
+
+    def dut(self,spicefile=None,subckt=None):
+        sp = cs.SpiceParser()
+        if(not spicefile or not subckt):
+            spicefile = self.NetlistName()
+            subckt = self.Cell()
+        ports = sp.fastGetPortsFromFile(spicefile,subckt)
+        sw = cs.SpectreWriter()
+        sw.writeSpectreDutfile("dut.scs",subckt,ports)
+
+
+
 
     def merge(self,dest,source):
         for key,val in source.items():
@@ -90,12 +121,12 @@ class RunConfig:
         else:
             self.cm.error(f"Could not find config file '{filename}'")
 
-    def makeDirectory(self,library,cell,view):
-        library = self.getCadenceWithName(library,"library")
-        cell = self.getCadenceWithName(cell,"cell")
-        view = self.getCadenceWithName(view,"view")
-        cds_dir = os.path.expandvars(self.getCadence("cds_dir"))
-        self.spectrefile = f"{cell}_{view}.scs"
+    def makeDirectory(self):
+        library = self.Library()
+        cell = self.Cell()
+        view = self.View()
+        cds_dir = self.CdsDir()
+        
         if(os.path.exists(cell)):
             self.cm.error(f"I refuse to override the simulation directory '{cell}'. You should delete it.\nIf you'r trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
             return False
@@ -141,16 +172,6 @@ class RunConfig:
                 print(fi.read(),file=fo)
 
 
-    def getCadenceWithName(self,val,name):
-        if(val is None and name in self.cadence):
-            val = self.cadence[name]
-        elif(val):
-            pass
-        else:
-            self.cm.error(f"Argument cadence->{name} is not specified, specify either on command line or in config file")
-        return val
-
-
     def getCadence(self,key):
         if(key in self.cadence):
             return self.cadence[key]
@@ -183,15 +204,13 @@ class RunConfig:
             corner.append(d.split(" "))
         return corner
 
+    
 
-
-
-
-    def netlist(self,library,cell,view,top=True):
-        library = self.getCadenceWithName(library,"library")
-        cell = self.getCadenceWithName(cell,"cell")
-        view = self.getCadenceWithName(view,"view")
-        cds_dir = os.path.expandvars(self.getCadence("cds_dir"))
+    def netlist(self,top=True):
+        library = self.Library()
+        cell = self.Cell()
+        view = self.View()
+        cds_dir = self.CdsDir()
         curdir = os.getcwd()
 
         if(library is None or cell is None or view is None or cds_dir is None):
@@ -217,8 +236,7 @@ exit()
 
 
         os.system(f"cd {cds_dir};ocean  < netlist.ocean")
-        fname =  f"{cell}_{view}.scs"
-        self.spectrefile = fname
+        fname = self.NetlistName()
 
         if(not os.path.exists(fname)):
             os.system(f"ln -s {cell}/spectre/{view}/netlist/netlist {fname}")

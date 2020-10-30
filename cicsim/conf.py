@@ -52,8 +52,8 @@ class SimConfPort:
         self.force = {
             "vdc": None,
             "idc" : None,
-            "resistance" : None,
-            "capacitance" : None
+            "resistance" : "10M",
+            "capacitance" : "10f"
         }
 
         self.guessType()
@@ -77,7 +77,9 @@ class SimConfPort:
         for f in self.force:
             if(self.force[f] is not None):
                 val = self.force[f]
-                writer.addForce(f,self.name,val)
+            else:
+                val = 0
+            writer.addForce(f,self.name,val)
 
 
 

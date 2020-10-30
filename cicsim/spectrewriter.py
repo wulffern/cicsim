@@ -30,7 +30,7 @@ import re
 
 class SpectreWriter:
 
-    def __init__(self,simconf):
+    def __init__(self,simconf=None):
         self.simconf = simconf
         self.simdir = None
         self.simfile = None
@@ -70,20 +70,40 @@ class SpectreWriter:
     def addLine(self):
         self.fo.write("\n")
 
+    def addForceComment(self,condition,ss):
+
+        if(condition):
+            self.fo.write( ss)
+        else:
+            self.fo.write("//" +ss)
+
+        
     def addForce(self,ftype,name,val):
-        if(ftype == "vdc"):
-            self.fo.write(f"v{name.lower()} ({name} 0) vsource type=dc dc={val} \n")
-        if(ftype == "idc"):
-            self.fo.write(f"i{name.lower()} (0 {name}) isource type=dc dc={val} \n")
-        if(ftype == "resistance"):
-            self.fo.write(f"r{name.lower()} ({name} 0) resistor r={val} \n")
-        if(ftype == "capacitance"):
-            self.fo.write(f"c{name.lower()} ({name} 0) capacitor c={val} \n")
+        self.addForceComment(ftype == "vdc",f"v{name.lower()} ({name} 0) vsource type=dc dc={val} \n")
+        self.addForceComment(ftype == "idc",f"i{name.lower()} (0 {name}) isource type=dc dc={val} \n")
+        self.addForceComment(ftype == "resistance",f"r{name.lower()} ({name} 0) resistor r={val} \n")
+        self.addForceComment(ftype == "capacitance",f"c{name.lower()} ({name} 0) capacitor c={val} \n")
 
         
     def addSubckt(self,subckt,nodes):
         self.fo.write("xdut (" +" ".join(nodes) +  f") {subckt}\n")
 
+    def writeSpectreDutfile(self,spicefile,subckt,ports):
+
+        stf = spectreForceTemplate
+
+        with open(spicefile,"w") as fo:
+            self.fo = fo
+            self.addHeader("DEVICE UNDER TEST")
+
+            self.addSubckt(subckt,ports)
+
+            for p in ports:
+                if(not p):
+                    continue
+                s = stf.replace("{name}",p).replace("{lname}",p.lower())
+                self.fo.write(s)
+            
 
 def writeSpectreTestbench(filename,tb=False):
 
@@ -97,16 +117,19 @@ def writeSpectreTestbench(filename,tb=False):
         else:
             stb = stb.replace("{top}","include \"../dut.scs\"")
 
-
-#        m = re.findall("\"(\w+\.scs)\"",stb)
-#        for mg in m:
-#            if(not os.path.exists(mg)):
-#                with open(mg,"w") as fo:
-#                    fo.write("")
-
         with open(filename,"w") as fo:
             print(stb,file=fo)
 
+
+spectreForceTemplate="""
+// Force {name}
+//vdc_{lname} ({name} 0 ) vsource type=dc dc="0"
+//vac_{lname} ({name} 0 ) vsource type=dc dc="0" mag=1
+//vpulse_{lname} ({name} 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
+//i{lname} (0 {name})  isource type=dc dc="0"
+//r{lname} ({name} 0) resistor r=10M
+//c{lname} ({name} 0) capacitor c=10f
+"""
 
 spectreTbTemplate="""
 
