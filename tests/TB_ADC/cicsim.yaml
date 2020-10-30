@@ -3,8 +3,15 @@ cadence:
   library: AGNEZA_SAR9B_TB
   view: config
 spectre:
-  options: ++aps
+  options: ++aps -multithread -E
 corner:
-  Sch: 'include "../TB_ADC_config.scs"
-
-    '
+  Sch: |
+    include "../TB_ADC_config.scs"
+  Debug: |
+    #define DEBUG
+    save SAR_IP_CV
+    save SAR_IN_CV
+    save AVDD
+    save XDUT.SARN
+    save XDUT.SARP
+    save AVDD_ADC_CV ARST_N_CV AVDD_CV  CK_SAMPLE  VDD_LOW AVDD_VREF

@@ -31,5 +31,5 @@ vsrc1 (A 0) vsource type=pulse val0=0 val1=vdda period=1/cfs rise=50p fall=50p w
 // ANALYSIS
 //-----------------------------------------------------------------
 
-
-tran tran start=0 stop=1u
+ac ac start=1k stop=1G dec=50
+//tran tran start=0 stop=1u compression=yes

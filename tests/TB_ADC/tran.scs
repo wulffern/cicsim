@@ -7,13 +7,21 @@
 global 0
 
 simulatorOptions options reltol=1e-6 vabstol=1e-6 save=selected \
-iabstol=1e-12 gmin=1e-15 redefinedparams=warning digits=7 cols=80 \ 
+iabstol=1e-12 gmin=1e-15 redefinedparams=warning digits=7 cols=80 \
 pivrel=1e-3  checklimitdest=both
-saveOptions options save=selected
+
 //-----------------------------------------------------------------
 // PARAMETERS
 //-----------------------------------------------------------------
-parameters cfs=8M vamp=0.6 tshift=10n td=3/cfs fbin=2 nbpt=64 blk_pwell=vdda blk_nwell=0 tend=(nbpt/cfs + 25/cfs + td + tshift)
+
+#ifdef DEBUG
+parameters nbpt=16
+#else
+parameters nbpt=64
+#endif
+
+parameters cfs=8M vamp=0.6 tshift=10n td=3/cfs fbin=2  \
+ blk_pwell=vdda blk_nwell=0 tend=(nbpt/cfs + 25/cfs + td + tshift)
 
 //-----------------------------------------------------------------
 // DUT
@@ -30,17 +38,15 @@ ahdl_include "$PROJECT/testbench/AGNEZA_SAR9B_TB/mdl_supply/veriloga/veriloga.va
 //-----------------------------------------------------------------
 // ANALYSIS
 //-----------------------------------------------------------------
-tran tran start=0 stop=tend method=gear2only
+tran tran start=0 stop=tend method=gear2only compression=yes
 
 
 //-----------------------------------------------------------------
 // ANALYSIS
 //-----------------------------------------------------------------
-save SAR_IP_CV
-save SAR_IN_CV
-save AVDD
-save xdut:AVDD
+
+save XDUT:AVDD_CORE
+save XDUT:VREF
+save XDUT:AVDD_ADC
 save RO
-save XDUT.SARN
-save XDUT.SARP
-save AVDD_ADC_CV ARST_N_CV AVDD_CV BLK_NWELL BLK_PWELL CK_SAMPLE ARST_N_CV VDD_LOW AVDD_VREF
+save DISABLE_CAL_CV

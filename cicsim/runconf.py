@@ -59,7 +59,11 @@ class RunConfig:
                 else:
                     dest[key] = val
             else:
-                dest[key] = val
+                if(key in dest):
+                    if(isinstance(val,str)):
+                        dest[key] += " "+ val
+                else:
+                    dest[key] = val
         return dest
 
         

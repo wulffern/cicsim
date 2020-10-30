@@ -7,7 +7,7 @@ netlist:
 	cicsim netlist --no-top
 
 typical:
-	cicsim run ${TB} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bt
+	cicsim run ${TB} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bl
 
 slow:
 	cicsim run ${TB} ${VIEW} Gt Mss Rh Ch Bf Df "Th,Tl" Vl
