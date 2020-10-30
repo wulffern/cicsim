@@ -37,6 +37,10 @@ class RunConfig:
         self.config = None
         self.cm = cs.Command()
         if(parentdirconf):
+
+            pparent = ".." + os.path.sep + ".." + os.path.sep + rcfg
+            if(os.path.exists(pparent)):
+                self.readYamlConfig(pparent)
             self.readYamlConfig(".." + os.path.sep + rcfg)
         self.readYamlConfig(rcfg)
 
@@ -72,7 +76,8 @@ class RunConfig:
 
         if(os.path.exists(filename)):
             with open(filename,"r") as fi:
-                ys = yaml.load(fi,Loader=yaml.FullLoader)
+                #ys = yaml.load(fi,Loader=yaml.FullLoader)
+                ys = yaml.safe_load(fi)
 
                 if(ys == None):
                     return
@@ -211,7 +216,7 @@ exit()
             fo.write(scr)
 
 
-        os.system(f"cd {cds_dir};ocean -nograph < netlist.ocean")
+        os.system(f"cd {cds_dir};ocean  < netlist.ocean")
         fname =  f"{cell}_{view}.scs"
         self.spectrefile = fname
 
