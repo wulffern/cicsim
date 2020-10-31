@@ -99,13 +99,7 @@ def simdir(library,cell,view,tb):
         os.chdir(cell)
         rc.netlist(top=(not tb))
         if(not tb):
-            sc = cs.getSimConf(rc.NetlistName(),cell)
-
-            #- Not sure I like the config concept anymore, maybe it's better just to
-            # generate the dut.scs
-            #sc.toFile("dut.cfg")
-            ss = cs.SpectreWriter(sc)
-            ss.write()
+            rc.dut()
         cs.writeSpectreTestbench("tran.scs",tb=tb)
         with open("Makefile","w") as fo:
             fo.write(cs.template_make)

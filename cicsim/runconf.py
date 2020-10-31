@@ -167,6 +167,7 @@ class RunConfig:
 
         with open(fdest,"w") as fo:
             print("cicsimgen" + fsource.replace(".scs",""),file=fo)
+            print("parameters tbname=\"" + os.path.basename(fdest).replace(".scs","") + "\" ",file=fo)
             print(ss,file=fo)
             with open(fsource,"r") as fi:
                 print(fi.read(),file=fo)
