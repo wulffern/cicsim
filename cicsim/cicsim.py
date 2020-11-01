@@ -33,6 +33,7 @@ import re
 import os
 import difflib
 import cicsim as cs
+import importlib
 
 def writeDutFile(cfg,oformat):
     #- Check if default config file exist
@@ -69,7 +70,7 @@ def dut(spicefile,subckt):
 @click.argument("corner",nargs=-1)
 @click.option("--cfg", default=None, help="DUT Config file")
 @click.option("--oformat",default="spectre",help="spectre|aimspice")
-@click.option("--run/--no-run", default=False, help="Run simulator")
+@click.option("--run/--no-run", default=True, help="Run simulator")
 def run(cfg,testbench,oformat,run,corner):
     """Run a simulation of TESTBENCH
     """
@@ -83,12 +84,26 @@ def run(cfg,testbench,oformat,run,corner):
     rc = cs.RunConfig()
 
     permutations = rc.getPermutations(corner)
-    
+
     for p in permutations:
-        path = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "".join(p) + ".scs"
-        rc.makeSpectreFile(filename,p,path)
-        cm.comment(f"Running {p}")
-        rc.run()
+        fname = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "".join(p)
+        path = fname + ".scs"
+        if(run):
+            rc.makeSpectreFile(filename,p,path)
+            cm.comment(f"Running {p}")
+            rc.run()
+
+        #- Run python post parsing if it exists
+        pyscript = testbench + ".py"
+        if(os.path.exists(pyscript)):
+            sys.path.append(os.getcwd())
+            tb = importlib.import_module(testbench)
+            tb.main(fname)
+            
+
+
+
+
 
 def simdir(library,cell,view,tb):
     """
