@@ -156,6 +156,8 @@ class RunConfig:
             for c in corner:
                 if(c in self.config["corner"]):
                     ss += self.config["corner"][c]
+                else:
+                    ss += "#define " + c.upper() + "\n"
 
         dirn = os.path.dirname(fdest)
 
