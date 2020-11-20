@@ -88,10 +88,28 @@ def run(cfg,testbench,oformat,run,corner):
     for p in permutations:
         fname = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "".join(p)
         path = fname + ".scs"
+        cm.comment(f"Running results {path}")
         if(run):
             rc.makeSpectreFile(filename,p,path)
             cm.comment(f"Running {p}")
             rc.run()
+
+        cm.comment(f"Parsing results {fname}")
+
+
+        #- Run ocean post parsing if it exists
+        ocnscript = testbench + ".ocn"
+        if(os.path.exists(ocnscript)):
+            ocnfo = fname + ".ocn"
+            resultsDir = os.getcwd() + os.path.sep+ fname + ".psf"
+            resultsFile = os.getcwd() + os.path.sep+ fname + ".yaml"
+            with open(ocnscript,"r") as fi:
+                buffer = fi.read()
+            buffer = re.sub("{resultsDir}",resultsDir,buffer)
+            buffer = re.sub("{resultsFile}",resultsFile,buffer)
+            with open(ocnfo,"w") as fo:
+                fo.write(buffer)
+            os.system(f"ocean -nograph -replay {ocnfo}")
 
         #- Run python post parsing if it exists
         pyscript = testbench + ".py"
@@ -99,6 +117,9 @@ def run(cfg,testbench,oformat,run,corner):
             sys.path.append(os.getcwd())
             tb = importlib.import_module(testbench)
             tb.main(fname)
+
+
+
             
 
 
