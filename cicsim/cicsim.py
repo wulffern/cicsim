@@ -111,7 +111,7 @@ def run(cfg,testbench,oformat,run,corner):
                 fo.write(buffer)
             os.system(f"ocean -nograph -replay {ocnfo}")
         else:
-            cmd.warning(f" {ocnscript} not found")
+            cm.warning(f" {ocnscript} not found")
 
         #- Run python post parsing if it exists
         pyscript = testbench + ".py"
@@ -120,7 +120,7 @@ def run(cfg,testbench,oformat,run,corner):
             tb = importlib.import_module(testbench)
             tb.main(fname)
         else:
-            cmd.warning(f" {pyscript} not found")
+            cm.warning(f" {pyscript} not found")
 
 
 
