@@ -39,6 +39,7 @@ class colors:
         "green" : '\033[32m',
         "blue" : '\033[34m',
         "cyan" :'\033[36m',
+        "yellow" :'\033[93m',
         "default": '',
     }
 
@@ -66,6 +67,9 @@ class Command:
 
     def comment(self,ss,color="green"):
         print(self.getIndent() + self.getColor(color) + ss + "\n"  + colors.reset)
+
+    def warning(self,ss):
+        self.comment(ss,"yellow")
 
     def error(self,ss):
         self.comment(ss,"red")
