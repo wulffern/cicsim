@@ -1,16 +1,15 @@
 
 # Custom IC Creator Simulation Tools
 
- **This is a work in progress**
-
+ 
 # Plan
 - [x] Learn how to use setup.py
 - [x] Add wrapper script for netlisting
 - [x] Add wrapper sript for generating corners based on YAML files
 - [x] Add script for simulating
-- [ ] Add hooks for adding custom python output parsing
-- [ ] Add hooks to run a post python script per corner
-- [ ] Aggregate extracted parmeters and store in a dataframe
+- [x] Add hooks for adding custom python output parsing
+- [x] Add hooks to run a post python script per corner
+- [x] Aggregate extracted parmeters and store in a dataframe
 - [ ] Write the scripts as easy as I can, and understandable as I can.
 
 
@@ -77,7 +76,7 @@ cadence:
   view: <cadence view, usually schematic is the one you want>
 ```
 
-The tests/IVX1_CV/cicsim.yaml example also shows how you can add corners to
+The `tests/IVX1_CV/cicsim.yaml' example also shows how you can add corners to
 include the spice file.
 
 # cicsim simdir
