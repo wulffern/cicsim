@@ -130,11 +130,11 @@ def results(testbench):
             df["type"] = m.group(1)
         df_all = pd.concat([df,df_all])
 
-    print("|Parameter|Min | Typ | Max| Unit|")
+    print("|**Parameter**|**Min** | **Typ** | **Max**|** Unit**|")
     print("|:---| :-:| :-:| :-:| :-:|")
     dfg = df_all.groupby(["type"])
     for ind,df in dfg:
-        print("|%s| | | | |" %(ind))
+        print("|**%s**| | | | |" %(ind))
         for c in df.columns:
             if(c not in ["t_rise","t_fall"]):
                 continue
