@@ -25,7 +25,7 @@
 ##  SOFTWARE.
 ##
 ######################################################################
-
+from engineering_notation import EngNumber
 import json
 import click
 import sys
@@ -130,15 +130,17 @@ def results(testbench):
             df["type"] = m.group(1)
         df_all = pd.concat([df,df_all])
 
-    print("|**Parameter**|**Min** | **Typ** | **Max**|** Unit**|")
+    print("|**Parameter**|**Min** | **Typ** | **Max**|**Unit**|")
     print("|:---| :-:| :-:| :-:| :-:|")
     dfg = df_all.groupby(["type"])
-    for ind,df in dfg:
-        print("|**%s**| | | | |" %(ind))
-        for c in df.columns:
-            if(c not in ["t_rise","t_fall"]):
-                continue
-            print("|%s | %.2g | %.2g | %.2g| |" % (c,df[c].min(),df[c].mean(),df[c].max()))
+    for c in df.columns:
+        if(c in ["Unnamed: 0","name","type"]):
+            continue
+        for ind,df in dfg:
+            print("|%s | %s|%s | %s | %s |" % (c,ind,EngNumber(df[c].min()),EngNumber(df[c].mean()),EngNumber(df[c].max())))
+
+            #if(c not in ["t_rise","t_fall"]):
+        #        continue
 
 
 def simdir(library,cell,view,tb):
