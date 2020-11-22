@@ -34,6 +34,8 @@ import os
 import difflib
 import cicsim as cs
 import importlib
+import glob
+import pandas as pd
 
 @click.group()
 def cli():
@@ -112,6 +114,32 @@ def run(testbench,oformat,run,ocn,corner):
         else:
             cm.warning(f" {pyscript} not found")
 
+@cli.command()
+@click.argument("testbench")
+def results(testbench):
+    """Summarize results of TESTBENCH
+    """
+    files = glob.glob(f"output_{testbench}/{testbench}_*.csv")
+    df_all = pd.DataFrame()
+    for f in files:
+        df = pd.read_csv(f)
+        name = os.path.basename(f).replace("tran_","").replace(".csv","")
+        df["name"] = name
+        m = re.search("([A-Z]+[a-z]+)[A-Z]",name)
+        if(m):
+            df["type"] = m.group(1)
+        df_all = pd.concat([df,df_all])
+
+    print("|Parameter|Min | Typ | Max| Unit|")
+    print("|:---| :-:| :-:| :-:| :-:|")
+    dfg = df_all.groupby(["type"])
+    for ind,df in dfg:
+        print("|%s| | | | |" %(ind))
+        for c in df.columns:
+            if(c not in ["t_rise","t_fall"]):
+                continue
+            print("|%s | %.2g | %.2g | %.2g| |" % (c,df[c].min(),df[c].mean(),df[c].max()))
+
 
 def simdir(library,cell,view,tb):
     """
@@ -165,5 +193,6 @@ def netlist(library,cell,view,top):
     rc = cs.RunConfig(library,cell,view)
     rc.netlist(top=top)
 
+    
 if __name__ == "__main__":
     cli()

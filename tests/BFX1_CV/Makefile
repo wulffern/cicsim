@@ -23,4 +23,4 @@ tfs:
 	${MAKE} typical slow fast OPT="${OPT}" VIEW="${VIEW}" TB="${TB}"
 
 results:
-	python3 results.py  > README.md && cat README.md
+	cicsim results ${TB} |tee  ${TB}.md

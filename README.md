@@ -65,7 +65,7 @@ expects the simulation directory to be layed out.
 This is the main config file for cicsim, it sets up corners, links to cadence,
 how to find the model files etc
 
-### tests/IVX1_CV/cicsim.yaml
+### tests/BFX1_CV/cicsim.yaml
 This is the child config file. The general rule is, one cell, one directory with
 a cicsim.yaml file. The YAML file must contain the following:
 

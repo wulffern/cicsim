@@ -155,7 +155,7 @@ class RunConfig:
         if("corner" in self.config):
             for c in corner:
                 if(c in self.config["corner"]):
-                    ss += self.config["corner"][c]
+                    ss += self.config["corner"][c] + "\n"
                 else:
                     ss += "#define " + c.upper() + "\n"
 
