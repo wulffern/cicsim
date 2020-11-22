@@ -46,15 +46,6 @@ def cli():
     pass
 
 @cli.command()
-@click.argument("spicefile",required=False)
-@click.argument("subckt",required=False)
-def dut(spicefile,subckt):
-    """Make a device under test file for SPICEFILE and SUBCKT
-    """
-    rc = cs.RunConfig()
-    rc.dut(spicefile,subckt)
-
-@cli.command()
 @click.argument("testbench")
 @click.argument("corner",nargs=-1)
 @click.option("--oformat",default="spectre",help="spectre|aimspice")

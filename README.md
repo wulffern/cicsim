@@ -76,7 +76,7 @@ cadence:
   view: <cadence view, usually schematic is the one you want>
 ```
 
-The `tests/IVX1_CV/cicsim.yaml' example also shows how you can add corners to
+The `tests/BFX1_CV/cicsim.yaml' example also shows how you can add corners to
 include the spice file.
 
 # cicsim simdir
@@ -92,7 +92,7 @@ first option. If you want to draw the testbench in cadence, choose the second
 
 Run cicsim simdir, for example
 ``` sh
-cicsim simdir AGNEZA_SAR9B_GF130N SAR9B_CV schematic --no-tb
+cicsim simcell AGNEZA_SAR9B_GF130N SAR9B_CV schematic 
 ```
 
 cicsim expects to be told via the cicsim.yaml where the cadence work directory
@@ -103,11 +103,11 @@ cadence:
   cds_dir: $PROJECT/work/wulff
 ```
 
-cicsim simdir will, as of the time of writing, generate
+cicsim simcell will, as of the time of writing, generate
 - Directory from cell name
 - Netlist the schematic
-- Create a dut config (cell/dut.cfg)
-- Create default testbenc (cell/tran.scs)
+- Create a dut spectre file (cell/dut.scs)
+- Create default testbench (cell/tran.scs)
 - Create default Makefile (cell/Makefile)
 - Create default YAML file (cell/cicsim.yaml)
 
@@ -115,12 +115,12 @@ Once it's complete, you should be able to go into cell directory and run "make
 typical" and spectre will tell you what's missing
 
 ## Cadence testbench
-Run cicsim simdir, for example
+Run cicsim simtb, for example
 ``` sh
-cicsim simdir AGNEZA_SAR9B_GF130N TB_SAR9B_CV schematic
+cicsim simtb AGNEZA_SAR9B_GF130N TB_SAR9B_CV schematic
 ```
 
-cicsim simdir will, as of the time of writing, generate
+cicsim simtb will, as of the time of writing, generate
 - Directory from cell name
 - Netlist the schematic
 - Create default testbench (cell/tran.scs)
@@ -130,11 +130,11 @@ cicsim simdir will, as of the time of writing, generate
 Once it's complete, you should be able to go into cell directory and run "make
 typical" and spectre will tell you what's missing
 
-
-
 # cicsim netlist
 
 # cicsim run
+
+# cicsim results
 
 
 

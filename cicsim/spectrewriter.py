@@ -123,10 +123,10 @@ def writeSpectreTestbench(filename,tb=False):
 
 spectreForceTemplate="""
 // Force {name}
-//vdc_{lname} ({name} 0 ) vsource type=dc dc="0"
-//vac_{lname} ({name} 0 ) vsource type=dc dc="0" mag=1
+//vdc_{lname} ({name} 0 ) vsource type=dc dc=0
+//vac_{lname} ({name} 0 ) vsource type=dc dc=0 mag=1
 //vpulse_{lname} ({name} 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
-//i{lname} (0 {name})  isource type=dc dc="0"
+//i{lname} (0 {name})  isource type=dc dc=0
 //r{lname} ({name} 0) resistor r=10M
 //c{lname} ({name} 0) capacitor c=10f
 """
