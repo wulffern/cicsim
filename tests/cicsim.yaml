@@ -3,8 +3,8 @@ cadence:
   cds_dir: $PROJECT/work/wulff
 
 spectre:
-  options: 
-     -format psfascii
+  options:
+    -format psfxl
   includes:
     - $PROJECT/lib/spectre
 

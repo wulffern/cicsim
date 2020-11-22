@@ -35,19 +35,6 @@ import difflib
 import cicsim as cs
 import importlib
 
-def writeDutFile(cfg,oformat):
-    #- Check if default config file exist
-    if(cfg == None and os.path.exists("dut.cfg")):
-        cfg = "dut.cfg"
-    if(cfg):
-        sc = cs.SimConf()
-        sc.fromFile(cfg)
-
-        if(oformat == "spectre"):
-            ss = cs.SpectreWriter(sc)
-            ss.write()
-    
-
 @click.group()
 def cli():
     """Custom IC Creator Simulator Tools
@@ -68,11 +55,10 @@ def dut(spicefile,subckt):
 @cli.command()
 @click.argument("testbench")
 @click.argument("corner",nargs=-1)
-@click.option("--cfg", default=None, help="DUT Config file")
 @click.option("--oformat",default="spectre",help="spectre|aimspice")
 @click.option("--run/--no-run", default=True, help="Run simulator")
 @click.option("--ocn/--no-ocn", default=True, help="Run ocean")
-def run(cfg,testbench,oformat,run,ocn,corner):
+def run(testbench,oformat,run,ocn,corner):
     """Run a simulation of TESTBENCH
     """
     cm = cs.Command()
@@ -80,8 +66,6 @@ def run(cfg,testbench,oformat,run,ocn,corner):
     if(not os.path.exists(filename)):
         cm.error("Testbench '{filename}' does not exists in this folder")
         return
-
-    writeDutFile(cfg,oformat)
     rc = cs.RunConfig()
 
     permutations = rc.getPermutations(corner)
@@ -102,8 +86,6 @@ def run(cfg,testbench,oformat,run,ocn,corner):
             continue
 
         cm.comment(f"Parsing results {fname}")
-
-
 
         #- Run ocean post parsing if it exists
         ocnscript = testbench + ".ocn"
@@ -129,13 +111,6 @@ def run(cfg,testbench,oformat,run,ocn,corner):
             tb.main(fname)
         else:
             cm.warning(f" {pyscript} not found")
-
-
-
-            
-
-
-
 
 
 def simdir(library,cell,view,tb):
@@ -189,18 +164,6 @@ def netlist(library,cell,view,top):
     """
     rc = cs.RunConfig(library,cell,view)
     rc.netlist(top=top)
-    
-
-@cli.command()
-@click.argument("testbench")
-@click.option("--force/--no-force",default=False,help="Force testbench override")
-def tb(testbench,force):
-    cm = cs.Command()
-    if(not force and os.path.exists(testbench)):
-        cm.error(f"Error: {testbench} aready exists, don't want to override when force is off")
-        return
-
-    cs.writeSpectreTestbench(testbench)
 
 if __name__ == "__main__":
     cli()

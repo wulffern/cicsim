@@ -1,4 +1,28 @@
 
+
+simulator lang=spice
+.model nch NMOS level=47 version=4.7
+.model pch PMOS level=47  version=4.7
+
+simulator lang=spectre
+
+
+subckt NCHDL B D G S
+    M1_0 (D G S B) nch w=(1.08*1u) l=0.14*1u nf=1
+ends NCHDL
+
+
+subckt PCHDL B D G S
+    M1_0 (D G S B) pch w=(1.08*1u) l=0.14*1u nf=1 
+ends PCHDL
+
+subckt BFX1_CV A AVDD AVSS BULKN BULKP Y
+MN1 (BULKN Y B AVSS) NCHDL
+MN0 (BULKN AVSS A B) NCHDL
+MP1 (BULKP Y B AVDD) PCHDL
+MP0 (BULKP AVDD A B) PCHDL
+ends BFX1_CV
+
 //-----------------------------------------------------------------
 // DEVICE UNDER TEST
 //-----------------------------------------------------------------

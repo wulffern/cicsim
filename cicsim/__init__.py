@@ -1,4 +1,3 @@
-from .conf import *
 from .spectrewriter import *
 from .spiceparser import *
 import cicsim

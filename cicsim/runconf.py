@@ -256,7 +256,7 @@ exit()
                 for I in self.config["spectre"]["includes"]:
                     includes += " -I" + I
 
-        cmd = f"spectre  {options} {includes}  -raw " + self.fname.replace(".scs",".psf") + f" {self.fname}"
+        cmd = f"spectre  {options} {includes}  -E -raw " + self.fname.replace(".scs",".psf") + f" {self.fname}"
         cm = cs.Command()
         cm.comment(cmd)
         return os.system(f"cd {self.rundir}; {cmd}")
