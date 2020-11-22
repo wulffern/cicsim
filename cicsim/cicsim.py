@@ -103,10 +103,10 @@ def run(cfg,testbench,oformat,run,corner):
             ocnfo = fname + ".ocn"
             resultsDir = os.getcwd() + os.path.sep+ fname + ".psf"
             resultsFile = os.getcwd() + os.path.sep+ fname + ".yaml"
+
             with open(ocnscript,"r") as fi:
                 buffer = fi.read()
-            buffer = re.sub("{resultsDir}",resultsDir,buffer)
-            buffer = re.sub("{resultsFile}",resultsFile,buffer)
+            buffer = f"cicResultsDir = {resultsDir}\ncicResultsFile = {resultsFile}\n" + buffer
             with open(ocnfo,"w") as fo:
                 fo.write(buffer)
             os.system(f"ocean -nograph -replay {ocnfo}")
