@@ -1,0 +1,8 @@
+cadence:
+  cell: BFX1_CV
+  library: SUN_SAR9B_GF130N
+  view: schematic
+corner:
+  Sch: 'include "../BFX1_CV_schematic.scs"
+
+    '

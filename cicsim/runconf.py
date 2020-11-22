@@ -259,5 +259,4 @@ exit()
         cmd = f"spectre  {options} {includes}  -raw " + self.fname.replace(".scs",".psf") + f" {self.fname}"
         cm = cs.Command()
         cm.comment(cmd)
-        os.system(f"cd {self.rundir}; {cmd}")
-        pass
+        return os.system(f"cd {self.rundir}; {cmd}")

@@ -71,7 +71,8 @@ def dut(spicefile,subckt):
 @click.option("--cfg", default=None, help="DUT Config file")
 @click.option("--oformat",default="spectre",help="spectre|aimspice")
 @click.option("--run/--no-run", default=True, help="Run simulator")
-def run(cfg,testbench,oformat,run,corner):
+@click.option("--ocn/--no-ocn", default=True, help="Run ocean")
+def run(cfg,testbench,oformat,run,ocn,corner):
     """Run a simulation of TESTBENCH
     """
     cm = cs.Command()
@@ -89,24 +90,31 @@ def run(cfg,testbench,oformat,run,corner):
         fname = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "".join(p)
         path = fname + ".scs"
         cm.comment(f"Running results {path}")
+        simOk = True
         if(run):
             rc.makeSpectreFile(filename,p,path)
             cm.comment(f"Running {p}")
-            rc.run()
+            if( rc.run() > 0):
+                simOk = False
+
+        if(not simOk):
+            cm.error("Simulation failed ")
+            continue
 
         cm.comment(f"Parsing results {fname}")
 
 
+
         #- Run ocean post parsing if it exists
         ocnscript = testbench + ".ocn"
-        if(os.path.exists(ocnscript)):
+        if(os.path.exists(ocnscript) and ocn):
             ocnfo = fname + ".ocn"
             resultsDir = os.getcwd() + os.path.sep+ fname + ".psf"
             resultsFile = os.getcwd() + os.path.sep+ fname + ".yaml"
 
             with open(ocnscript,"r") as fi:
                 buffer = fi.read()
-            buffer = f"cicResultsDir = {resultsDir}\ncicResultsFile = {resultsFile}\n" + buffer
+                buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\n" + buffer
             with open(ocnfo,"w") as fo:
                 fo.write(buffer)
             os.system(f"ocean -nograph -replay {ocnfo}")
