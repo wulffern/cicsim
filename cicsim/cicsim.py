@@ -130,13 +130,14 @@ def results(testbench):
             df["type"] = m.group(1)
         df_all = pd.concat([df,df_all])
 
-    print("|**Parameter**|**Min** | **Typ** | **Max**|**Unit**|")
-    print("|:---| :-:| :-:| :-:| :-:|")
+    print("|**Parameter**|**View**|**Min** | **Typ** | **Max**|**Unit**|")
+    print("|:---| :-:| :-:| :-:| :-:| :-:|")
     dfg = df_all.groupby(["type"])
     for c in df.columns:
         if(c in ["Unnamed: 0","name","type"]):
             continue
         for ind,df in dfg:
+
             print("|%s | %s|%s | %s | %s |" % (c,ind,EngNumber(df[c].min()),EngNumber(df[c].mean()),EngNumber(df[c].max())))
 
             #if(c not in ["t_rise","t_fall"]):
