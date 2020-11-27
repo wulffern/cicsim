@@ -120,7 +120,7 @@ def results(testbench):
             df["type"] = m.group(1)
         df_all = pd.concat([df,df_all])
 
-    if(df.empty):
+    if(df_all.empty):
         cm.error("No CSV files found")
         return
 
