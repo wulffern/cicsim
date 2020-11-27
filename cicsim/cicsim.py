@@ -53,6 +53,7 @@ def cli():
 def run(testbench,oformat,run,ocn,corner):
     """Run a simulation of TESTBENCH
     """
+
     cm = cs.Command()
     filename = testbench + ".scs"
     if(not os.path.exists(filename)):
@@ -109,6 +110,7 @@ def run(testbench,oformat,run,ocn,corner):
 def results(testbench):
     """Summarize results of TESTBENCH
     """
+    cm = cs.Command()
     files = glob.glob(f"output_{testbench}/{testbench}_*.csv")
     df_all = pd.DataFrame()
     for f in files:
@@ -120,7 +122,7 @@ def results(testbench):
             df["type"] = m.group(1)
         df_all = pd.concat([df,df_all])
 
-    if(df.empty):
+    if(df_all.empty):
         cm.error("No CSV files found")
         return
 
