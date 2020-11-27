@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.6', '3.7', '3.8']
+        python-version: ['3.8']
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -31,8 +31,9 @@ jobs:
       # Runs a single command using the runners shell
       - name: install setup
         run: |
+          python -m pip install --upgrade pip
           pip3 install -r requirements.txt --user
-          pi3 install --no-deps -e  .
+          pip3 install --no-deps -e  .
           cd tests/sim/BFX1_CV
           make
  
