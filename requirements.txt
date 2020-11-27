@@ -3,3 +3,4 @@ click
 matplotlib
 pyyaml
 pandas
+setuptools
