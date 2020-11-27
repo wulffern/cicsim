@@ -32,8 +32,8 @@ jobs:
       - name: install setup
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt --user
-          pip3 install --no-deps -e  .
+          pip3 install -r requirements.txt 
+          pip3 install --no-deps   .
           cd tests/sim/BFX1_CV
           make
  
