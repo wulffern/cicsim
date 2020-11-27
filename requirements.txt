@@ -4,3 +4,4 @@ matplotlib
 pyyaml
 pandas
 wheel
+setuptools
