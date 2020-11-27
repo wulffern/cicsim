@@ -67,85 +67,61 @@ pip3 install -r requirements.txt --user
 pip3 install --no-deps -e .
 ```
 # Get started with simulation
-See tests/ for how cicsim
+See tests/sim for how cicsim
 expects the simulation directory to be layed out.
 
-### tests/cicsim.yaml
+### tests/sim/cicsim.yaml
 This is the main config file for cicsim, it sets up corners, links to cadence,
 how to find the model files etc
 
-### tests/BFX1_CV/cicsim.yaml
-This is the child config file. The general rule is, one cell, one directory with
-a cicsim.yaml file. The YAML file must contain the following:
+### tests/sim/project/spectre
+This is an example on how you can setup the model includes in spectre. Of
+course, the current setup is empty, as the foundry PDKs are under NDA. 
 
-``` yaml
-cadence:
-  library: <cadence library name>
-  cell: <cadence cell name>
-  view: <cadence view, usually schematic is the one you want>
+### tests/sim/BFX1_CV
+This directory contains an example of how you can run simulations with cicsim. If you go into
+this directory, and type
+
+``` sh
+make
 ```
 
-The `tests/BFX1_CV/cicsim.yaml' example also shows how you can add corners to
-include the spice file.
+It should try to run a simulation. 
+
+The directory contains a number of files
+
+``` yaml
+Makefile: cmake file to run the simulations
+BFX1_CV_model.scs: Simplified model of a buffer that should run without a PDK
+cicsim.yaml : This is the child config file. It contains the link to library,cell,view, and custom corners
+dut.scs: Setup of the device under test
+tran.scs: Main spectre file
+tran.ocn: Ocean script to extract results after spectre simulation
+tran.py: Python script to collate the ocean results, and anything else from the spectre simulation
+tran.md: Results from simulation
+```
+
 
 # Commands
----
-##cicsim simdir
-There are two senarios for the simulation directory creation. 
 
-1. Top level is a cadence testbench, with sources etc
-2. Top level is the circuit top level (to testbench structures)
+``` 
+Usage: cicsim [OPTIONS] COMMAND [ARGS]...
 
-If you'd like to do everything, include the testbench, in spectre, you want the
-first option. If you want to draw the testbench in cadence, choose the second
+  Custom IC Creator Simulator Tools
 
-### Barebone spectre
+  This package provides helper scripts for simulating integrated circuits in
+  Cadence Spectre
 
-Run cicsim simdir, for example
-``` sh
-cicsim simcell AGNEZA_SAR9B_GF130N SAR9B_CV schematic 
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  netlist  Netlist from a cadence library.
+  results  Summarize results of TESTBENCH
+  run      Run a simulation of TESTBENCH
+  simcell  Create a simulation directory for a cell
+  simtb    Create a simulation directory for a testbench
 ```
-
-cicsim expects to be told via the cicsim.yaml where the cadence work directory
-is via the cicsim.yaml file
-
-``` yaml
-cadence:
-  cds_dir: $PROJECT/work/wulff
-```
-
-cicsim simcell will, as of the time of writing, generate
-- Directory from cell name
-- Netlist the schematic
-- Create a dut spectre file (cell/dut.scs)
-- Create default testbench (cell/tran.scs)
-- Create default Makefile (cell/Makefile)
-- Create default YAML file (cell/cicsim.yaml)
-
-Once it's complete, you should be able to go into cell directory and run "make
-typical" and spectre will tell you what's missing
-
-### Cadence testbench
-Run cicsim simtb, for example
-``` sh
-cicsim simtb AGNEZA_SAR9B_GF130N TB_SAR9B_CV schematic
-```
-
-cicsim simtb will, as of the time of writing, generate
-- Directory from cell name
-- Netlist the schematic
-- Create default testbench (cell/tran.scs)
-- Create default Makefile (cell/Makefile)
-- Create default YAML file (cell/cicsim.yaml)
-
-Once it's complete, you should be able to go into cell directory and run "make
-typical" and spectre will tell you what's missing
-
-## cicsim netlist
-
-## cicsim run
-
-## cicsim results
 
 
 
