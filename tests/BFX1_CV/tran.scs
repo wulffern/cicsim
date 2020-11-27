@@ -32,4 +32,4 @@ include "../dut.scs"
 tran tran start=0 stop=1u
 
 
-//save A Y
+save A Y

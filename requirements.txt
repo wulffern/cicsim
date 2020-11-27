@@ -1,5 +1,4 @@
 click
 pyyaml
 pandas
-difflib
 engineering_notation

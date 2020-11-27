@@ -7,6 +7,8 @@ VIEW=Mdl
 OPT=
 
 
+all: typical results
+
 netlist:
 	cicsim netlist --top
 
