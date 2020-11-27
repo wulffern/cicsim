@@ -126,19 +126,24 @@ def results(testbench):
         cm.error("No CSV files found")
         return
 
+    #- Print each corner
+    df_all.drop(columns=["Unnamed: 0"],inplace=True)
+
+    print("# Summary")
     print("|**Parameter**|**View**|**Min** | **Typ** | **Max**|**Unit**|")
     print("|:---| :-:| :-:| :-:| :-:| :-:|")
+
     dfg = df_all.groupby(["type"])
-    for c in df.columns:
-        if(c in ["Unnamed: 0","name","type"]):
+    for c in df_all.columns:
+        if(c in ["name","type"]):
             continue
         for ind,df in dfg:
-
             print("|%s | %s|%s | %s | %s |" % (c,ind,EngNumber(df[c].min()),EngNumber(df[c].mean()),EngNumber(df[c].max())))
 
-            #if(c not in ["t_rise","t_fall"]):
-        #        continue
 
+    print("\n\n# All corners")
+    #print(dfg.describe().reset_index().to_markdown(tablefmt="github"))
+    print(df_all.to_markdown(index=False,tablefmt="github"))
 
 def simdir(library,cell,view,tb):
     """
