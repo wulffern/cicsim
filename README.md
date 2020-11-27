@@ -12,49 +12,12 @@ This is a script package I use to control spectre, it can
 - Combine results
 
  
-# Plan
-- [x] Learn how to use setup.py
-- [x] Add wrapper script for netlisting
-- [x] Add wrapper sript for generating corners based on YAML files
-- [x] Add script for simulating
-- [x] Add hooks for adding custom python output parsing
-- [x] Add hooks to run a post python script per corner
-- [x] Aggregate extracted parmeters and store in a dataframe
-- [ ] Write the scripts as easy as I can, and understandable as I can.
+# Changelog
 
-
-# Requirements:
-- Python > 3.6.6
-
-
-## Know what python you're running
-
-Python is great, however, python exists in many different versions, and you can
-never trust that the right version is installed on the system that you're going
-to use. As such, always know what you're running.
-
-### Option 1: Build yourself
-If you don't control the system, then you can still install locally
-http://thelazylog.com/install-python-as-local-user-on-linux/
-
-It's not straightforward though, and it can be a rabbit hole that takes some
-time
-
-### Option 2: Check version
-Try 
-
-  python3 --version
-
-Or
-
-  python --version 
-
-### Option 3: Set version
-Sometimes multiple versions can be installed, if so, then you can add the
-following lines to your .bashrc file
-  
-  alias python3='/usr/local/bin/python3.8'
-  alias pip3='/usr/local/bin/pip3.8'
+| Version | Status | Comment |
+|:--|:--|:--|
+|0.0.2| to be released | Probably bugfixes|
+|0.0.1| :white_check_mark: | First version of cicsim|
 
 # Install this module
 If you want to follow the latest and greatest
@@ -124,7 +87,31 @@ Commands:
 ```
 
 
+## Know what python you're running
 
+Python is great, however, python exists in many different versions, and you can
+never trust that the right version is installed on the system that you're going
+to use. As such, always know what you're running.
 
+### Option 1: Build yourself
+If you don't control the system, then you can still install locally
+http://thelazylog.com/install-python-as-local-user-on-linux/
 
+It's not straightforward though, and it can be a rabbit hole that takes some
+time
 
+### Option 2: Check version
+Try 
+
+  python3 --version
+
+Or
+
+  python --version 
+
+### Option 3: Set version
+Sometimes multiple versions can be installed, if so, then you can add the
+following lines to your .bashrc file
+  
+  alias python3='/usr/local/bin/python3.8'
+  alias pip3='/usr/local/bin/pip3.8'
