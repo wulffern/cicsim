@@ -3,4 +3,3 @@ click
 matplotlib
 pyyaml
 pandas
-engineering_notation

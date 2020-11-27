@@ -25,7 +25,7 @@
 ##  SOFTWARE.
 ##
 ######################################################################
-from engineering_notation import EngNumber
+
 import json
 import click
 import sys
@@ -138,7 +138,7 @@ def results(testbench):
         if(c in ["name","type"]):
             continue
         for ind,df in dfg:
-            print("|%s | %s|%s | %s | %s |" % (c,ind,EngNumber(df[c].min()),EngNumber(df[c].mean()),EngNumber(df[c].max())))
+            print("|%s | %s|%0.2g | %0.2g | %0.2g |" % (c,ind,df[c].min(),df[c].mean(),df[c].max()))
 
 
     print("\n\n# All corners")

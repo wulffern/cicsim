@@ -1,8 +1,8 @@
 # Summary
 |**Parameter**|**View**|**Min** | **Typ** | **Max**|**Unit**|
 |:---| :-:| :-:| :-:| :-:| :-:|
-|t_fall | Mdl|29.80p | 37.11p | 43.16p |
-|t_rise | Mdl|35.29p | 4.16n | 10.35n |
+|t_fall | Mdl|3e-11 | 3.7e-11 | 4.3e-11 |
+|t_rise | Mdl|3.5e-11 | 4.2e-09 | 1e-08 |
 
 
 # All corners
