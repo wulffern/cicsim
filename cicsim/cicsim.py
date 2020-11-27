@@ -120,6 +120,10 @@ def results(testbench):
             df["type"] = m.group(1)
         df_all = pd.concat([df,df_all])
 
+    if(df.empty):
+        cm.error("No CSV files found")
+        return
+
     print("|**Parameter**|**View**|**Min** | **Typ** | **Max**|**Unit**|")
     print("|:---| :-:| :-:| :-:| :-:| :-:|")
     dfg = df_all.groupby(["type"])
