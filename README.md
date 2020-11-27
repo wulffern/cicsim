@@ -1,6 +1,14 @@
 
 # Custom IC Creator Simulation Tools
 
+# Why
+This is a script package I use to control spectre, it can
+- Netlist from cadence
+- Run corner simulations
+- Run ocean scripts on spectre results
+- Run python scripts to combine ocean results
+- Combine results
+
  
 # Plan
 - [x] Learn how to use setup.py
@@ -14,11 +22,10 @@
 
 
 # Requirements:
-
 - Python > 3.6.6
 
 
-# Know what python you're running
+## Know what python you're running
 
 Python is great, however, python exists in many different versions, and you can
 never trust that the right version is installed on the system that you're going
@@ -47,7 +54,7 @@ following lines to your .bashrc file
   alias python3='/usr/local/bin/python3.8'
   alias pip3='/usr/local/bin/pip3.8'
 
-# Install this script
+# Install this module
 If you want to follow the latest and greatest
 ``` sh
 mkdir pro
@@ -55,7 +62,7 @@ cd pro
 git clone https://github.com/wulffern/cicsim
 cd cicsim
 pip3 install -r requirements.txt --user
-pip3 install --no-deps -e --user .
+pip3 install --no-deps -e .
 ```
 # Get started with simulation
 See tests/ for how cicsim
@@ -79,7 +86,9 @@ cadence:
 The `tests/BFX1_CV/cicsim.yaml' example also shows how you can add corners to
 include the spice file.
 
-# cicsim simdir
+# Commands
+---
+##cicsim simdir
 There are two senarios for the simulation directory creation. 
 
 1. Top level is a cadence testbench, with sources etc
@@ -88,7 +97,7 @@ There are two senarios for the simulation directory creation.
 If you'd like to do everything, include the testbench, in spectre, you want the
 first option. If you want to draw the testbench in cadence, choose the second
 
-## Barebone spectre
+### Barebone spectre
 
 Run cicsim simdir, for example
 ``` sh
@@ -114,7 +123,7 @@ cicsim simcell will, as of the time of writing, generate
 Once it's complete, you should be able to go into cell directory and run "make
 typical" and spectre will tell you what's missing
 
-## Cadence testbench
+### Cadence testbench
 Run cicsim simtb, for example
 ``` sh
 cicsim simtb AGNEZA_SAR9B_GF130N TB_SAR9B_CV schematic
@@ -130,11 +139,11 @@ cicsim simtb will, as of the time of writing, generate
 Once it's complete, you should be able to go into cell directory and run "make
 typical" and spectre will tell you what's missing
 
-# cicsim netlist
+## cicsim netlist
 
-# cicsim run
+## cicsim run
 
-# cicsim results
+## cicsim results
 
 
 
