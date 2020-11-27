@@ -1,2 +1,6 @@
 click
 pyyaml
+psf_utils
+pandas
+difflib
+engineering_notation

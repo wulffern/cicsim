@@ -27,6 +27,7 @@
 
 import re
 import json
+import difflib
 
 class SpiceParser():
 

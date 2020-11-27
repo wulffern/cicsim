@@ -1,0 +1,18 @@
+
+
+lib res
+
+section Rt
+endsection
+
+
+section Rl
+
+endsection
+
+
+section Rh
+
+endsection
+
+endlib

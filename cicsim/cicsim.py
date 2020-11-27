@@ -31,7 +31,6 @@ import click
 import sys
 import re
 import os
-import difflib
 import cicsim as cs
 import importlib
 import glob

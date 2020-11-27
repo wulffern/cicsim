@@ -1,12 +1,12 @@
 
 cadence:
-  cds_dir: $PROJECT/work/wulff
+  cds_dir: ../project/work/wulff
 
 spectre:
   options:
     -format psfxl
   includes:
-    - $PROJECT/lib/spectre
+    - ../../project/lib/spectre
 
 corner:
   Gt: |

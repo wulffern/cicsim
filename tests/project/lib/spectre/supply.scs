@@ -1,0 +1,17 @@
+
+
+lib supply
+
+section Vt
+parameters vdda=1.5 vdde = 5 vddh = 12
+endsection
+
+section Vl
+parameters vdda=1.35 vdde = 4.5 vddh = 10.8
+endsection
+
+section Vh
+parameters vdda=1.65 vdde = 4.4 vddh = 13.2
+endsection
+
+endlib

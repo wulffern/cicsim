@@ -24,7 +24,6 @@
 ##  SOFTWARE.
 ##
 ######################################################################
-from psf_utils import PSF
 import pandas as pd
 import yaml
 import sys

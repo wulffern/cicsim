@@ -1,0 +1,17 @@
+
+lib temperature
+
+section Tt
+parameters t_temp = 27
+endsection
+
+
+section Th
+parameters t_temp = 125
+endsection
+
+section Tl
+parameters t_temp = -40
+endsection
+
+endlib

@@ -1,0 +1,21 @@
+
+
+lib bjt
+
+
+
+section Bt
+
+endsection
+
+
+section Bf
+
+endsection
+
+
+section Bs
+
+endsection
+
+endlib

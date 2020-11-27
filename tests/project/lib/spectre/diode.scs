@@ -1,0 +1,21 @@
+
+
+lib diode
+
+
+
+section Dt
+
+endsection
+
+
+section Df
+
+endsection
+
+
+section Ds
+
+endsection
+
+endlib
