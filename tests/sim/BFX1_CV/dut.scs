@@ -5,49 +5,19 @@
 xdut (A AVDD AVSS BULKN BULKP Y ) BFX1_CV
 
 // Force A
-//vdc_a (A 0 ) vsource type=dc dc="0"
-//vac_a (A 0 ) vsource type=dc dc="0" mag=1
 vpulse_a (A 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
-//ia (0 A)  isource type=dc dc="0"
-//ra (A 0) resistor r=10M
-//ca (A 0) capacitor c=10f
 
 // Force AVDD
 vdc_avdd (AVDD 0 ) vsource type=dc dc=vdda
-//vac_avdd (AVDD 0 ) vsource type=dc dc="0" mag=1
-//vpulse_avdd (AVDD 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
-//iavdd (0 AVDD)  isource type=dc dc="0"
-//ravdd (AVDD 0) resistor r=10M
-//cavdd (AVDD 0) capacitor c=10f
 
 // Force AVSS
 vdc_avss (AVSS 0 ) vsource type=dc dc=0
-//vac_avss (AVSS 0 ) vsource type=dc dc="0" mag=1
-//vpulse_avss (AVSS 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
-//iavss (0 AVSS)  isource type=dc dc="0"
-//ravss (AVSS 0) resistor r=10M
-//cavss (AVSS 0) capacitor c=10f
 
 // Force BULKN
 vdc_bulkn (BULKN 0 ) vsource type=dc dc=0
-//vac_bulkn (BULKN 0 ) vsource type=dc dc="0" mag=1
-//vpulse_bulkn (BULKN 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
-//ibulkn (0 BULKN)  isource type=dc dc="0"
-//rbulkn (BULKN 0) resistor r=10M
-//cbulkn (BULKN 0) capacitor c=10f
 
 // Force BULKP
 vdc_bulkp (BULKP 0 ) vsource type=dc dc=vdda
-//vac_bulkp (BULKP 0 ) vsource type=dc dc="0" mag=1
-//vpulse_bulkp (BULKP 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
-//ibulkp (0 BULKP)  isource type=dc dc="0"
-//rbulkp (BULKP 0) resistor r=10M
-//cbulkp (BULKP 0) capacitor c=10f
 
 // Force Y
-//vdc_y (Y 0 ) vsource type=dc dc="0"
-//vac_y (Y 0 ) vsource type=dc dc="0" mag=1
-//vpulse_y (Y 0 ) vsource type=pulse val0=0 vall=vdda period=1/cfs rise=50p fall=50p width=1/cfs/2
-//iy (0 Y)  isource type=dc dc="0"
-//ry (Y 0) resistor r=10M
 cy (Y 0) capacitor c=10f

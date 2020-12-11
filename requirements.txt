@@ -3,4 +3,5 @@ click
 matplotlib
 pyyaml
 pandas
+wheel
 setuptools
