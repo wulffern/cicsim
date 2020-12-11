@@ -25,6 +25,9 @@
 ##
 ######################################################################
 
+import os
+import re
+
 
 class colors:
     '''Colors class:
@@ -66,10 +69,26 @@ class Command:
             return self.indentstr + self.getIndent(nextindent-1)
 
     def comment(self,ss,color="green"):
-        print(self.getIndent() + self.getColor(color) + ss + "\n"  + colors.reset)
+        print(self.getIndent() + self.getColor(color) + ss  + colors.reset)
 
     def warning(self,ss):
         self.comment(ss,"yellow")
 
     def error(self,ss):
-        self.comment(ss,"red")
+        ss_h = "Error(%s)" %self.__class__  + ": "
+        self.comment(ss_h + ss,"red")
+
+    def doCmd(self,cmd):
+        os.system(cmd)
+
+    def sub(self,buffer,keyval):
+        """Replace ${NAME} constructs in buffer with values from 'dict' or shell environment"""
+        for (k,v) in keyval.items():
+            buffer = re.sub('\${%s}'%k,v,buffer)
+        m = re.search('\${([^}]+)}',buffer)
+        if(m):
+            for var in m.groups():
+                val = os.getenv(var)
+                if(val):
+                    buffer = re.sub('\${%s}' %var,val,buffer)
+        return buffer

@@ -26,6 +26,8 @@
 ##
 ######################################################################
 
+import yaml
+import errno
 import json
 import click
 import sys
@@ -197,6 +199,17 @@ def netlist(library,cell,view,top):
     rc = cs.RunConfig(library,cell,view)
     rc.netlist(top=top)
 
+
+@cli.command("ip",help=cs.CmdIp.__doc__,short_help="make ip from a YAML template file")
+@click.argument("ip",required=True)
+@click.argument("template",required=True)
+@click.option("--src", default=None, help="Copy files from another IP")
+def cmd_ip(ip,template,src):
+    c_ip = cs.CmdIp(ip,template,src)
+    c_ip.run()
+
+
+    
     
 if __name__ == "__main__":
     cli()
