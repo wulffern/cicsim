@@ -6,9 +6,9 @@ name: tests/sim/BFX1_CV
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: [ main ]
+    branches: [ main develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main develop ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -37,3 +37,5 @@ jobs:
           cd tests/sim/BFX1_CV
           export PATH=/home/runner/.local/bin:$PATH
           make
+          cd ../../ip
+          cicsim ip SUN_TEST_GF130N module_template.yaml
