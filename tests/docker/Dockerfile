@@ -15,4 +15,5 @@ RUN echo "!#/bin/bash\n"
 WORKDIR /home/cicsim/tests/sim/BFX1_CV
 RUN make
 WORKDIR /home/cicsim/tests/ip/
+RUN export PROJECT=/home/cicsim/tests/ip/sun_test_gf130n
 RUN cicsim ip SUN_TEST module_template.yaml
