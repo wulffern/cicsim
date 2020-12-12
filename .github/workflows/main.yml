@@ -38,4 +38,5 @@ jobs:
           export PATH=/home/runner/.local/bin:$PATH
           make
           cd ../../ip
+          export PROJECT=`pwd`/sun_test_gf130n
           cicsim ip SUN_TEST_GF130N module_template.yaml
