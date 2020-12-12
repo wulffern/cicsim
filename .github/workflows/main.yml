@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: tests/sim/BFX1_CV
+name: tests
 
 # Controls when the action will run. 
 on:
@@ -37,3 +37,5 @@ jobs:
           cd tests/sim/BFX1_CV
           export PATH=/home/runner/.local/bin:$PATH
           make
+          cd ../../ip
+          cicsim ip SUN_TEST_GF130N module_template.yaml

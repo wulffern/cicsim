@@ -185,4 +185,4 @@ do:
   - cd sim/SUN_TEST; cicsim results tran
 
 echo: |
-   Remember to change your PROJECT variable, and re-source your .bashrc file
+   So long, and thanks for all the fish.
