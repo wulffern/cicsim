@@ -17,7 +17,7 @@ create:
     INCLUDE $PROJECT/lib/virtuoso/cds.lib
   sim/cicsim.yaml: |
     cadence:
-      cds_dir: $PROJECT/work/wulff
+      cds_dir: $PROJECT/work/${USER}
 
     spectre:
       options:
