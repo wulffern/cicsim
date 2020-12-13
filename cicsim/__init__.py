@@ -1,8 +1,13 @@
-from .spectrewriter import *
+#from .spectrewriter import *
 from .spiceparser import *
-from .command import *
-from .runconf import *
-from .template_make import *
+
 from .simcalc import *
-from .cmdip import *
+
+#- Commands
+from .commands.command import *
+from .cdsconf import *
+from .commands.cmdip import *
+from .commands.cmdresults import *
+from .commands.cmdsimdir import *
+from .commands.cmdrun import *
 from cicsim import *

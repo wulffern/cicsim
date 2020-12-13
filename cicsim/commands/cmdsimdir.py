@@ -1,7 +1,7 @@
 ######################################################################
 ##        Copyright (c) 2020 Carsten Wulff Software, Norway
 ## ###################################################################
-## Created       : wulff at 2020-10-16
+## Created       : wulff at 2020-12-13
 ## ###################################################################
 ##  The MIT License (MIT)
 ##
@@ -25,40 +25,54 @@
 ##
 ######################################################################
 
+import cicsim as cs
 import os
-import re
-
-class SpectreWriter:
-
-    def __init__(self,simconf=None):
-        self.simconf = simconf
-        self.simdir = None
-        self.simfile = None
-
-    def run(self):
-        os.system(f"""cd {self.simdir};spectre {self.simfile}  +escchars +log spectre.out -raw psf -format psfascii""")
-
-    def write(self):
-
-        with open(self.simconf.filename,"w") as fo:
-            self.fo = fo
-            
-            self.addHeader("DEVICE UNDER TEST")
-
-            self.simconf.writeSubckt(self)
-
-            self.simconf.writePorts(self)
-
-    def addParam(self,key,val):
-        self.fo.write(f"parameters {key}={val}\n")
+import yaml
 
 
-    def addInclude(self,spicefile):
-        self.fo.write(f"include \"{spicefile}\"\n")
 
 
-    def addComment(self,ss):
-        self.fo.write(f"// {ss}\n")
+class CmdSimDir(cs.CdsConfig):
+    """ Create a simulation directory
+    """
+
+    def __init__(self,library,cell,view,isTestbench=False):
+        self.isTestbench = isTestbench
+        super().__init__(library,cell,view)
+
+    def dut(self,spicefile=None,subckt=None):
+        sp = cs.SpiceParser()
+        if(not spicefile or not subckt):
+            spicefile = self.netlistname
+            subckt = self.cell
+        ports = sp.fastGetPortsFromFile(spicefile,subckt)
+        #sw = cs.SpectreWriter()
+        self.writeSpectreDutfile("dut.scs",subckt,ports)
+
+    def makeDirectory(self):
+
+        if(os.path.exists(self.cell)):
+            self.cm.error(f"I refuse to override the simulation directory '{self.cell}'. You should delete it.\nIf you'r trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
+            return False
+
+        os.makedirs(self.cell)
+
+        d = {
+            "cadence":{
+                "library": self.library,
+                "cell" : self.cell,
+                "view" : self.view,
+            },
+            "corner":{
+                "Sch": f"""include "../{self.cell}_{self.view}.scs"\n"""
+
+            }
+        }
+        with open(self.cell + os.path.sep + "cicsim.yaml","w") as fo:
+            yaml.dump(d,fo)
+        return True
+
+
 
     def addHeader(self,name):
         self.fo.write(f"""
@@ -66,62 +80,10 @@ class SpectreWriter:
 // {name}
 //-----------------------------------------------------------------
 """)
-
-    def addLine(self):
-        self.fo.write("\n")
-
-    def addForceComment(self,condition,ss):
-
-        if(condition):
-            self.fo.write( ss)
-        else:
-            self.fo.write("//" +ss)
-
         
-    def addForce(self,ftype,name,val):
-        self.addForceComment(ftype == "vdc",f"v{name.lower()} ({name} 0) vsource type=dc dc={val} \n")
-        self.addForceComment(ftype == "idc",f"i{name.lower()} (0 {name}) isource type=dc dc={val} \n")
-        self.addForceComment(ftype == "resistance",f"r{name.lower()} ({name} 0) resistor r={val} \n")
-        self.addForceComment(ftype == "capacitance",f"c{name.lower()} ({name} 0) capacitor c={val} \n")
-
-        
-    def addSubckt(self,subckt,nodes):
-        self.fo.write("xdut (" +" ".join(nodes) +  f") {subckt}\n")
-
     def writeSpectreDutfile(self,spicefile,subckt,ports):
 
-        stf = spectreForceTemplate
-
-        with open(spicefile,"w") as fo:
-            self.fo = fo
-            self.addHeader("DEVICE UNDER TEST")
-
-            self.addSubckt(subckt,ports)
-
-            for p in ports:
-                if(not p):
-                    continue
-                s = stf.replace("{name}",p).replace("{lname}",p.lower())
-                self.fo.write(s)
-            
-
-def writeSpectreTestbench(filename,tb=False):
-
-        stb = spectreTbTemplate
-
-
-        stb = stb.replace("{name}",filename.replace(".scs",""))
-
-        if(tb):
-            stb = stb.replace("{top}","")
-        else:
-            stb = stb.replace("{top}","include \"../dut.scs\"")
-
-        with open(filename,"w") as fo:
-            print(stb,file=fo)
-
-
-spectreForceTemplate="""
+        stf = """
 // Force {name}
 //vdc_{lname} ({name} 0 ) vsource type=dc dc=0
 //vac_{lname} ({name} 0 ) vsource type=dc dc=0 mag=1
@@ -131,7 +93,23 @@ spectreForceTemplate="""
 //c{lname} ({name} 0) capacitor c=10f
 """
 
-spectreTbTemplate="""
+        with open(spicefile,"w") as fo:
+            self.fo = fo
+            self.addHeader("DEVICE UNDER TEST")
+
+            
+            self.fo.write("xdut (" +" ".join(ports) +  f") {subckt}\n")
+
+            for p in ports:
+                if(not p):
+                    continue
+                s = stf.replace("{name}",p).replace("{lname}",p.lower())
+                self.fo.write(s)
+
+
+    def writeSpectreTestbench(self,filename,tb=False):
+
+        stb = """
 
 //-----------------------------------------------------------------
 // OPTIONS
@@ -140,7 +118,7 @@ spectreTbTemplate="""
 global 0
 
 simulatorOptions options reltol=1e-6 vabstol=1e-6 save=selected \\
-iabstol=1e-12 gmin=1e-15 redefinedparams=warning digits=7 cols=80 \\ 
+iabstol=1e-12 gmin=1e-15 redefinedparams=warning digits=7 cols=80 \\
 pivrel=1e-3  checklimitdest=both
 
 //-----------------------------------------------------------------
@@ -163,3 +141,44 @@ pivrel=1e-3  checklimitdest=both
 //-----------------------------------------------------------------
 tran tran start=0 stop=1u
 """
+
+
+        stb = stb.replace("{name}",filename.replace(".scs",""))
+
+        if(tb):
+            stb = stb.replace("{top}","")
+        else:
+            stb = stb.replace("{top}","include \"../dut.scs\"")
+
+        with open(filename,"w") as fo:
+            print(stb,file=fo)
+
+    def run(self):
+        if(self.makeDirectory()):
+            os.chdir(self.cell)
+            self.netlist(top=(not self.isTestbench))
+            if(not self.isTestbench):
+                self.dut()
+            self.writeSpectreTestbench("tran.scs",tb=self.isTestbench)
+            with open("Makefile","w") as fo:
+                fo.write("""
+TB=tran
+VIEW=Sch
+#VIEW=Lay
+
+netlist:
+	cicsim netlist --top
+
+typical:
+	cicsim run ${TB} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bt
+
+slow:
+	cicsim run ${TB} ${VIEW} Gt Mss Rh Ch Bf Df "Th,Tl" Vl
+
+fast:
+	cicsim run ${TB} ${VIEW} Gt Mff Rl Cl Bs Ds "Th,Tl" Vh
+
+tfs:
+	${MAKE} typical slow fast
+
+""")
