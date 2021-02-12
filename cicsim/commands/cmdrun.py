@@ -32,7 +32,8 @@ import os
 import errno
 import yaml
 import shutil as sh
-
+import sys
+import importlib
 
 class CmdRun(cs.CdsConfig):
     """ Create a simulation directory
@@ -118,14 +119,16 @@ class CmdRun(cs.CdsConfig):
             if(os.path.exists(ocnscript) and self.ocn):
                 ocnfo = fname + ".ocn"
                 resultsDir = os.getcwd() + os.path.sep+ fname + ".psf"
-                resultsFile = os.getcwd() + os.path.sep+ fname + ".yaml"
+                resultsFileName = os.getcwd() + os.path.sep+ fname
+                resultsFile = resultsFileName + ".yaml"
+
 
                 with open(ocnscript,"r") as fi:
                     buffer = fi.read()
-                    buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\n" + buffer
+                    buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\ncicResultsFileName = \"{resultsFileName}\"\n" + buffer
                 with open(ocnfo,"w") as fo:
                     fo.write(buffer)
-                os.system(f"ocean -nograph -replay {ocnfo}")
+                os.system(f"ocean -nograph -replay {ocnfo} -log {ocnfo}.log")
             else:
                 self.warning(f" {ocnscript} not found")
 
