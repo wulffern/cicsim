@@ -124,11 +124,32 @@ class CmdRun(cs.CdsConfig):
 
 
                 with open(ocnscript,"r") as fi:
-                    buffer = fi.read()
+                    buffer = ""
+                    yamlprint = list()
+                    for line in fi:
+                        m = re.search(";\s*yamlprint\s(.*)$",line)
+                        if(m):
+                            ll = re.split("\s*,\s*",m.group(1))
+                            for l in ll:
+                                yamlprint.append(l)
+                        buffer += line
+
+                    buffer += "fo = outfile(cicResultsFile)\n"
+                    yamlprint.sort()
+                    for yvar in yamlprint:
+                        buffer += f"ocnPrint(?output fo ?numberNotation \"scientific\"  ?numSpaces 0 \"{yvar}: \" {yvar})\n"
+                    buffer += "close(fo)\n"
+                    
                     buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\ncicResultsFileName = \"{resultsFileName}\"\n" + buffer
                 with open(ocnfo,"w") as fo:
                     fo.write(buffer)
                 os.system(f"ocean -nograph -replay {ocnfo} -log {ocnfo}.log")
+                if(os.path.exists(resultsFile)):
+                    with open(resultsFile,"r") as fi:
+                        obj = yaml.safe_load(fi)
+                    print(yaml.dump(obj))
+
+
             else:
                 self.warning(f" {ocnscript} not found")
 
