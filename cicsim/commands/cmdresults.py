@@ -36,6 +36,7 @@ import glob
 import pandas as pd
 import numpy as np
 import time
+import json
 
 class SpecMinMax:
 
@@ -45,6 +46,7 @@ class SpecMinMax:
         self.max = None
         self.unit = "V"
         self.scale = 1
+        self.digits = 2
         self.sources = list()
 
         if(obj):
@@ -55,16 +57,25 @@ class SpecMinMax:
                 else:
                     self.sources.append(obj["src"])
             if("min" in obj):
-                self.min = eval(obj["min"])
+                if(type(obj["min"]) is str):
+                    self.min = eval(obj["min"])
+                else:
+                    self.min = obj["min"]
 
             if("max" in obj):
-                self.max = eval(obj["max"])
+                if(type(obj["max"]) is str):
+                    self.max = eval(obj["max"])
+                else:
+                    self.max = obj["max"]
             if("scale" in obj):
                 self.scale = float(obj["scale"])
             if("unit" in obj):
                 self.unit = obj["unit"]
+            if("digits" in obj):
+                self.digits = obj["digits"]
 
-    def format(self,ser):
+
+    def css(self,ser):
 
         css = list()
         for v in ser:
@@ -79,6 +90,10 @@ class SpecMinMax:
                 css.append('')
         return css
 
+
+    def format(self):
+        return "{0:.%df} %s" % (self.digits,self.unit)
+    
     def applyScale(self,s):
 
         return s*self.scale
@@ -106,9 +121,9 @@ class Specification(dict):
                             self.sources.append(s)
                             self[s] = self[k]
 
-    def format(self,s):
+    def css(self,s):
         if(s.name in self):
-            return self[s.name].format(s)
+            return self[s.name].css(s)
         else:
             return ['' for v in s]
 
@@ -118,6 +133,13 @@ class Specification(dict):
             return self[s.name].applyScale(s)
         else:
             return s
+
+    def format_dict(self):
+
+        d = dict()
+        for s,v in self.items():
+            d[s] = v.format()
+        return d
 
 
 
@@ -154,9 +176,12 @@ class CmdResults(cs.Command):
     def printFails(self,specs,df):
         df = df[specs.sources + ["name","type","time"]]
         df.reset_index(inplace=True)
-        #df = df[not "index"]
+        #df = df[not "Index"]
         df = df.apply(specs.scale)
-        st = df.style.apply(specs.format)
+        st = df.style.format(specs.format_dict()).apply(specs.css)
+
+        if(not os.path.exists("results")):
+            os.mkdir("results")
 
         text_file = open(f"results/{self.testbench}.html", "w")
         text_file.write(self.header)
@@ -166,8 +191,7 @@ class CmdResults(cs.Command):
         text_file.close()
 
 
-
-    def run(self):
+    def readCsv(self):
         files = glob.glob(f"output_{self.testbench}/{self.testbench}_*.csv")
         df_all = pd.DataFrame()
         for f in files:
@@ -182,11 +206,42 @@ class CmdResults(cs.Command):
             df_all = pd.concat([df,df_all])
 
         if(df_all.empty):
-            self.error("No CSV files found")
-            return
+            self.warning("No CSV files found")
+            return None
 
         #- Print each corner
         df_all.drop(columns=["Unnamed: 0"],inplace=True)
+        return df_all
+
+    def readYaml(self):
+        files = glob.glob(f"output_{self.testbench}/{self.testbench}_*.yaml")
+        df_all = pd.DataFrame()
+        for f in files:
+            with open(f) as yaml_file:
+                yaml_contents = yaml.safe_load(yaml_file)
+            df = pd.json_normalize(yaml_contents)
+            name = os.path.basename(f).replace(".*_","").replace(".csv","")
+            df["name"] = name
+            (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(f)
+            df["time"] = time.ctime(mtime)
+            m = re.search("([A-Z]+[a-z]+)[A-Z]",name)
+            if(m):
+                df["type"] = m.group(1)
+            df_all = pd.concat([df,df_all])
+
+        if(df_all.empty):
+            self.error("No YAML files found either")
+            return None
+        return df_all
+
+
+
+
+    def run(self):
+        df_all = self.readCsv()
+        if(df_all is None):
+            df_all = self.readYaml()
+
 
         specs = Specification(self.testbench)
 

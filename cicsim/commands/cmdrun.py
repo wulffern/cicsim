@@ -97,10 +97,13 @@ class CmdRun(cs.CdsConfig):
 
         permutations = self.getPermutations(self.corners)
 
+        oceanRunLater = list()
+        pyRunLater = list()
+
         for p in permutations:
             fname = f"output_{self.testbench}" + os.path.sep + self.testbench +  "_"+ "".join(p)
             path = fname + ".scs"
-            self.comment(f"Running results {path}")
+            self.comment(f"Running  {path}")
             simOk = True
             if(self.runsim):
                 self.makeSpectreFile(filename,p,path)
@@ -112,7 +115,7 @@ class CmdRun(cs.CdsConfig):
                 self.error("Simulation failed ")
                 continue
 
-            self.comment(f"Parsing results {fname}")
+
 
             #- Run ocean post parsing if it exists
             ocnscript = self.testbench + ".ocn"
@@ -143,21 +146,38 @@ class CmdRun(cs.CdsConfig):
                     buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\ncicResultsFileName = \"{resultsFileName}\"\n" + buffer
                 with open(ocnfo,"w") as fo:
                     fo.write(buffer)
-                os.system(f"ocean -nograph -replay {ocnfo} -log {ocnfo}.log")
-                if(os.path.exists(resultsFile)):
-                    with open(resultsFile,"r") as fi:
-                        obj = yaml.safe_load(fi)
-                    print(yaml.dump(obj))
 
-
-            else:
-                self.warning(f" {ocnscript} not found")
+                oceanRunLater.append(ocnfo)
 
             #- Run python post parsing if it exists
             pyscript = self.testbench + ".py"
             if(os.path.exists(pyscript)):
-                sys.path.append(os.getcwd())
-                tb = importlib.import_module(self.testbench)
-                tb.main(fname)
-            else:
-                self.warning(f" {pyscript} not found")
+                pythonRunLater.append(fname)
+
+        #- Run oceanscripts
+
+
+
+        if(len(oceanRunLater) == 1 and self.ocn):
+            ocnfo = oceanRunLater[0]
+            self.comment(f"Running ocean {ocnfo}")
+            os.system(f"ocean -nograph -replay {ocnfo} -log {ocnfo}.log")
+        elif(len(oceanRunLater) > 1 and self.ocn):
+            buff = ""
+            for focn in oceanRunLater:
+                buff += f"load(\"{focn}\")\n"
+            focean_all = f"output_{self.testbench}" + os.path.sep + self.testbench + "_" + self.getShortName(self.corners) + ".ocn"
+
+            with open(focean_all,"w") as fo:
+                fo.write(buff)
+            self.comment(f"Running ocean {focean_all}")
+            os.system(f"ocean -nograph -replay {focean_all} -log {focean_all}.log")
+
+
+        #- Run python
+        if(len(pyRunLater) > 0):
+            sys.path.append(os.getcwd())
+            tb = importlib.import_module(self.testbench)
+            for perm in pythonRunLater:
+                self.comment(f"Running {self.testbench}.py with {perm}")
+                tb.main(perm)
