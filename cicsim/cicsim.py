@@ -38,6 +38,12 @@ import importlib
 import glob
 import pandas as pd
 
+
+#- Few words on the coding in this file:
+# 1. I use click, its really nice, just google "python click"
+# 2. I try the design pattern "one command, one file in commands/* that inherits commands/command.py".
+#    That's why it's instanciating a class below and doing <obj>.run()
+
 @click.group()
 def cli():
     """Custom IC Creator Simulator Tools
@@ -55,111 +61,17 @@ def cli():
 def run(testbench,oformat,run,ocn,corner):
     """Run a simulation of TESTBENCH
     """
+    r = cs.CmdRun(testbench,oformat,run,ocn,corner)
+    r.run()
 
-    cm = cs.Command()
-    filename = testbench + ".scs"
-    if(not os.path.exists(filename)):
-        cm.error("Testbench '{filename}' does not exists in this folder")
-        return
-    rc = cs.RunConfig()
-
-    permutations = rc.getPermutations(corner)
-
-    for p in permutations:
-        fname = f"output_{testbench}" + os.path.sep + testbench +  "_"+ "".join(p)
-        path = fname + ".scs"
-        cm.comment(f"Running results {path}")
-        simOk = True
-        if(run):
-            rc.makeSpectreFile(filename,p,path)
-            cm.comment(f"Running {p}")
-            if( rc.run() > 0):
-                simOk = False
-
-        if(not simOk):
-            cm.error("Simulation failed ")
-            continue
-
-        cm.comment(f"Parsing results {fname}")
-
-        #- Run ocean post parsing if it exists
-        ocnscript = testbench + ".ocn"
-        if(os.path.exists(ocnscript) and ocn):
-            ocnfo = fname + ".ocn"
-            resultsDir = os.getcwd() + os.path.sep+ fname + ".psf"
-            resultsFile = os.getcwd() + os.path.sep+ fname + ".yaml"
-
-            with open(ocnscript,"r") as fi:
-                buffer = fi.read()
-                buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\n" + buffer
-            with open(ocnfo,"w") as fo:
-                fo.write(buffer)
-            os.system(f"ocean -nograph -replay {ocnfo}")
-        else:
-            cm.warning(f" {ocnscript} not found")
-
-        #- Run python post parsing if it exists
-        pyscript = testbench + ".py"
-        if(os.path.exists(pyscript)):
-            sys.path.append(os.getcwd())
-            tb = importlib.import_module(testbench)
-            tb.main(fname)
-        else:
-            cm.warning(f" {pyscript} not found")
 
 @cli.command()
 @click.argument("testbench")
 def results(testbench):
     """Summarize results of TESTBENCH
     """
-    cm = cs.Command()
-    files = glob.glob(f"output_{testbench}/{testbench}_*.csv")
-    df_all = pd.DataFrame()
-    for f in files:
-        df = pd.read_csv(f)
-        name = os.path.basename(f).replace("tran_","").replace(".csv","")
-        df["name"] = name
-        m = re.search("([A-Z]+[a-z]+)[A-Z]",name)
-        if(m):
-            df["type"] = m.group(1)
-        df_all = pd.concat([df,df_all])
-
-    if(df_all.empty):
-        cm.error("No CSV files found")
-        return
-
-    #- Print each corner
-    df_all.drop(columns=["Unnamed: 0"],inplace=True)
-
-    print("# Summary")
-    print("|**Parameter**|**View**|**Min** | **Typ** | **Max**|**Unit**|")
-    print("|:---| :-:| :-:| :-:| :-:| :-:|")
-
-    dfg = df_all.groupby(["type"])
-    for c in df_all.columns:
-        if(c in ["name","type"]):
-            continue
-        for ind,df in dfg:
-            print("|%s | %s|%0.2g | %0.2g | %0.2g |" % (c,ind,df[c].min(),df[c].mean(),df[c].max()))
-
-
-    print("\n\n# All corners")
-    #print(dfg.describe().reset_index().to_markdown(tablefmt="github"))
-    print(df_all.to_markdown(index=False,tablefmt="github"))
-
-def simdir(library,cell,view,tb):
-    """
-    Create a simulation directory
-    """
-    rc = cs.RunConfig(library,cell,view)
-    if(rc.makeDirectory()):
-        os.chdir(cell)
-        rc.netlist(top=(not tb))
-        if(not tb):
-            rc.dut()
-        cs.writeSpectreTestbench("tran.scs",tb=tb)
-        with open("Makefile","w") as fo:
-            fo.write(cs.template_make)
+    r = cs.CmdResults(testbench)
+    r.run()
 
 @cli.command()
 @click.argument("library",required=False)
@@ -168,7 +80,8 @@ def simdir(library,cell,view,tb):
 def simtb(library,cell,view):
     """Create a simulation directory for a testbench
     """
-    simdir(library,cell,view,True)
+    simdir = cs.CmdSimDir(library,cell,view,True)
+    simdir.run()
 
 @cli.command()
 @click.argument("library",required=False)
@@ -177,8 +90,8 @@ def simtb(library,cell,view):
 def simcell(library,cell,view):
     """Create a simulation directory for a Cell
     """
-    simdir(library,cell,view,False)
-
+    simdir = cs.CmdSimDir(library,cell,view,False)
+    simdir.run()
 
 @cli.command()
 @click.argument("library",required=False)
@@ -196,9 +109,8 @@ def netlist(library,cell,view,top):
     or, you can specify on the commandline.
 
     """
-    rc = cs.RunConfig(library,cell,view)
-    rc.netlist(top=top)
-
+    cds = cs.CdsConfig(library,cell,view)
+    cds.netlist(top=top)
 
 @cli.command("ip",help=cs.CmdIp.__doc__,short_help="make ip from a YAML template file")
 @click.argument("ip",required=True)
@@ -207,8 +119,6 @@ def netlist(library,cell,view,top):
 def cmd_ip(ip,template,src):
     c_ip = cs.CmdIp(ip,template,src)
     c_ip.run()
-
-
     
     
 if __name__ == "__main__":

@@ -31,7 +31,7 @@ import cicsim as cs
 
 rcfg = "cicsim.yaml"
 
-class RunConfig:
+class CdsConfig(cs.Command):
 
     def __init__(self,library=None,cell=None,view=None):
         self.config = None
@@ -56,28 +56,25 @@ class RunConfig:
             self.cadence["cell"] = cell
         if(view):
             self.cadence["view"] = view
-        
-    def Library(self):
+
+        super().__init__()
+
+    @property
+    def library(self):
         return self.getCadence("library")
-    def Cell(self):
+    @property
+    def cell(self):
         return self.getCadence("cell")
-    def View(self):
+    @property
+    def view(self):
         return self.getCadence("view")
-    def NetlistName(self):
-        return self.Cell() + "_" + self.View() + ".scs"
-    def CdsDir(self):
+
+    @property
+    def netlistname(self):
+        return self.cell + "_" + self.view + ".scs"
+    @property
+    def cdsdir(self):
         return os.path.expandvars(self.getCadence("cds_dir"))
-
-    def dut(self,spicefile=None,subckt=None):
-        sp = cs.SpiceParser()
-        if(not spicefile or not subckt):
-            spicefile = self.NetlistName()
-            subckt = self.Cell()
-        ports = sp.fastGetPortsFromFile(spicefile,subckt)
-        sw = cs.SpectreWriter()
-        sw.writeSpectreDutfile("dut.scs",subckt,ports)
-
-
 
 
     def merge(self,dest,source):
@@ -102,7 +99,6 @@ class RunConfig:
         return dest
 
         
-
     def readYamlConfig(self,filename):
 
         if(os.path.exists(filename)):
@@ -122,57 +118,30 @@ class RunConfig:
             self.cm.error(f"Could not find config file '{filename}'")
 
     def makeDirectory(self):
-        library = self.Library()
-        cell = self.Cell()
-        view = self.View()
-        cds_dir = self.CdsDir()
         
-        if(os.path.exists(cell)):
-            self.cm.error(f"I refuse to override the simulation directory '{cell}'. You should delete it.\nIf you'r trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
+        if(os.path.exists(self.cell)):
+            self.cm.error(f"I refuse to override the simulation directory '{self.cell}'. You should delete it.\nIf you'r trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
             return False
 
-        os.makedirs(cell)
+        os.makedirs(self.cell)
 
         d = {
             "cadence":{
-                "library": library,
-                "cell" : cell,
-                "view" : view,
+                "library": self.library,
+                "cell" : self.cell,
+                "view" : self.view,
             },
             "corner":{
-                "Sch": f"""include "../{cell}_{view}.scs"\n"""
+                "Sch": f"""include "../{self.cell}_{self.view}.scs"\n"""
 
             }
         }
-        with open(cell + os.path.sep + "cicsim.yaml","w") as fo:
+        with open(self.cell + os.path.sep + "cicsim.yaml","w") as fo:
             yaml.dump(d,fo)
         return True
 
 
-    def makeSpectreFile(self,fsource,corner,fdest):
 
-        ss = ""
-        if("corner" in self.config):
-            for c in corner:
-                if(c in self.config["corner"]):
-                    ss += self.config["corner"][c] + "\n"
-                else:
-                    ss += "#define " + c.upper() + "\n"
-
-        dirn = os.path.dirname(fdest)
-
-        self.rundir = dirn
-        self.fname = os.path.basename(fdest)
-        self.fdest = fdest
-        self.fsource = fsource
-        os.makedirs(dirn,exist_ok=True)
-
-        with open(fdest,"w") as fo:
-            print("cicsimgen" + fsource.replace(".scs",""),file=fo)
-            print("parameters tbname=\"" + os.path.basename(fdest).replace(".scs","") + "\" ",file=fo)
-            print(ss,file=fo)
-            with open(fsource,"r") as fi:
-                print(fi.read(),file=fo)
 
 
     def getCadence(self,key):
@@ -181,6 +150,14 @@ class RunConfig:
         else:
             self.cm.error(f"Argument cadence->{key} is not specified, specify either on command line or in config file")
 
+
+    def getShortName(self,corner):
+
+        sname = ""
+        for c in corner:
+            c = c.replace(",","")
+            sname += c
+        return sname
 
     def getPermutations(self,corner):
         data = []
@@ -210,13 +187,10 @@ class RunConfig:
     
 
     def netlist(self,top=True):
-        library = self.Library()
-        cell = self.Cell()
-        view = self.View()
-        cds_dir = self.CdsDir()
+        
         curdir = os.getcwd()
 
-        if(library is None or cell is None or view is None or cds_dir is None):
+        if(self.library is None or self.cell is None or self.view is None or self.cdsdir is None):
             return
 
         topsubckt = ""
@@ -226,37 +200,18 @@ class RunConfig:
         scr = f"""
 envSetVal("asimenv.startup" "projectDir" `string "{curdir}")
 simulator('spectre)
-design("{library}" "{cell}" "{view}")
+design("{self.library}" "{self.cell}" "{self.view}")
 {topsubckt}
 createNetlist(?recreateAll t ?display nil)
 exit()
         """
 
-
-
-        with open(cds_dir + os.path.sep + "netlist.ocean","w") as fo:
+        with open(self.cdsdir + os.path.sep + "netlist.ocean","w") as fo:
             fo.write(scr)
 
 
-        os.system(f"cd {cds_dir};ocean  < netlist.ocean")
-        fname = self.NetlistName()
+        os.system(f"cd {self.cdsdir};ocean  < netlist.ocean")
+        fname = self.netlistname
 
         if(not os.path.exists(fname)):
-            os.system(f"ln -s {cell}/spectre/{view}/netlist/netlist {fname}")
-
-
-    def run(self):
-
-        options = ""
-        includes = ""
-        if("spectre" in self.config):
-            if("options" in self.config["spectre"]):
-                options = self.config["spectre"]["options"]
-            if("includes" in self.config["spectre"]):
-                for I in self.config["spectre"]["includes"]:
-                    includes += " -I" + I
-
-        cmd = f"spectre  {options} {includes}  -E -raw " + self.fname.replace(".scs",".psf") + f" {self.fname}"
-        cm = cs.Command()
-        cm.comment(cmd)
-        return os.system(f"cd {self.rundir}; {cmd}")
+            os.system(f"ln -s {self.cell}/spectre/{self.view}/netlist/netlist {fname}")
