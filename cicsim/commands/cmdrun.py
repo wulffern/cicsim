@@ -45,6 +45,30 @@ class CmdRun(cs.CdsConfig):
         self.runsim = runsim
         self.ocn = ocn
         self.corners = corners
+
+        self.runObjFile = """
+HEADER
+"PSFversion" "1.00"
+"Run Generator" "drlRun rev. 1.0"
+TYPE
+"runObject" STRUCT(
+"logName" ARRAY( * ) STRING *
+"parent" STRING *
+"sweepVariable" ARRAY( * ) STRING *
+) PROP( "key" "runObject" )
+VALUE
+"Run1" "runObject" (
+(
+"logFile"
+"artistLogFile"
+"matlabLogFile"
+)
+""
+()
+)
+END
+        """
+
         super().__init__()
 
 
@@ -57,6 +81,15 @@ class CmdRun(cs.CdsConfig):
             if("includes" in self.config["spectre"]):
                 for I in self.config["spectre"]["includes"]:
                     includes += " -I" + I
+
+        psf = self.fname.replace(".scs",".psf")
+        psf = self.rundir + os.path.sep +psf
+        if(not os.path.exists(psf)):
+            os.mkdir(psf)
+
+        with open(psf + os.path.sep + "runObjFile","w") as fo:
+            fo.write(self.runObjFile)
+
 
         cmd = f"spectre  {options} {includes}  -E -raw " + self.fname.replace(".scs",".psf") + f" {self.fname}"
         
@@ -130,6 +163,9 @@ class CmdRun(cs.CdsConfig):
                     buffer = ""
                     yamlprint = list()
                     for line in fi:
+
+                        line = re.sub("\?result",f" ?resultsDir cicResultsDir ?result",line)
+
                         m = re.search(";\s*yamlprint\s(.*)$",line)
                         if(m):
                             ll = re.split("\s*,\s*",m.group(1))
