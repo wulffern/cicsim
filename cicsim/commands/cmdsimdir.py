@@ -159,8 +159,12 @@ tran tran start=0 stop=1u
         if(self.makeDirectory()):
             os.chdir(self.cell)
             self.netlist(top=(not self.isTestbench))
+            netlistTop = "--no-top"
             if(not self.isTestbench):
                 self.dut()
+                netlistTop ="--top"
+
+
             self.writeSpectreTestbench("tran.scs",tb=self.isTestbench)
             with open("Makefile","w") as fo:
                 fo.write("""
@@ -169,7 +173,7 @@ VIEW=Sch
 #VIEW=Lay
 
 netlist:
-	cicsim netlist --top
+	cicsim netlist %s
 
 typical:
 	cicsim run ${TB} ${OPT} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bt
@@ -183,4 +187,4 @@ fast:
 tfs:
 	${MAKE} typical slow fast
 
-""")
+""" % (netlistTop))

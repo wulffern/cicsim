@@ -119,7 +119,13 @@ def netlist(library,cell,view,top):
 def cmd_ip(ip,template,src):
     c_ip = cs.CmdIp(ip,template,src)
     c_ip.run()
-    
+
+@cli.command("spider",help=cs.CmdSpider.__doc__,short_help="Make spider plot from Assembler csv file")
+@click.argument("csvfile",required=True)
+def cmd_ip(csvfile):
+    c = cs.CmdSpider(csvfile)
+    c.run()
+
     
 if __name__ == "__main__":
     cli()

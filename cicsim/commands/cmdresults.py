@@ -46,6 +46,7 @@ class SpecMinMax:
         self.max = None
         self.unit = "V"
         self.scale = 1
+        self.typ = 0
         self.digits = 2
         self.sources = list()
 
@@ -56,15 +57,29 @@ class SpecMinMax:
                         self.sources.append(s)
                 else:
                     self.sources.append(obj["src"])
+            if("typ" in obj):
+                if(type(obj["typ"]) is str):
+                    self.typ = eval(obj["typ"])
+                else:
+                    self.typ = obj["typ"]
+
             if("min" in obj):
                 if(type(obj["min"]) is str):
-                    self.min = eval(obj["min"])
+                    s  = obj["min"]
+                    if("%" in s):
+                        self.min = self.typ*(1 + float(s.replace("%",""))/100)
+                    else:
+                        self.min = eval(s)
                 else:
                     self.min = obj["min"]
 
             if("max" in obj):
                 if(type(obj["max"]) is str):
-                    self.max = eval(obj["max"])
+                    s  = obj["max"]
+                    if("%" in s):
+                        self.max = self.typ*(1 + float(s.replace("%",""))/100)
+                    else:
+                        self.max = eval(s)
                 else:
                     self.max = obj["max"]
             if("scale" in obj):
@@ -74,18 +89,15 @@ class SpecMinMax:
             if("digits" in obj):
                 self.digits = obj["digits"]
 
+            #print(self.min,self.typ,self.max)
+
 
     def css(self,ser):
 
         css = list()
         for v in ser:
-#            print(v)
-#            print(self.max)
-#               print(self.min)
             if(v > self.max or v < self.min):
                 css.append('background-color:lightcoral')
-            #elif(np.abs(v-self.max)/self.max > 0.1  or np.abs(v-self.min)/self.min > 0.1):
-            #    css.append('background-color:red')
             else:
                 css.append('')
         return css
@@ -97,7 +109,13 @@ class SpecMinMax:
     def applyScale(self,s):
 
         return s*self.scale
-
+    def OK(self,v):
+        if(v > self.max or v < self.min):
+            return False
+        else:
+            return True
+    def string(self,v):
+        return str.format(self.format(),v)
 
 
 
@@ -129,10 +147,19 @@ class Specification(dict):
 
     def scale(self,s):
         if(s.name in self):
-
             return self[s.name].applyScale(s)
         else:
             return s
+
+    def OK(self,s):
+        isOk = True
+        for field in s.index:
+
+            if(field in self):
+                isOk &= self[field].OK(s[field])
+        return isOk
+        #return isOk
+
 
     def format_dict(self):
 
@@ -150,17 +177,26 @@ class CmdResults(cs.Command):
         self.testbench = testbench
         super().__init__()
 
-    def summaryToMarkdown(self,df_all):
-        print("# Summary")
-        print("|**Parameter**|**View**|**Min** | **Typ** | **Max**|**Unit**|")
-        print("|:---| :-:| :-:| :-:| :-:| :-:|")
+    def summaryToMarkdown(self,specs,df_all):
+        with open(f"results/{self.testbench}.md","w") as fo:
+            fo.write(f"# Summary {self.testbench}\n\n")
+            fo.write(f"For details see <a href='{self.testbench}.html'>{self.testbench}.html</a>\n\n")
+            fo.write("|**Parameter**|**View**|**Min** | **Typ** | **Max**|\n")
+            fo.write("|:---| :-:| :-:| :-:| :-:| :-:|\n")
 
-        dfg = df_all.groupby(["type"])
-        for c in df_all.columns:
-            if(c in ["name","type"]):
-                continue
-            for ind,df in dfg:
-                print("|%s | %s|%0.4g | %0.4g | %0.4g |" % (c,ind,df[c].min(),df[c].mean(),df[c].max()))
+            dfg = df_all.groupby(["type"])
+            for c in df_all.columns:
+                if(c in ["name","type"]):
+                    continue
+                if(c not in specs):
+                    continue
+                spec = specs[c]
+
+                for ind,df in dfg:
+
+                    fo.write("|%s | Spec | %s | %s | %s |\n" % (c,spec.string(spec.min),spec.string(spec.typ),spec.string(spec.max)))
+                    #print("|%s | %s|%0.4g | %0.4g | %0.4g |" % (c,ind,df[c].min(),df[c].mean(),df[c].max()))
+                    fo.write("| | %s|%s | %s | %s |\n" % (ind,spec.string(df[c].min()),spec.string(df[c].median()),spec.string(df[c].max())))
 
     def allToMarkdown(self,df_all):
         print("\n\n# All corners")
@@ -174,18 +210,21 @@ class CmdResults(cs.Command):
         text_file.close()
 
     def printFails(self,specs,df):
-        df = df[specs.sources + ["name","type","time"]]
-        df.reset_index(inplace=True)
-        #df = df[not "Index"]
-        df = df.apply(specs.scale)
+
+        df["OK"] = df.apply(specs.OK,axis=1)
+
+        df.drop(columns=["index"],inplace=True)
+
         st = df.style.format(specs.format_dict()).apply(specs.css)
 
         if(not os.path.exists("results")):
             os.mkdir("results")
 
+        df.to_csv(f"results/{self.testbench}.csv")
+
         text_file = open(f"results/{self.testbench}.html", "w")
         text_file.write(self.header)
-        text_file.write(df.describe().style.render())
+        text_file.write(df.describe().style.format(specs.format_dict()).render())
         text_file.write(st.hide_index().render())
         text_file.write(self.footer)
         text_file.close()
@@ -206,8 +245,8 @@ class CmdResults(cs.Command):
             df_all = pd.concat([df,df_all])
 
         if(df_all.empty):
-            self.warning("No CSV files found")
             return None
+
 
         #- Print each corner
         df_all.drop(columns=["Unnamed: 0"],inplace=True)
@@ -229,9 +268,12 @@ class CmdResults(cs.Command):
                 df["type"] = m.group(1)
             df_all = pd.concat([df,df_all])
 
+
         if(df_all.empty):
-            self.error("No YAML files found either")
+
             return None
+
+
         return df_all
 
 
@@ -242,11 +284,23 @@ class CmdResults(cs.Command):
         if(df_all is None):
             df_all = self.readYaml()
 
+        print(df_all)
+
 
         specs = Specification(self.testbench)
 
         if(len(specs) > 0):
-            self.printFails(specs,df_all)
+            df = df_all[specs.sources + ["name","type","time"]]
+            df.reset_index(inplace=True)
+            #df = df[not "Index"]
+            df = df.apply(specs.scale)
+
+            self.printFails(specs,df)
+            self.summaryToMarkdown(specs,df)
+
+
+
+
 
     header = """
 

@@ -7,6 +7,7 @@ from .simcalc import *
 from .commands.command import *
 from .cdsconf import *
 from .commands.cmdip import *
+from .commands.cmdspider import *
 from .commands.cmdresults import *
 from .commands.cmdsimdir import *
 from .commands.cmdrun import *
