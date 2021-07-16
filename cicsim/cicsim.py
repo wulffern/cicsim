@@ -38,6 +38,12 @@ import importlib
 import glob
 import pandas as pd
 
+
+#- Few words on the coding in this file:
+# 1. I use click, its really nice, just google "python click"
+# 2. I try the design pattern "one command, one file in commands/* that inherits commands/command.py".
+#    That's why it's instanciating a class below and doing <obj>.run()
+
 @click.group()
 def cli():
     """Custom IC Creator Simulator Tools
@@ -84,7 +90,7 @@ def simtb(library,cell,view):
 def simcell(library,cell,view):
     """Create a simulation directory for a Cell
     """
-    simdir = cs.CmdSimDir(library,cell,view,True)
+    simdir = cs.CmdSimDir(library,cell,view,False)
     simdir.run()
 
 @cli.command()
@@ -113,7 +119,13 @@ def netlist(library,cell,view,top):
 def cmd_ip(ip,template,src):
     c_ip = cs.CmdIp(ip,template,src)
     c_ip.run()
-    
+
+@cli.command("spider",help=cs.CmdSpider.__doc__,short_help="Make spider plot from Assembler csv file")
+@click.argument("csvfile",required=True)
+def cmd_ip(csvfile):
+    c = cs.CmdSpider(csvfile)
+    c.run()
+
     
 if __name__ == "__main__":
     cli()

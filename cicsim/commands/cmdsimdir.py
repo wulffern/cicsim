@@ -121,6 +121,8 @@ simulatorOptions options reltol=1e-6 vabstol=1e-6 save=selected \\
 iabstol=1e-12 gmin=1e-15 redefinedparams=warning digits=7 cols=80 \\
 pivrel=1e-3  checklimitdest=both
 
+params info what=parameters where=rawfile
+
 //-----------------------------------------------------------------
 // PARAMETERS
 //-----------------------------------------------------------------
@@ -157,8 +159,12 @@ tran tran start=0 stop=1u
         if(self.makeDirectory()):
             os.chdir(self.cell)
             self.netlist(top=(not self.isTestbench))
+            netlistTop = "--no-top"
             if(not self.isTestbench):
                 self.dut()
+                netlistTop ="--top"
+
+
             self.writeSpectreTestbench("tran.scs",tb=self.isTestbench)
             with open("Makefile","w") as fo:
                 fo.write("""
@@ -167,18 +173,18 @@ VIEW=Sch
 #VIEW=Lay
 
 netlist:
-	cicsim netlist --top
+	cicsim netlist %s
 
 typical:
-	cicsim run ${TB} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bt
+	cicsim run ${TB} ${OPT} ${VIEW} Gt Mtt Rt Ct Tt Vt Dt Bt
 
 slow:
-	cicsim run ${TB} ${VIEW} Gt Mss Rh Ch Bf Df "Th,Tl" Vl
+	cicsim run ${TB} ${OPT} ${VIEW} Gt Mss Rh Ch Bf Df "Th,Tl" Vl
 
 fast:
-	cicsim run ${TB} ${VIEW} Gt Mff Rl Cl Bs Ds "Th,Tl" Vh
+	cicsim run ${TB} ${OPT} ${VIEW} Gt Mff Rl Cl Bs Ds "Th,Tl" Vh
 
 tfs:
 	${MAKE} typical slow fast
 
-""")
+""" % (netlistTop))
