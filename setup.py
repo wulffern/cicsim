@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="cicsim-pkg", # Replace with your own username
+    name="cicsim",
     version="0.0.1",
     author="Carsten Wulff",
     author_email="carsten@wulff.no",
