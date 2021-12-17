@@ -10,6 +10,12 @@ from .ngraw import *
 
 
 def plot(df,xname,yname,ptype=None,ax=None,label=""):
+
+    if(xname not in df.columns):
+        print(xname + " not found in " + str(df.columns))
+    if(yname not in df.columns):
+        print(yname + " not found in " + str(df.columns))
+
     x = df[xname]
     y = df[yname]
 
