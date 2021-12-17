@@ -59,9 +59,21 @@ def cli():
 @click.option("--run/--no-run", default=True, help="Run simulator")
 @click.option("--ocn/--no-ocn", default=True, help="Run ocean")
 def run(testbench,oformat,run,ocn,corner):
-    """Run a simulation of TESTBENCH
+    """Run a spectre simulation of TESTBENCH
     """
     r = cs.CmdRun(testbench,oformat,run,ocn,corner)
+    r.run()
+
+@cli.command()
+@click.argument("testbench")
+@click.argument("corner",nargs=-1)
+@click.option("--oformat",default="spectre",help="spectre|aimspice")
+@click.option("--run/--no-run", default=True, help="Run simulator")
+@click.option("--ocn/--no-ocn", default=True, help="Run ocean")
+def runng(testbench,oformat,run,ocn,corner):
+    """Run a ngspice simulation of TESTBENCH
+    """
+    r = cs.CmdRunNg(testbench,oformat,run,ocn,corner)
     r.run()
 
 
