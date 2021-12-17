@@ -11,4 +11,7 @@ from .commands.cmdspider import *
 from .commands.cmdresults import *
 from .commands.cmdsimdir import *
 from .commands.cmdrun import *
+from .commands.cmdrunng import *
 from cicsim import *
+from .ngraw import *
+from .plot import *
