@@ -173,11 +173,12 @@ END
                                 yamlprint.append(l)
                         buffer += line
 
-                    buffer += "fo = outfile(cicResultsFile)\n"
-                    yamlprint.sort()
-                    for yvar in yamlprint:
-                        buffer += f"ocnPrint(?output fo ?numberNotation \"scientific\"  ?numSpaces 0 \"{yvar}: \" {yvar})\n"
-                    buffer += "close(fo)\n"
+                    if(len(yamlprint) > 0):
+                        buffer += "fo = outfile(cicResultsFile)\n"
+                        yamlprint.sort()
+                        for yvar in yamlprint:
+                            buffer += f"ocnPrint(?output fo ?numberNotation \"scientific\"  ?numSpaces 0 \"{yvar}: \" {yvar})\n"
+                        buffer += "close(fo)\n"
                     
                     buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\ncicResultsFileName = \"{resultsFileName}\"\n" + buffer
                 with open(ocnfo,"w") as fo:
