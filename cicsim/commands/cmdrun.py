@@ -188,7 +188,7 @@ END
             #- Run python post parsing if it exists
             pyscript = self.testbench + ".py"
             if(os.path.exists(pyscript)):
-                pythonRunLater.append(fname)
+                pyRunLater.append(fname)
 
         #- Run oceanscripts
 
@@ -214,6 +214,6 @@ END
         if(len(pyRunLater) > 0):
             sys.path.append(os.getcwd())
             tb = importlib.import_module(self.testbench)
-            for perm in pythonRunLater:
+            for perm in pyRunLater:
                 self.comment(f"Running {self.testbench}.py with {perm}")
                 tb.main(perm)
