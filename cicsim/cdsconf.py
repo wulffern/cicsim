@@ -184,6 +184,13 @@ class CdsConfig(cs.Command):
             corner.append(d.split(" "))
         return corner
 
+    def getShortName(self,corner):
+        ss = ""
+        for c in corner:
+            ss += c.replace(",","")
+        return ss
+
+        
     
 
     def netlist(self,top=True):

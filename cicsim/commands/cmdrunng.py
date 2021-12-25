@@ -121,21 +121,27 @@ class CmdRunNg(cs.CdsConfig):
         permutations = self.getPermutations(self.corners)
 
         pyRunLater = list()
-
+        files = list()
         for p in permutations:
             fname = f"output_{self.testbench}" + os.path.sep + self.testbench +  "_"+ "".join(p)
             path = fname + ".spi"
-            self.comment(f"Running  {path}")
+            files.append(fname)
+
             simOk = True
             if(self.runsim):
+                self.comment(f"Running  {path}")
                 self.makeSpiceFile(filename,p,path)
                 self.comment(f"Running {p}")
                 if(self.ngspice() > 0):
                     simOk = False
+            else:
+                self.warning(f"Skipping  {path}")
+
 
             if(not simOk):
                 self.error("Simulation failed ")
-                continue
+                return
+
 
 
 
@@ -143,6 +149,13 @@ class CmdRunNg(cs.CdsConfig):
             pyscript = self.testbench + ".py"
             if(os.path.exists(pyscript)):
                 pyRunLater.append(fname)
+
+
+        runfile = self.testbench + "_" + self.getShortName(self.corners) + ".run"
+
+        with open(runfile,"w") as fo:
+            for f in files:
+                fo.write(f + "\n")
 
         #- Run python
         if(len(pyRunLater) > 0):
