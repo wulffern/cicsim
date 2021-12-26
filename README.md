@@ -1,7 +1,7 @@
 
 # Custom IC Creator Simulation Tools
 
-![tests/sim/BFX1_CV](https://github.com/wulffern/cicsim/workflows/tests/sim/BFX1_CV/badge.svg)
+[![tests](https://github.com/wulffern/cicsim/actions/workflows/main.yml/badge.svg)](https://github.com/wulffern/cicsim/actions/workflows/main.yml)
 
 # Why
 This is a script package I use to control spectre, it can
