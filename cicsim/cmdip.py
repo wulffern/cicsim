@@ -115,7 +115,10 @@ class CmdIp(cs.Command):
             fsrc = ".." + os.path.sep + self.src + os.path.sep + f
             self.comment("copy: '%s'" %fsrc)
             self.content.append(f)
-            sh.copy(fsrc,f,follow_symlinks=False)
+            if(os.path.exists(fsrc)):
+                sh.copy(fsrc,f,follow_symlinks=False)
+            else:
+                self.comment("Could find %s" %fsrc)
 
     def create(self,data):
         for (k,v) in data.items():

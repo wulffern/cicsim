@@ -26,3 +26,5 @@ tfs:
 
 results:
 	cicsim results ${TB} |tee  ${TB}.md
+
+test: typical results

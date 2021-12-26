@@ -1,7 +1,9 @@
 
 # Custom IC Creator Simulation Tools
 
-![tests](https://github.com/wulffern/cicsim/workflows/tests/badge.svg)
+
+[![tests](https://github.com/wulffern/cicsim/actions/workflows/main.yml/badge.svg)](https://github.com/wulffern/cicsim/actions/workflows/main.yml)
+
 
 # Why
 This is a script package I use to control spectre, it can
@@ -26,8 +28,8 @@ mkdir pro
 cd pro
 git clone https://github.com/wulffern/cicsim
 cd cicsim
-pip3 install -r requirements.txt --user
-pip3 install --no-deps -e .
+python3 -m pip install -r requirements.txt --user
+python3 -m pip install --no-deps -e . --user
 ```
 # Get started with simulation
 See tests/sim for how cicsim
@@ -97,7 +99,7 @@ to use. As such, always know what you're running.
 
 ### Option 1: Build yourself
 If you don't control the system, then you can still install locally
-http://thelazylog.com/install-python-as-local-user-on-linux/
+https://randomwalk.in/python/2019/10/27/Install-Python-copy.html
 
 It's not straightforward though, and it can be a rabbit hole that takes some
 time

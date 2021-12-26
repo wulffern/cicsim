@@ -5,3 +5,5 @@ pyyaml
 pandas
 wheel
 setuptools
+numpy
+tikzplotlib

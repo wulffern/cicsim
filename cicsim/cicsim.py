@@ -37,6 +37,7 @@ import cicsim as cs
 import importlib
 import glob
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 #- Few words on the coding in this file:
@@ -75,6 +76,19 @@ def runng(testbench,oformat,run,ocn,corner):
     """
     r = cs.CmdRunNg(testbench,oformat,run,ocn,corner)
     r.run()
+
+
+@cli.command()
+@click.argument("filename")
+@click.argument("xname")
+@click.argument("yname")
+@click.option("--ptype",default="", help="Plot options")
+
+def plot(filename,xname,yname,ptype):
+    """Plot from rawfile
+    """
+    cs.rawplot(filename,xname,yname,ptype)
+    plt.show()
 
 
 @cli.command()

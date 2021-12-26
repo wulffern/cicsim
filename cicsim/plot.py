@@ -12,9 +12,9 @@ from .ngraw import *
 def plot(df,xname,yname,ptype=None,ax=None,label=""):
 
     if(xname not in df.columns):
-        print(xname + " not found in " + str(df.columns))
+        raise Exception("Could not find name %s in %s" %(xname,",".join(df.columns)))
     if(yname not in df.columns):
-        print(yname + " not found in " + str(df.columns))
+        raise Exception("Could not find name %s in %s" %(xname,",".join(df.columns)))
 
     x = df[xname]
     y = df[yname]
@@ -36,6 +36,7 @@ def plot(df,xname,yname,ptype=None,ax=None,label=""):
     if(ptype == ""):
         ax.set_ylabel(yname)
     ax.grid()
+    return (x,y)
 
 
 def rawplot(fraw,xname,yname,ptype=None,axes=None):
@@ -43,6 +44,7 @@ def rawplot(fraw,xname,yname,ptype=None,axes=None):
 
     if(len(dfs)> 0):
         df = dfs[0]
+
     else:
         raise "You have multiple plots in .raw file, that's not supported"
 
@@ -56,14 +58,16 @@ def rawplot(fraw,xname,yname,ptype=None,axes=None):
 
         for i in range(0,len(names)):
             if("same" in ptype):
-                plot(xname,names[i],ptype,ax=axes)
+                return plot(xname,names[i],ptype,ax=axes)
             else:
-                plot(df,xname,names[i],ptype,ax=axes[i])
+                return plot(df,xname,names[i],ptype,ax=axes[i])
         plt.xlabel(xname + "(" + fname + ")")
     elif(axes is not None):
-        plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
+        return plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
     else:
         f,axes = plt.subplots(1,1)
+        return plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
+
 
 
     plt.tight_layout()

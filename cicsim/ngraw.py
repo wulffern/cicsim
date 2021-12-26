@@ -78,6 +78,8 @@ def toDataFrames(ngarr):
     return dfs
 
 
+
+
 if __name__ == '__main__':
     arrs, plots = rawread('test.raw')
     print(arrs)
