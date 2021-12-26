@@ -173,11 +173,12 @@ END
                                 yamlprint.append(l)
                         buffer += line
 
-                    buffer += "fo = outfile(cicResultsFile)\n"
-                    yamlprint.sort()
-                    for yvar in yamlprint:
-                        buffer += f"ocnPrint(?output fo ?numberNotation \"scientific\"  ?numSpaces 0 \"{yvar}: \" {yvar})\n"
-                    buffer += "close(fo)\n"
+                    if(len(yamlprint) > 0):
+                        buffer += "fo = outfile(cicResultsFile)\n"
+                        yamlprint.sort()
+                        for yvar in yamlprint:
+                            buffer += f"ocnPrint(?output fo ?numberNotation \"scientific\"  ?numSpaces 0 \"{yvar}: \" {yvar})\n"
+                        buffer += "close(fo)\n"
                     
                     buffer = f"cicResultsDir = \"{resultsDir}\"\ncicResultsFile = \"{resultsFile}\"\ncicResultsFileName = \"{resultsFileName}\"\n" + buffer
                 with open(ocnfo,"w") as fo:
@@ -188,7 +189,7 @@ END
             #- Run python post parsing if it exists
             pyscript = self.testbench + ".py"
             if(os.path.exists(pyscript)):
-                pythonRunLater.append(fname)
+                pyRunLater.append(fname)
 
         #- Run oceanscripts
 
@@ -214,6 +215,6 @@ END
         if(len(pyRunLater) > 0):
             sys.path.append(os.getcwd())
             tb = importlib.import_module(self.testbench)
-            for perm in pythonRunLater:
+            for perm in pyRunLater:
                 self.comment(f"Running {self.testbench}.py with {perm}")
                 tb.main(perm)
