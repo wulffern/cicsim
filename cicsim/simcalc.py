@@ -34,6 +34,42 @@ class SimCalc():
     def __init__(self):
         pass
 
+    def fft(self,ser):
+        N = len(ser)
+        pwr2 = np.floor(np.log2(N))
+        M = int(2**pwr2)
+        x = ser[int(N - M):]
+        x = x - x.mean()
+
+        #h = np.hanning(M)
+        y = np.fft.fft(x)
+        y = y[:int(M/2)]*2
+
+        #- Normalize amplitude
+        y = y/(M/2)
+        ydB = 20*np.log10(np.abs(y))
+
+        sig = np.max(y)
+        fbin = np.argmax(y)
+
+        sigbins = [-1, 0, 1] *fbin
+
+        noisebins = np.arange(0,int(M/2)-1,1)
+        noisebins[sigbins] = 0
+        noisebins[0:2] = 0
+
+        s = np.linalg.norm(y[sigbins],2)
+
+        n = np.linalg.norm(y[noisebins],2)
+
+        data = {}
+        data["sndr"] = 20*np.log10(s/n)
+        data["amp"] = max(ydB)
+        data["sfdr"] = max(ydB) - np.max(ydB[noisebins])
+        data["enob"] = (data["sndr"]-1.76)/6.02
+
+        return (data,ydB)
+
     def fftWithHanning(self,ser):
         N = len(ser)
         pwr2 = np.floor(np.log2(N))
@@ -53,8 +89,10 @@ class SimCalc():
         
         sig = np.max(y)
         fbin = np.argmax(y)
+
         if(fbin < 3):
             fbin = 3
+
 
         sigbins = [-3,-2,-1,0,1,2,3] + fbin
 
