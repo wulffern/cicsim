@@ -102,11 +102,13 @@ class CmdRunNg(cs.CdsConfig):
 
                 res = "{cic(%s)}" % selfkeys
 
+
                 m = re.search(res,line)
 
                 if(m is not None):
                     for mg in m.groups():
-                        self.comment(f"Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
+                        self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
+
                         line = line.replace("{cic%s}" %mg,self.__dict__[mg])
 
                 print(line,file=fo)
