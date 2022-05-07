@@ -102,6 +102,7 @@ class CmdRunNg(cs.CdsConfig):
 
                 res = "{cic(%s)}" % selfkeys
 
+                self.comment("Available replacements %s" %res)
 
                 m = re.search(res,line)
 
