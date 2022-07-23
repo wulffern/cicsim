@@ -74,6 +74,9 @@ def run(testbench,oformat,run,ocn,corner):
 def runng(testbench,oformat,run,ocn,corner):
     """Run a ngspice simulation of TESTBENCH
     """
+
+    #TODO Add timing info
+
     r = cs.CmdRunNg(testbench,oformat,run,ocn,corner)
     r.run()
 

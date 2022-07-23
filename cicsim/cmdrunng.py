@@ -98,15 +98,49 @@ class CmdRunNg(cs.CdsConfig):
             selfkeys = "|".join(list(self.__dict__.keys()))
 
             with open(fsource,"r") as fi:
-                line = fi.read()
+
+                #- Check for #defines
+                state = 0
+                buffer = ""
+                buffif = ""
+                buffelse = ""
+                dkey = ""
+                for l in fi:
+                    if(l.startswith("*ifdef")):
+                        d = re.split("\s+",l)
+                        dkey = d[1]
+                        state = 1
+                    if(l.startswith("*else")):
+                        state = 2
+                    if(l.startswith("*endif")):
+                        if(dkey in corner):
+                            buffer += buffif
+                        else:
+                            buffer += buffelse
+                        state = 0
+                        dkey = 0
+                        buffif = ""
+                        buffelse = ""
+
+                    if(state == 0):
+                        buffer += l
+                    elif(state == 1 ):
+                        buffif += l
+                    elif(state == 2 ):
+                        buffelse += l
+                
+                line = buffer
 
                 res = "{cic(%s)}" % selfkeys
+
+                self.comment("Available replacements %s" %res)
 
                 m = re.search(res,line)
 
                 if(m is not None):
                     for mg in m.groups():
-                        self.comment(f"Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
+                        self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
+
                         line = line.replace("{cic%s}" %mg,self.__dict__[mg])
 
                 print(line,file=fo)
@@ -141,8 +175,6 @@ class CmdRunNg(cs.CdsConfig):
             if(not simOk):
                 self.error("Simulation failed ")
                 return
-
-
 
 
             #- Run python post parsing if it exists
