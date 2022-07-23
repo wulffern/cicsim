@@ -113,7 +113,7 @@ class CmdRunNg(cs.CdsConfig):
                     if(l.startswith("*else")):
                         state = 2
                     if(l.startswith("*endif")):
-                        if(dkey in self.config["corner"]):
+                        if(dkey in corner):
                             buffer += buffif
                         else:
                             buffer += buffelse
