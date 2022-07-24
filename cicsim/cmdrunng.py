@@ -34,6 +34,7 @@ import yaml
 import shutil as sh
 import sys
 import importlib
+import datetime
 
 class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
@@ -71,7 +72,7 @@ class CmdRunNg(cs.CdsConfig):
                 if(c in self.config["corner"]):
                     ss += self.config["corner"][c] + "\n"
                 else:
-                    ss += "#define " + c.upper() + "\n"
+                    ss += "*define " + c.upper() + "\n"
 
 
         dirn = os.path.dirname(fdest)
@@ -106,13 +107,15 @@ class CmdRunNg(cs.CdsConfig):
                 buffelse = ""
                 dkey = ""
                 for l in fi:
-                    if(l.startswith("*ifdef")):
+                    if(l.startswith("#ifdef")):
                         d = re.split("\s+",l)
                         dkey = d[1]
                         state = 1
-                    if(l.startswith("*else")):
+                        l = "*" + l
+                    if(l.startswith("#else")):
                         state = 2
-                    if(l.startswith("*endif")):
+                        l = "*" + l
+                    if(l.startswith("#endif")):
                         if(dkey in corner):
                             buffer += buffif
                         else:
@@ -121,6 +124,7 @@ class CmdRunNg(cs.CdsConfig):
                         dkey = 0
                         buffif = ""
                         buffelse = ""
+                        l = "*" + l
 
                     if(state == 0):
                         buffer += l
@@ -146,6 +150,7 @@ class CmdRunNg(cs.CdsConfig):
                 print(line,file=fo)
 
     def run(self):
+        startTime = datetime.datetime.now()
         
         filename = self.testbench + ".spi"
         if(not os.path.exists(filename)):
@@ -162,12 +167,17 @@ class CmdRunNg(cs.CdsConfig):
             files.append(fname)
 
             simOk = True
+
             if(self.runsim):
+                tickTime = datetime.datetime.now()
                 self.comment(f"Running  {path}")
                 self.makeSpiceFile(filename,p,path)
                 self.comment(f"Running {p}")
                 if(self.ngspice() > 0):
                     simOk = False
+                nextTime = datetime.datetime.now()
+                self.comment("Corner simulation time : " + str(nextTime - tickTime))
+                tickTime = nextTime
             else:
                 self.warning(f"Skipping  {path}")
 
@@ -183,6 +193,8 @@ class CmdRunNg(cs.CdsConfig):
                 pyRunLater.append(fname)
 
 
+        endTime = datetime.datetime.now()
+        self.comment("Total  simulation time : " + str(endTime - startTime))
         runfile = self.testbench + "_" + self.getShortName(self.corners) + ".run"
 
         with open(runfile,"w") as fo:

@@ -38,6 +38,7 @@ import importlib
 import glob
 import pandas as pd
 import matplotlib.pyplot as plt
+import datetime
 
 
 #- Few words on the coding in this file:
@@ -75,10 +76,10 @@ def runng(testbench,oformat,run,ocn,corner):
     """Run a ngspice simulation of TESTBENCH
     """
 
-    #TODO Add timing info
-
     r = cs.CmdRunNg(testbench,oformat,run,ocn,corner)
+
     r.run()
+
 
 
 @cli.command()
