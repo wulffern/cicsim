@@ -49,10 +49,11 @@ class SimCalc():
         y = y/(M/2)
         ydB = 20*np.log10(np.abs(y))
 
-        sig = np.max(y)
-        fbin = np.argmax(y)
+        sig = np.max(ydB)
+        fbin = np.argmax(ydB)
 
-        sigbins = [-1, 0, 1] *fbin
+        sigbins = [ 0] +fbin
+
 
         noisebins = np.arange(0,int(M/2)-1,1)
         noisebins[sigbins] = 0
