@@ -10,6 +10,7 @@ from .cmdip import *
 from .cmdspider import *
 from .cmdresults import *
 from .cmdsimdir import *
+from .cmdsimdirng import *
 from .cmdrun import *
 from .cmdrunng import *
 from cicsim import *

@@ -124,6 +124,15 @@ def simcell(library,cell,view):
     simdir.run()
 
 @cli.command()
+@click.argument("library",required=True)
+@click.argument("cell",required=True)
+def simcellng(library,cell):
+    """Create a ngspice simulation directory for a Cell
+    """
+    simdir = cs.CmdSimDirNg(library,cell)
+    simdir.run()
+
+@cli.command()
 @click.argument("library",required=False)
 @click.argument("cell",required=False)
 @click.argument("view",required=False)

@@ -44,7 +44,7 @@ class SpiceParser():
                 if(match):
                     cktbuff.append(line)
 
-                if(re.search(f"\s*.?SUBCKT\s+{subckt}",line,re.IGNORECASE)):
+                if(re.search(f"\s*.?SUBCKT\s+{subckt}\s+",line,re.IGNORECASE)):
                     match = True
                     cktbuff.append(line)
 
@@ -68,10 +68,19 @@ class SpiceParser():
 
         cktstr = re.sub("\s+"," ",cktstr)
 
+        # TODO Add support for paramters on subckt?
+
         ports = cktstr.split(" ")
         #- Remove .SUBCKT
         ports.pop(0)
         #- Remove subckt name
         ports.pop(0)
+
+        # TODO Is this dirty hackish?? Let's see if it fails in the future
+        for i in range(0,len(ports)):
+            if(ports[i] == ""):
+                ports.pop(i)
+                i = i-1
+
 
         return ports
