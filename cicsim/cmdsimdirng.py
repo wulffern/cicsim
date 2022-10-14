@@ -65,14 +65,13 @@ class CmdSimDirNg(cs.CdsConfig):
     def writeSpiceTestbench(self,filename,tb=False):
 
         stb = """*{library}/{cell}
-
 *----------------------------------------------------------------
 * Include
 *----------------------------------------------------------------
 #ifdef Lay
 .include ../../../work/lpe/{cell}_lpe.spi
 #else
-.include ../../../design/{library}.spice
+.include ../../../work/xsch/{cell}.spice
 #endif
 
 *-----------------------------------------------------------------
@@ -94,8 +93,8 @@ class CmdSimDirNg(cs.CdsConfig):
 *-----------------------------------------------------------------
 * FORCE
 *-----------------------------------------------------------------
-VSS  AVSS  0     dc 0
-VDD  AVDD  AVSS  pwl 0 0 10n {AVDD}
+VSS  VSS  0     dc 0
+VDD  VDD_1V8  VSS  pwl 0 0 10n {AVDD}
 
 *-----------------------------------------------------------------
 * DUT
@@ -147,7 +146,7 @@ quit
         stb = stb.replace("{library}",self.library)
 
         sp = cs.SpiceParser()
-        ports = sp.fastGetPortsFromFile(f"../../design/{self.library}.spice",self.cell)
+        ports = sp.fastGetPortsFromFile(f"../../work/xsch/{self.cell}.spice",self.cell)
         stb = stb.replace("{ports}"," ".join(ports))
 
         stb = stb.replace("{vports}"," ".join(map(lambda x: "v(%s)"%x,ports)))
@@ -159,16 +158,17 @@ quit
     def run(self):
         if(self.makeDirectory()):
             os.chdir(self.cell)
-            self.writeSpiceTestbench("tran.spi")
-
-            with open("Makefile","w") as fo:
-                fo.write("""
-
+            mk = """
 TB=tran
 VIEW=Sch
 #VIEW=Lay
 
 OPT=
+
+netlist:
+	cd ../../work && xschem -q -x -b -s -n ../design/{library}/{cell}.sch
+	perl -pi -e "s/\*\*\.subckt/\.subckt/ig;s/\*\*\.ends/\.ends/ig;" ../../work/xsch/{cell}.spice
+
 
 test:
 	${MAKE} typical OPT="Debug"
@@ -197,4 +197,11 @@ clean:
 	-rm *.run
 	-rm *.pdf
 	-rm *.csv
-""")
+"""
+
+            mk = mk.replace("{cell}",self.cell)
+            mk = mk.replace("{library}",self.library)
+            with open("Makefile","w") as fo:
+                fo.write(mk)
+            os.system("make netlist")
+            self.writeSpiceTestbench("tran.spi")

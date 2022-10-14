@@ -70,7 +70,11 @@ class CmdRunNg(cs.CdsConfig):
         if("corner" in self.config):
             for c in corner:
                 if(c in self.config["corner"]):
-                    ss += self.config["corner"][c] + "\n"
+                    sstr = self.config["corner"][c] + "\n"
+
+                    #- Expand any os variables in lib string
+                    sstr = os.path.expandvars(sstr)
+                    ss += sstr
                 else:
                     ss += "*define " + c.upper() + "\n"
 
