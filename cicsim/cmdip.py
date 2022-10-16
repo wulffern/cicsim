@@ -65,27 +65,42 @@ class CmdIp(cs.Command):
     """
     
 
-    def __init__(self,ip,template,src):
+    def __init__(self,ip,template,src=None,cell=None):
         self.ip = ip
         self.template = template
         self.src = src
+        self.cell = cell
         super().__init__()
 
     def run(self):
         if not os.path.exists(self.template):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), self.template)
 
-        self.cell = re.sub("_[^\_]+$","",self.ip)
+        useCellName = False
+        if(not self.cell):
+            self.cell = re.sub("_[^\_]+$","",self.ip)
+        else:
+            useCellName = True
+
 
         with open(self.template,"r") as fi:
             buffer = fi.read()
-            buffer = self.sub(buffer,{ "CELL": self.cell, "IP" : self.ip })
+            buffer = self.sub(buffer,{ "CELL": self.cell,
+                                       "IP" : self.ip,
+                                       "cell": self.cell.lower(),
+                                       "ip" : self.ip.lower()
+
+                                      })
 
         self.buf =  yaml.safe_load(buffer)
 
         # Make ip
-        os.makedirs(self.ip.lower())
-        os.chdir(self.ip.lower())
+        dir = self.ip.lower()
+        if(useCellName):
+            dir = self.cell
+
+        os.makedirs(dir)
+        os.chdir(dir)
 
         self.content = list()
 

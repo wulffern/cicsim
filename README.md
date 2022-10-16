@@ -4,22 +4,24 @@
 
 [![tests](https://github.com/wulffern/cicsim/actions/workflows/main.yml/badge.svg)](https://github.com/wulffern/cicsim/actions/workflows/main.yml)
 
+# Caution
+If you're looking for the cicsim that controlled spectre, then look in the
+cadence branch. From 2022-10-14 I decided to go all in on open source tools like
+ngspice, and thus discontinued support for spectre
 
 # Why
-This is a script package I use to control spectre, it can
-- Netlist from cadence
+This is a script package I use to control ngspice, it can
 - Run corner simulations
-- Run ocean scripts on spectre results
-- Run python scripts to combine ocean results
-- Combine results
+- Create IPs (used in wulffern/aicex)
+- Create simulation directories
 
- 
 # Changelog
 
-| Version | Status | Comment |
-|:--|:--|:--|
-|0.0.2| to be released | Probably bugfixes|
-|0.0.1| :white_check_mark: | First version of cicsim|
+| Version | Status                      | Comment                 |
+|:--------|:----------------------------|:------------------------|
+| 0.0.3   | All in on open source tools |                         |
+| 0.0.2   | to be released              | Probably bugfixes       |
+| 0.0.1   | :white_check_mark:          | First version of cicsim |
 
 # Install this module
 If you want to follow the latest and greatest
@@ -32,42 +34,7 @@ python3 -m pip install -r requirements.txt --user
 python3 -m pip install --no-deps -e . --user
 ```
 # Get started with simulation
-See tests/sim for how cicsim
-expects the simulation directory to be layed out.
-
-### tests/sim/cicsim.yaml
-This is the main config file for cicsim, it sets up corners, links to cadence,
-how to find the model files etc
-
-### tests/sim/project/spectre
-This is an example on how you can setup the model includes in spectre. Of
-course, the current setup is empty, as the foundry PDKs are under NDA. 
-
-### tests/sim/BFX1_CV
-This directory contains an example of how you can run simulations with cicsim. If you go into
-this directory, and type
-
-``` sh
-make
-```
-
-
-
-It should try to run a simulation. 
-
-The directory contains a number of files
-
-``` yaml
-Makefile: cmake file to run the simulations
-BFX1_CV_model.scs: Simplified model of a buffer that should run without a PDK
-cicsim.yaml : This is the child config file. It contains the link to library,cell,view, and custom corners
-dut.scs: Setup of the device under test
-tran.scs: Main spectre file
-tran.ocn: Ocean script to extract results after spectre simulation
-tran.py: Python script to collate the ocean results, and anything else from the spectre simulation
-tran.md: Results from simulation
-```
-
+Head over to [wulffern/aicex](https://github.com/wulffern/aicex) to see how it works
 
 # Commands
 
@@ -77,19 +44,15 @@ Usage: cicsim [OPTIONS] COMMAND [ARGS]...
   Custom IC Creator Simulator Tools
 
   This package provides helper scripts for simulating integrated circuits in
-  Cadence Spectre
+  ngspice
 
 Options:
   --help  Show this message and exit.
 
 Commands:
-  netlist  Netlist from a cadence library.
-  results  Summarize results of TESTBENCH
   run      Run a simulation of TESTBENCH
   simcell  Create a simulation directory for a cell
-  simtb    Create a simulation directory for a testbench
 ```
-
 
 ## Know what python you're running
 

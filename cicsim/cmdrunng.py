@@ -40,11 +40,10 @@ class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,oformat,runsim,ocn,corners):
+    def __init__(self,testbench,oformat,runsim,corners):
         self.testbench = testbench
         self.oformat = oformat
         self.runsim = runsim
-        self.ocn = ocn
         self.corners = corners
 
         super().__init__()
