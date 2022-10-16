@@ -88,6 +88,7 @@ class CmdRunNg(cs.CdsConfig):
 
         self.log = self.fname.replace(".spi",".log")
         self.raw = self.fname.replace(".spi",".raw")
+        self.name = self.fname.replace(".spi","")
 
         data = self.fname.replace(".spi","_data")
         self.datadir = data
@@ -152,6 +153,29 @@ class CmdRunNg(cs.CdsConfig):
 
                 print(line,file=fo)
 
+    def parseLog(self,flog):
+
+        analysis = False
+        data = dict()
+        with open(flog) as fi:
+            for l in fi:
+                if(analysis and re.search("=",l)):
+                    keyVal = re.split("\s+",l)
+                    data[keyVal[0]] = float(keyVal[2])
+
+                if(re.search("binary raw file",l)):
+                    analysis = False
+
+                m = re.search("Measurements for (.*)$",l)
+                if(m):
+                    analysis = True
+
+        fyaml = flog.replace(".log",".yaml")
+        with open(fyaml,"w") as fo:
+            self.comment(f"Writing {fyaml}")
+            yaml.dump(data,fo)
+
+
     def run(self):
         startTime = datetime.datetime.now()
         
@@ -189,6 +213,11 @@ class CmdRunNg(cs.CdsConfig):
                 self.error("Simulation failed ")
                 return
 
+            #- If log file exists, then parse the log and create yaml file
+            flog = fname + ".log"
+
+            if(os.path.exists(flog)):
+                self.parseLog(flog)
 
             #- Run python post parsing if it exists
             pyscript = self.testbench + ".py"

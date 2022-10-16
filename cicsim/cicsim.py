@@ -80,11 +80,11 @@ def plot(filename,xname,yname,ptype):
     plt.show()
 
 @cli.command()
-@click.argument("testbench")
-def results(testbench):
-    """Summarize results of TESTBENCH
+@click.argument("runfile")
+def results(runfile):
+    """Summarize results of runfile
     """
-    r = cs.CmdResults(testbench)
+    r = cs.CmdResults(runfile)
     r.run()
 
 @cli.command()

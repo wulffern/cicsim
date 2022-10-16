@@ -173,8 +173,9 @@ class Specification(dict):
 class CmdResults(cs.Command):
     """ Summarize results of TESTBENCH """
 
-    def __init__(self,testbench):
-        self.testbench = testbench
+    def __init__(self,runfile):
+        self.runfile = runfile
+        self.testbench = re.sub("_.*","",runfile)
         super().__init__()
 
     def summaryToMarkdown(self,specs,df_all):
@@ -231,6 +232,8 @@ class CmdResults(cs.Command):
 
 
     def readCsv(self):
+        print("Not updated")
+        pass
         files = glob.glob(f"output_{self.testbench}/{self.testbench}_*.csv")
         df_all = pd.DataFrame()
         for f in files:
@@ -253,13 +256,18 @@ class CmdResults(cs.Command):
         return df_all
 
     def readYaml(self):
-        files = glob.glob(f"output_{self.testbench}/{self.testbench}_*.yaml")
+        files = list()
+        with open(self.runfile) as fi:
+            for l in fi:
+                l = re.sub("\n","",l)
+                files.append(l + ".yaml")
+
         df_all = pd.DataFrame()
         for f in files:
             with open(f) as yaml_file:
                 yaml_contents = yaml.safe_load(yaml_file)
             df = pd.json_normalize(yaml_contents)
-            name = os.path.basename(f).replace(".*_","").replace(".csv","")
+            name = os.path.basename(f).replace(".*_","").replace(".yaml","")
             df["name"] = name
             (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(f)
             df["time"] = time.ctime(mtime)
@@ -280,9 +288,8 @@ class CmdResults(cs.Command):
 
 
     def run(self):
-        df_all = self.readCsv()
-        if(df_all is None):
-            df_all = self.readYaml()
+
+        df_all = self.readYaml()
 
         print(df_all)
 
