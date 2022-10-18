@@ -291,7 +291,7 @@ class CmdRunNg(cs.CdsConfig):
             #- Run python post parsing if it exists
             pyscript = self.testbench + ".py"
             if(os.path.exists(pyscript)):
-                pyRunLater.append(fname)
+                pyRunLater.append(self.name)
 
 
         endTime = datetime.datetime.now()

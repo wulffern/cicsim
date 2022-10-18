@@ -182,9 +182,9 @@ class CmdResults(cs.Command):
     def summaryToMarkdown(self,specs,df_all):
         with open(f"results/{self.ofile}.md","w") as fo:
             fo.write(f"# Summary {self.ofile}\n\n")
-            fo.write(f"For details see <a href='{self.ofile}.html'>{self.ofile}.html</a>\n\n")
+            fo.write(f"For details see <a href='{self.ofile}.html'>{self.ofile}.html</a>\n\n\n")
             fo.write("|**Parameter**|**View**|**Min** | **Typ** | **Max**|\n")
-            fo.write("|:---| :-:| :-:| :-:| :-:| :-:|\n")
+            fo.write("|:---| :---:| :---:| :---:| :---:| :---:|\n")
 
             dfg = df_all.groupby(["type"])
             for c in df_all.columns:
@@ -196,7 +196,7 @@ class CmdResults(cs.Command):
 
                 for ind,df in dfg:
 
-                    fo.write("|%s | Spec | %s | %s | %s |\n" % (c,spec.string(spec.min),spec.string(spec.typ),spec.string(spec.max)))
+                    fo.write("|%s | Spec | %s | %s | %s |\n" % (c.replace("_","\\_"),spec.string(spec.min),spec.string(spec.typ),spec.string(spec.max)))
                     #print("|%s | %s|%0.4g | %0.4g | %0.4g |" % (c,ind,df[c].min(),df[c].mean(),df[c].max()))
                     fo.write("| | %s|%s | %s | %s |\n" % (ind,spec.string(df[c].min()),spec.string(df[c].median()),spec.string(df[c].max())))
 
