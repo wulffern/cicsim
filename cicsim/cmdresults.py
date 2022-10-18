@@ -175,13 +175,14 @@ class CmdResults(cs.Command):
 
     def __init__(self,runfile):
         self.runfile = runfile
+        self.ofile = runfile.replace(".run","")
         self.testbench = re.sub("_.*","",runfile)
         super().__init__()
 
     def summaryToMarkdown(self,specs,df_all):
-        with open(f"results/{self.testbench}.md","w") as fo:
-            fo.write(f"# Summary {self.testbench}\n\n")
-            fo.write(f"For details see <a href='{self.testbench}.html'>{self.testbench}.html</a>\n\n")
+        with open(f"results/{self.ofile}.md","w") as fo:
+            fo.write(f"# Summary {self.ofile}\n\n")
+            fo.write(f"For details see <a href='{self.ofile}.html'>{self.ofile}.html</a>\n\n")
             fo.write("|**Parameter**|**View**|**Min** | **Typ** | **Max**|\n")
             fo.write("|:---| :-:| :-:| :-:| :-:| :-:|\n")
 
@@ -206,7 +207,7 @@ class CmdResults(cs.Command):
 
     def allToHtml(self,df_all):
         html = df_all.to_html()
-        text_file = open(f"{self.testbench}.html", "w")
+        text_file = open(f"{self.ofile}.html", "w")
         text_file.write(html)
         text_file.close()
 
@@ -221,9 +222,9 @@ class CmdResults(cs.Command):
         if(not os.path.exists("results")):
             os.mkdir("results")
 
-        df.to_csv(f"results/{self.testbench}.csv")
+        df.to_csv(f"results/{self.ofile}.csv")
 
-        text_file = open(f"results/{self.testbench}.html", "w")
+        text_file = open(f"results/{self.ofile}.html", "w")
         text_file.write(self.header)
         text_file.write(df.describe().style.format(specs.format_dict()).render())
         text_file.write(st.hide_index().render())

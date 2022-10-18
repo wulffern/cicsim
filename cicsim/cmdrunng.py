@@ -25,6 +25,8 @@
 ##
 ######################################################################
 
+# TODO Add hash of spice netlist. Don't rerun if all spice files are the same.
+#       However, what should I do about .includes?
 
 import cicsim as cs
 import re
@@ -49,6 +51,9 @@ class CmdRunNg(cs.CdsConfig):
         super().__init__()
 
 
+    def removeFile(self,filename):
+        os.remove(filename) if os.path.exists(filename) else 0
+
     def ngspice(self):
         options = ""
         includes = ""
@@ -58,12 +63,42 @@ class CmdRunNg(cs.CdsConfig):
             else:
                 options = ""
 
-        cmd = f"ngspice {options} {includes} {self.fname} -r {self.raw} | tee {self.log}"
+        cmd = f"ngspice {options} {includes} {self.ldst_spi} -r {self.raw} | tee {self.log}"
         
         self.comment(cmd)
+
+        #- Remove old files
+        self.removeFile(self.log)
+        self.removeFile(self.raw)
+        self.removeFile(self.dst_yaml)
+
+
         return os.system(f"cd {self.rundir}; {cmd}")
 
-    def makeSpiceFile(self,fsource,corner,fdest):
+    def ngspiceMeas(self):
+
+        cmd = f"ngspice -b {self.ldst_meas}  | tee {self.ldst_meas_log}"
+
+        self.comment(cmd)
+
+        #- Remove old files
+        self.removeFile(self.fname + ".logm")
+        return os.system(f"cd {self.rundir}; {cmd}")
+
+    def replaceLine(self,line):
+
+        selfkeys = "|".join(list(self.__dict__.keys()))
+        res = "{cic(%s)}" % selfkeys
+        m = re.search(res,line)
+
+        if(m is not None):
+            for mg in m.groups():
+                self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
+
+                line = line.replace("{cic%s}" %mg,self.__dict__[mg])
+        return line
+
+    def makeSpiceFile(self,corner):
 
         ss = ""
         if("corner" in self.config):
@@ -77,32 +112,13 @@ class CmdRunNg(cs.CdsConfig):
                 else:
                     ss += "*define " + c.upper() + "\n"
 
+        os.makedirs(self.rundir,exist_ok=True)
 
-        dirn = os.path.dirname(fdest)
-
-        self.rundir = dirn
-        self.fname = os.path.basename(fdest)
-        self.fdest = fdest
-        self.fsource = fsource
-        os.makedirs(dirn,exist_ok=True)
-
-        self.log = self.fname.replace(".spi",".log")
-        self.raw = self.fname.replace(".spi",".raw")
-        self.name = self.fname.replace(".spi","")
-
-        data = self.fname.replace(".spi","_data")
-        self.datadir = data
-        if(not os.path.exists(self.rundir + os.path.sep + data)):
-            os.mkdir(self.rundir + os.path.sep + data)
-
-
-        with open(fdest,"w") as fo:
-            print("cicsimgen " + fsource.replace(".spi",""),file=fo)
+        with open(self.fdest,"w") as fo:
+            print("cicsimgen " + self.testbench,file=fo)
             print(ss,file=fo)
 
-            selfkeys = "|".join(list(self.__dict__.keys()))
-
-            with open(fsource,"r") as fi:
+            with open(self.filename,"r") as fi:
 
                 #- Check for #defines
                 state = 0
@@ -115,10 +131,12 @@ class CmdRunNg(cs.CdsConfig):
                         d = re.split("\s+",l)
                         dkey = d[1]
                         state = 1
-                        l = "*" + l
+                        continue
+                        #l = "*" + l
                     if(l.startswith("#else")):
                         state = 2
-                        l = "*" + l
+                        #l = "*" + l
+                        continue
                     if(l.startswith("#endif")):
                         if(dkey in corner):
                             buffer += buffif
@@ -128,7 +146,8 @@ class CmdRunNg(cs.CdsConfig):
                         dkey = 0
                         buffif = ""
                         buffelse = ""
-                        l = "*" + l
+                        continue
+                        #l = "*" + l
 
                     if(state == 0):
                         buffer += l
@@ -139,29 +158,31 @@ class CmdRunNg(cs.CdsConfig):
                 
                 line = buffer
 
-                res = "{cic(%s)}" % selfkeys
-
-                self.comment("Available replacements %s" %res)
-
-                m = re.search(res,line)
-
-                if(m is not None):
-                    for mg in m.groups():
-                        self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
-
-                        line = line.replace("{cic%s}" %mg,self.__dict__[mg])
+                line = self.replaceLine(line)
 
                 print(line,file=fo)
 
-    def parseLog(self,flog):
+    def makeMeasFile(self):
+        #- Check for a meas file
+        with open(self.src_meas) as fi:
+            with open(self.dst_meas,"w") as fo:
+                for line in fi:
+                    line = self.replaceLine(line)
+                    fo.write(line)
+
+
+    def parseLog(self):
 
         analysis = False
         data = dict()
-        with open(flog) as fi:
+        with open(self.dst_log) as fi:
             for l in fi:
                 if(analysis and re.search("=",l)):
-                    keyVal = re.split("\s+",l)
-                    data[keyVal[0]] = float(keyVal[2])
+                    m = re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)
+                    if(m):
+                        key = m.groups()[0].strip()
+                        val = m.groups()[1].strip()
+                        data[key] = float(val)
 
                 if(re.search("binary raw file",l)):
                     analysis = False
@@ -170,35 +191,78 @@ class CmdRunNg(cs.CdsConfig):
                 if(m):
                     analysis = True
 
-        fyaml = flog.replace(".log",".yaml")
-        with open(fyaml,"w") as fo:
-            self.comment(f"Writing {fyaml}")
+        #- Check if there is a measurement log, and read it
+        if(os.path.exists(self.dst_meas_log)):
+            analysis = False
+            with open(self.dst_meas_log) as fi:
+                for l in fi:
+                    if(analysis and re.search("=",l)):
+                        m = re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)
+                        if(m):
+                            key = m.groups()[0].strip()
+                            val = m.groups()[1].strip()
+                            data[key] = float(val)
+                    if(re.search("^\s*MEAS_START",l)):
+                        analysis = True
+                    if(re.search("^\s*MEAS_END",l)):
+                        analysis = False
+
+
+
+        with open(self.dst_yaml,"w") as fo:
+            self.comment(f"Writing {self.dst_yaml}")
             yaml.dump(data,fo)
 
 
     def run(self):
         startTime = datetime.datetime.now()
         
-        filename = self.testbench + ".spi"
-        if(not os.path.exists(filename)):
+        self.filename = self.testbench + ".spi"
+        if(not os.path.exists(self.filename)):
             self.error(f"Testbench {filename} does not exists in this folder")
             return
 
         permutations = self.getPermutations(self.corners)
 
+        self.src_meas = self.testbench + ".meas"
+        self.src_py = self.testbench + ".py"
+
         pyRunLater = list()
         files = list()
         for p in permutations:
-            fname = f"output_{self.testbench}" + os.path.sep + self.testbench +  "_"+ "".join(p)
-            path = fname + ".spi"
-            files.append(fname)
+
+            #- Permutation variables
+            self.fname = f"output_{self.testbench}" + os.path.sep + self.testbench +  "_"+ "".join(p)
+            self.name =  self.testbench +  "_"+ "".join(p)
+            self.fdest = self.fname + ".spi"
+            self.ldst_spi = self.name + ".spi"
+            self.dst_meas = self.fname + ".meas"
+            self.ldst_meas = self.name + ".meas"
+            self.dst_meas_log = self.fname + ".logm"
+            self.ldst_meas_log = self.name + ".logm"
+            self.log = self.name + ".log"
+            self.dst_log = self.fname + ".log"
+            self.dst_yaml = self.fname + ".yaml"
+            self.ldst_yaml = self.name + ".yaml"
+            self.dst_raw = self.fname + ".raw"
+            self.raw = self.name + ".raw"
+
+
+            self.rundir = os.path.dirname(self.fdest)
+
+
+            selfkeys = "|".join(list(self.__dict__.keys()))
+            res = "{cic(%s)}" % selfkeys
+            self.comment("Available replacements %s" %res)
+
+            files.append(self.fname)
 
             simOk = True
 
             if(self.runsim):
                 tickTime = datetime.datetime.now()
-                self.comment(f"Running  {path}")
-                self.makeSpiceFile(filename,p,path)
+                self.comment(f"Running  {self.fdest}")
+                self.makeSpiceFile(p)
                 self.comment(f"Running {p}")
                 if(self.ngspice() > 0):
                     simOk = False
@@ -206,18 +270,23 @@ class CmdRunNg(cs.CdsConfig):
                 self.comment("Corner simulation time : " + str(nextTime - tickTime))
                 tickTime = nextTime
             else:
-                self.warning(f"Skipping  {path}")
+                self.warning(f"Skipping  {self.fdest}")
 
 
             if(not simOk):
                 self.error("Simulation failed ")
                 return
 
-            #- If log file exists, then parse the log and create yaml file
-            flog = fname + ".log"
+            #- Run measurement if it exists
+            if(os.path.exists(self.src_meas)):
+                self.makeMeasFile()
+                self.ngspiceMeas()
 
-            if(os.path.exists(flog)):
-                self.parseLog(flog)
+            #- If log file exists, then parse the log and create yaml file
+
+
+            if(os.path.exists(self.dst_log)):
+                self.parseLog()
 
             #- Run python post parsing if it exists
             pyscript = self.testbench + ".py"
