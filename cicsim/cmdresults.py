@@ -44,6 +44,7 @@ class SpecMinMax:
 
         self.min = None
         self.max = None
+        self.name = None
         self.unit = "V"
         self.scale = 1
         self.typ = 0
@@ -88,6 +89,11 @@ class SpecMinMax:
                 self.unit = obj["unit"]
             if("digits" in obj):
                 self.digits = obj["digits"]
+
+            if("name" in obj):
+                self.name = obj["name"]
+            else:
+                self.name = ""
 
             #print(self.min,self.typ,self.max)
 
@@ -173,7 +179,11 @@ class Specification(dict):
 class CmdResults(cs.Command):
     """ Summarize results of TESTBENCH """
 
-    def __init__(self,runfile):
+    def __init__(self,runfile,runname=None):
+        if(runname is None):
+            self.runname = runfile.replace(".run","")
+        else:
+            self.runname = runname
         self.runfile = runfile
         self.ofile = runfile.replace(".run","")
         self.testbench = re.sub("_.*","",runfile)
@@ -181,10 +191,10 @@ class CmdResults(cs.Command):
 
     def summaryToMarkdown(self,specs,df_all):
         with open(f"results/{self.ofile}.md","w") as fo:
-            fo.write(f"# Summary {self.ofile}\n\n")
-            fo.write(f"For details see <a href='{self.ofile}.html'>{self.ofile}.html</a>\n\n\n")
-            fo.write("|**Parameter**|**View**|**Min** | **Typ** | **Max**|\n")
-            fo.write("|:---| :---:| :---:| :---:| :---:| :---:|\n")
+            fo.write(f"### Summary {self.runname}\n\n")
+            fo.write(f"For details see <a href='{self.ofile}.html'>{self.ofile}.html</a>\n\n")
+            fo.write("|**Name**|**Parameter**|**View**|**Min** | **Typ** | **Max**|\n")
+            fo.write("|:---|:---|:---:|:---:|:---:|:---:|\n")
 
             dfg = df_all.groupby(["type"])
             for c in df_all.columns:
@@ -196,9 +206,9 @@ class CmdResults(cs.Command):
 
                 for ind,df in dfg:
 
-                    fo.write("|%s | Spec | %s | %s | %s |\n" % (c.replace("_","\\_"),spec.string(spec.min),spec.string(spec.typ),spec.string(spec.max)))
+                    fo.write("|%s|%s | Spec | %s | %s | %s |\n" % (spec.name,c.replace("_","\\_"),spec.string(spec.min),spec.string(spec.typ),spec.string(spec.max)))
                     #print("|%s | %s|%0.4g | %0.4g | %0.4g |" % (c,ind,df[c].min(),df[c].mean(),df[c].max()))
-                    fo.write("| | %s|%s | %s | %s |\n" % (ind,spec.string(df[c].min()),spec.string(df[c].median()),spec.string(df[c].max())))
+                    fo.write("| | | %s|%s | %s | %s |\n" % (ind,spec.string(df[c].min()),spec.string(df[c].median()),spec.string(df[c].max())))
 
     def allToMarkdown(self,df_all):
         print("\n\n# All corners")
@@ -292,7 +302,9 @@ class CmdResults(cs.Command):
 
         df_all = self.readYaml()
 
-        print(df_all)
+        #-Print all resutlts
+        print(df_all.to_markdown(index=False,tablefmt="github",floatfmt=".5g"))
+
 
 
         specs = Specification(self.testbench)

@@ -75,7 +75,7 @@ class Command:
         self.comment(ss,"yellow")
 
     def error(self,ss):
-        ss_h = "Error(%s)" %self.__class__  + ": "
+        ss_h = "Error: "
         self.comment(ss_h + ss,"red")
 
     def doCmd(self,cmd):
