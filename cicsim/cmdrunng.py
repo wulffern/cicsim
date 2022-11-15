@@ -110,9 +110,6 @@ class Simulation(cs.CdsConfig):
             self.removeFile(self.oname + ".yaml")
 
             # Run NGSPICE
-            self.comment(f"Changing directory to {self.rundir}")
-
-
             try:
                 err = os.system(cmd)
             except Exception as e:
@@ -229,8 +226,8 @@ class Simulation(cs.CdsConfig):
             for l in fi:
                 if(re.search("Error:",l) or re.search("failed",l)):
                     errors.append(l.strip())
-                if(re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)):
-                    self.comment(l.strip(),"cyan")
+#                if(re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)):
+#                    self.comment(l.strip(),"cyan")
 
         if(len(errors) > 0):
             for line in errors:
