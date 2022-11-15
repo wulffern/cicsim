@@ -1,6 +1,6 @@
 
 
-dirs = tests/sim/BFX1_CV tests/ip
+dirs =  tests/ip tests/sim/ngspice/basic
 
 cwd = ${shell pwd}
 

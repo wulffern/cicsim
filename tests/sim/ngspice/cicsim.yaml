@@ -1,0 +1,14 @@
+
+corner:
+  Vt: |
+    .param vdda = 1.8
+  Vl: |
+    .param vdda = 1.62
+  Vh: |
+    .param vdda = 1.98
+  Tt: |
+    .option TEMP=27
+  Th: |
+    .option TEMP=125
+  Tl: |
+    .option TEMP=-40

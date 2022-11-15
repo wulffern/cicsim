@@ -179,11 +179,11 @@ do:
   - git status
   - git commit -m "Initial blank commit" -a
   - ln -s ../../sim/project/lib
-  - cd sim/; cicsim simtb SUN_TEST_GF130N SUN_TEST schematic
-  - cd sim/SUN_TEST; cicsim netlist --top
-  - cd sim/SUN_TEST; cicsim run tran Sch Gt "Mtt,Msf,Mfs,Mss,Mff" Ct Rt "Tt,Th,Tl" Vt Dt Bt
-  - cd sim/SUN_TEST; cicsim results tran
-  - cd sim/SUN_TEST; cicsim netlist
+  #- cd sim/; cicsim simtb SUN_TEST_GF130N SUN_TEST schematic
+  #- cd sim/SUN_TEST; cicsim netlist --top
+  #- cd sim/SUN_TEST; cicsim run tran Sch Gt "Mtt,Msf,Mfs,Mss,Mff" Ct Rt "Tt,Th,Tl" Vt Dt Bt
+  #- cd sim/SUN_TEST; cicsim results tran
+  #- cd sim/SUN_TEST; cicsim netlist
 
 
 echo: |

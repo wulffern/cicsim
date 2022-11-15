@@ -1,0 +1,10 @@
+,vx,name,type,time,OK
+0,0.7914109,tran_SchTlVl,Sch,Tue Nov 15 19:23:37 2022,False
+1,0.839298,tran_SchThVl,Sch,Tue Nov 15 19:23:37 2022,True
+2,0.8069706,tran_SchTtVl,Sch,Tue Nov 15 19:23:37 2022,True
+3,0.9953295,tran_SchTlVh,Sch,Tue Nov 15 19:23:36 2022,True
+4,1.015745,tran_SchThVh,Sch,Tue Nov 15 19:23:36 2022,False
+5,0.9806815,tran_SchTtVh,Sch,Tue Nov 15 19:23:36 2022,True
+6,0.8957421,tran_SchTlVt,Sch,Tue Nov 15 19:23:36 2022,True
+7,0.918516,tran_SchThVt,Sch,Tue Nov 15 19:23:36 2022,True
+8,0.916748,tran_SchTtVt,Sch,Tue Nov 15 19:23:36 2022,True

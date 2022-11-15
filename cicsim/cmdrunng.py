@@ -39,110 +39,109 @@ import importlib
 import datetime
 
 
-class CmdRunNg(cs.CdsConfig):
-    """ Run ngspice
-    """
+class Simulation(cs.CdsConfig):
 
-    def __init__(self,testbench,oformat,runsim,corners,cornername):
-        self.testbench = testbench
-        self.oformat = oformat
+    def __init__(self,testbench,corner,runsim,config,index):
+         #- Permutation variables
+
         self.runsim = runsim
-        self.corners = corners
-        self.cornername = cornername
+        self.corner = corner
+        self.index = index
+        self.testbench = testbench
+        self.rundir = f"output_{self.testbench}"
+
+
+        self.name =  self.testbench +  "_"+ "".join(corner)
+        self.oname = self.rundir + os.path.sep + self.name
+        if(index > 0):
+            self.oname += "_" + str(index)
+            self.name += "_" + str(index)
+
+        self.keys = "|".join(list(self.__dict__.keys()))
+        self.config = config
 
         super().__init__()
+
+    def run(self):
+        res = "{cic(%s)}" % self.keys
+        self.comment("Available replacements %s" %res)
+
+        #- Run simulation, or not, depends on runsim
+        simOk = self.ngspice()
+        if(not simOk):
+            self.error(f"Simulation {self.name} failed ")
+            return
+
+        #- Run measurement if it exists
+        measOk = self.ngspiceMeas()
+
+        if(simOk and measOk):
+            self.parseLog()
+            return True
+        else:
+            return False
 
 
     def removeFile(self,filename):
         os.remove(filename) if os.path.exists(filename) else 0
 
     def ngspice(self):
-        options = ""
-        includes = ""
-        if("ngspice" in self.config):
-            if("options" in self.config["ngspice"]):
-                options = self.config["ngspice"]["options"]
-            else:
-                options = ""
+        simOk = True
+        if(self.runsim):
+            tickTime = datetime.datetime.now()
+            self.makeSpiceFile(self.corner)
+            self.comment(f"Running {self.name}")
 
-        cmd = f"ngspice {options} {includes} {self.ldst_spi} -r {self.raw} 2>&1 |tee {self.log}"
-        
-        self.comment(cmd)
+            options = ""
+            includes = ""
+            if("ngspice" in self.config):
+                if("options" in self.config["ngspice"]):
+                    options = self.config["ngspice"]["options"]
+                else:
+                    options = ""
 
-        #- Remove old files
-        self.removeFile(self.log)
-        #self.removeFile(self.raw)
+            cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
 
-        rawcmd = f"cd {self.rundir} && rm -f {self.name}*.raw"
-        os.system(rawcmd)
+            self.comment(cmd)
 
-        self.removeFile(self.dst_yaml)
+            rawcmd = f"cd {self.rundir} && rm -f {self.name}*.raw"
+            os.system(rawcmd)
 
+            self.removeFile(self.oname + ".yaml")
 
-        # Run NGSPICE
-        self.comment(f"Changing directory to {self.rundir}")
-        os.chdir(self.rundir)
-        err =0
-        try:
-            err = os.system(cmd)
-        except Exception as e:
-            print(e)
+            # Run NGSPICE
+            self.comment(f"Changing directory to {self.rundir}")
 
 
-        self.comment(f"Changing directory back")
-        os.chdir("..")
+            try:
+                err = os.system(cmd)
+            except Exception as e:
+                print(e)
 
+            if(err > 0):
+                simOk = False
 
-        return err
+            nextTime = datetime.datetime.now()
+            self.comment("Corner simulation time : " + str(nextTime - tickTime))
+            tickTime = nextTime
+        else:
+            self.warning(f"Skipping  {self.name}")
 
-    def ngspiceMeas(self):
-
-        cmd = f"ngspice -b {self.ldst_meas}  -o {self.ldst_meas_log}"
-
-        self.comment(cmd)
-
-        #- Remove old files
-        self.removeFile(self.fname + ".logm")
-        os.system(f"cd {self.rundir}; {cmd}")
-
-
-        #- Check meas logfile. ngspice does not always exit cleanly
+         #- Check logfile. ngspice does not always exit cleanly
         errors = list()
-        with open(self.dst_meas_log) as fi:
+        with open(self.oname + ".log") as fi:
             for l in fi:
-                if(re.search("Error:",l)):
-                    errors.append(l.strip())
-                if(re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)):
-                    self.comment(l.strip(),"cyan")
-
-
+                if(re.search("(Error|ERROR):",l)):
+                    errors.append(l)
 
         if(len(errors) > 0):
+            simOk = False
             for line in errors:
-                self.comment(line,"red")
-            return False
-        else:
-            return True
+                print(line.strip())
 
-
-
-
-
-    def replaceLine(self,line):
-
-        selfkeys = "|".join(list(self.__dict__.keys()))
-        res = "{cic(%s)}" % selfkeys
-        m = re.search(res,line)
-
-        if(m is not None):
-            for mg in m.groups():
-                self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
-
-                line = line.replace("{cic%s}" %mg,self.__dict__[mg])
-        return line
+        return simOk
 
     def makeSpiceFile(self,corner):
-
         ss = ""
         if("corner" in self.config):
             for c in corner:
@@ -157,12 +156,11 @@ class CmdRunNg(cs.CdsConfig):
 
         os.makedirs(self.rundir,exist_ok=True)
 
-        with open(self.fdest,"w") as fo:
+        with open(self.oname + ".spi","w") as fo:
             print("cicsimgen " + self.testbench,file=fo)
             print(ss,file=fo)
 
-            with open(self.filename,"r") as fi:
-
+            with open(self.testbench + ".spi","r") as fi:
                 #- Check for #defines
                 state = 0
                 buffer = ""
@@ -198,27 +196,55 @@ class CmdRunNg(cs.CdsConfig):
                         buffif += l
                     elif(state == 2 ):
                         buffelse += l
-                
+
                 line = buffer
 
                 line = self.replaceLine(line)
 
                 print(line,file=fo)
 
-    def makeMeasFile(self):
-        #- Check for a meas file
-        with open(self.src_meas) as fi:
-            with open(self.dst_meas,"w") as fo:
+    def ngspiceMeas(self):
+        meas_src = self.testbench + ".meas"
+        meas_dst = self.oname + ".meas"
+
+        #- Check for a meas file, ignore measurement sim if it's not there
+        if(not os.path.exists(meas_src)):
+            return True
+
+        #- Create the measurement file
+        with open(meas_src) as fi:
+            with open(meas_dst,"w") as fo:
                 for line in fi:
                     line = self.replaceLine(line)
                     fo.write(line)
 
+        #- Run measurement
+        cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
+        self.comment(cmd)
+        os.system(cmd)
+
+        #- Check meas logfile. ngspice does not always exit cleanly
+        errors = list()
+        with open(self.oname + ".logm") as fi:
+            for l in fi:
+                if(re.search("Error:",l) or re.search("failed",l)):
+                    errors.append(l.strip())
+                if(re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)):
+                    self.comment(l.strip(),"cyan")
+
+        if(len(errors) > 0):
+            for line in errors:
+                self.comment(line,"red")
+            return False
+        else:
+            return True
 
     def parseLog(self):
-
         analysis = False
+
+        #- Parse main log file for measurements
         data = dict()
-        with open(self.dst_log) as fi:
+        with open(self.oname + ".log") as fi:
             for l in fi:
                 if(analysis and re.search("=",l)):
                     m = re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)
@@ -235,9 +261,10 @@ class CmdRunNg(cs.CdsConfig):
                     analysis = True
 
         #- Check if there is a measurement log, and read it
-        if(os.path.exists(self.dst_meas_log)):
+        measlog = self.oname + ".logm"
+        if(os.path.exists(measlog)):
             analysis = False
-            with open(self.dst_meas_log) as fi:
+            with open(measlog) as fi:
                 for l in fi:
                     if(analysis and re.search("=",l)):
                         m = re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)
@@ -250,11 +277,35 @@ class CmdRunNg(cs.CdsConfig):
                     if(re.search("^\s*MEAS_END",l)):
                         analysis = False
 
-
-
-        with open(self.dst_yaml,"w") as fo:
-            self.comment(f"Writing {self.dst_yaml}")
+        yamlfile = self.oname + ".yaml"
+        with open(yamlfile,"w") as fo:
+            self.comment(f"Writing {yamlfile}")
             yaml.dump(data,fo)
+
+
+    def replaceLine(self,line):
+        res = "{cic(%s)}" % self.keys
+        m = re.search(res,line)
+
+        if(m is not None):
+            for mg in m.groups():
+                self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
+
+                line = line.replace("{cic%s}" %mg,self.__dict__[mg])
+        return line
+
+class CmdRunNg(cs.CdsConfig):
+    """ Run ngspice
+    """
+
+    def __init__(self,testbench,oformat,runsim,corners,cornername,count):
+        self.testbench = testbench
+        self.count = count
+        self.oformat = oformat
+        self.runsim = runsim
+        self.corners = corners
+        self.cornername = cornername
+        super().__init__()
 
 
     def run(self):
@@ -266,96 +317,29 @@ class CmdRunNg(cs.CdsConfig):
             return
 
         permutations = self.getPermutations(self.corners)
-
-        self.src_meas = self.testbench + ".meas"
-        self.src_py = self.testbench + ".py"
-
         pyRunLater = list()
         files = list()
-        for p in permutations:
-
-            #- Permutation variables
-            self.fname = f"output_{self.testbench}" + os.path.sep + self.testbench +  "_"+ "".join(p)
-            self.name =  self.testbench +  "_"+ "".join(p)
-            self.fdest = self.fname + ".spi"
-            self.ldst_spi = self.name + ".spi"
-            self.dst_meas = self.fname + ".meas"
-            self.ldst_meas = self.name + ".meas"
-            self.dst_meas_log = self.fname + ".logm"
-            self.ldst_meas_log = self.name + ".logm"
-            self.log = self.name + ".log"
-            self.dst_log = self.fname + ".log"
-            self.dst_yaml = self.fname + ".yaml"
-            self.ldst_yaml = self.name + ".yaml"
-            self.dst_raw = self.fname + ".raw"
-            self.raw = self.name + ".raw"
-
-
-            self.rundir = os.path.dirname(self.fdest)
-
-
-            selfkeys = "|".join(list(self.__dict__.keys()))
-            res = "{cic(%s)}" % selfkeys
-            self.comment("Available replacements %s" %res)
-
-            files.append(self.fname)
-
-            simOk = True
-
-            if(self.runsim):
-                tickTime = datetime.datetime.now()
-                self.comment(f"Running  {self.fdest}")
-                self.makeSpiceFile(p)
-                self.comment(f"Running {p}")
-                err = self.ngspice()
-                if(err > 0):
+        simOk = True
+        for corner in permutations:
+            for index in range(0,self.count):
+                #- Run a simulation for a corner
+                c = Simulation(self.testbench,corner,self.runsim,self.config,index)
+                if(not c.run()):
                     simOk = False
-                nextTime = datetime.datetime.now()
-                self.comment("Corner simulation time : " + str(nextTime - tickTime))
-                tickTime = nextTime
-            else:
-                self.warning(f"Skipping  {self.fdest}")
+                    continue
 
+                files.append(c.oname)
 
-
-            #- Check logfile. ngspice does not always exit cleanly
-            errors = list()
-            with open(self.dst_log) as fi:
-                for l in fi:
-                    if(re.search("(Error|ERROR):",l)):
-                        errors.append(l)
-
-            if(len(errors) > 0):
-                simOk = False
-                for line in errors:
-                    print(line.strip())
-
-            if(not simOk):
-                self.error(f"Simulation {self.name} failed ")
-                return
-
-            #- Run measurement if it exists
-            if(os.path.exists(self.src_meas)):
-                self.makeMeasFile()
-
-                #- Does not fail on errors in measurement, just prints them
-                self.ngspiceMeas()
-
-
-
-
-            if(os.path.exists(self.dst_log)):
-                self.parseLog()
-
-            #- Run python post parsing if it exists
-            pyscript = self.testbench + ".py"
-            if(os.path.exists(pyscript)):
-                pyRunLater.append(self.fname)
+                #- Run python post parsing if py file exist and simulation is OK
+                pyscript = c.testbench + ".py"
+                if(simOk and os.path.exists(pyscript)):
+                    pyRunLater.append(c.oname)
 
 
         endTime = datetime.datetime.now()
-        self.comment("Total  simulation time : " + str(endTime - startTime))
+        self.comment("Total simulation time : " + str(endTime - startTime))
 
+        #- Make runfile
         if(self.cornername):
             runfile = self.testbench + "_" + self.cornername + ".run"
         else:
@@ -365,15 +349,16 @@ class CmdRunNg(cs.CdsConfig):
             for f in files:
                 fo.write(f + "\n")
 
-        #- Extract results
-        r = cs.CmdResults(runfile)
-        r.run()
-
-
-        #- Run python
-        if(len(pyRunLater) > 0):
-            sys.path.append(os.getcwd())
-            tb = importlib.import_module(self.testbench)
-            for perm in pyRunLater:
-                self.comment(f"Running {self.testbench}.py with {perm}")
-                tb.main(perm)
+        if(simOk):
+            #- Run python
+            if(len(pyRunLater) > 0):
+                sys.path.append(os.getcwd())
+                tb = importlib.import_module(self.testbench)
+                for perm in pyRunLater:
+                    self.comment(f"Running {self.testbench}.py with {perm}")
+                    tb.main(perm)
+            #- Extract results
+            r = cs.CmdResults(runfile)
+            r.run()
+        else:
+            self.warning("Skipping post processing, one simulation failed")

@@ -61,11 +61,12 @@ def cli():
 @click.argument("corner",nargs=-1)
 @click.option("--oformat",default="spectre",help="spectre|aimspice")
 @click.option("--run/--no-run", default=True, help="Run simulator")
-@click.option("--runname", default=None, help="Control name of run file")
-def run(testbench,oformat,run,corner,runname):
+@click.option("--count", default=1, help="Run each corner count times, useful for Monte-Carlo")
+@click.option("--name", default=None, help="Control name of run file")
+def run(testbench,oformat,run,corner,count,name):
     """Run a ngspice simulation of TESTBENCH
     """
-    r = cs.CmdRunNg(testbench,oformat,run,corner,runname)
+    r = cs.CmdRunNg(testbench,oformat,run,corner,name,count)
     r.run()
 
 

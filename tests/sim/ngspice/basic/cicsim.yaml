@@ -1,0 +1,7 @@
+corner:
+  Lay: ''
+  Sch: ''
+ngspice:
+  library: RPLY_BIAS_SKY130NM
+  cell: RPLY_BIAS
+  options: -b

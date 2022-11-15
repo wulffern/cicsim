@@ -301,6 +301,9 @@ class CmdResults(cs.Command):
     def run(self):
 
         df_all = self.readYaml()
+        if(df_all is None):
+            self.warning("No results found in yaml file")
+            return
 
         #-Print all resutlts
         print(df_all.to_markdown(index=False,tablefmt="github",floatfmt=".5g"))
