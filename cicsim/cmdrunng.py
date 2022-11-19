@@ -111,11 +111,15 @@ class Simulation(cs.CdsConfig):
 
             # Run NGSPICE
             try:
-                err = os.system(cmd)
+                self.err = os.system(cmd)
             except Exception as e:
                 print(e)
 
-            if(err > 0):
+            #- Exit directly if Ctrl-C is pressed
+            if(self.err == 2):
+                exit()
+
+            if(self.err > 0):
                 simOk = False
 
             nextTime = datetime.datetime.now()
@@ -325,7 +329,9 @@ class CmdRunNg(cs.CdsConfig):
                     simOk = False
                     continue
 
+
                 files.append(c.oname)
+
 
                 #- Run python post parsing if py file exist and simulation is OK
                 pyscript = c.testbench + ".py"
@@ -338,6 +344,7 @@ class CmdRunNg(cs.CdsConfig):
 
         #- Make runfile
         if(self.cornername):
+            view = "_"
             runfile = self.testbench + "_" + self.cornername + ".run"
         else:
             runfile = self.testbench + "_" + self.getShortName(self.corners) + ".run"

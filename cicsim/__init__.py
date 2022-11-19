@@ -13,6 +13,8 @@ from .cmdsimdir import *
 from .cmdsimdirng import *
 from .cmdrun import *
 from .cmdrunng import *
+from .cmdsummary import *
 from cicsim import *
 from .ngraw import *
 from .plot import *
+from .spec import *

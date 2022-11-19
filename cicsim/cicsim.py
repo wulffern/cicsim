@@ -84,9 +84,18 @@ def plot(filename,xname,yname,ptype):
 @cli.command()
 @click.argument("runfile")
 def results(runfile):
-    """Summarize results of runfile
+    """Results of single runfile
     """
     r = cs.CmdResults(runfile)
+    r.run()
+
+@cli.command()
+@click.option("--filename",default="summary.yaml",help="Input config file")
+@click.option("--output",default="summary.md",help="Output summary file")
+def summary(filename,output):
+    """Generate simulation summary for results
+    """
+    r = cs.CmdSummary(filename,output)
     r.run()
 
 @cli.command()
