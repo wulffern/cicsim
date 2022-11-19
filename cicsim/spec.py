@@ -96,7 +96,7 @@ class SpecMinMax:
         if(self.OK(v)):
             return md
         else:
-            return "<span style='color:red'>" + md + "</span>"
+            return "<span style='color:red'>**" + md + "**</span>"
 
 
 
