@@ -72,6 +72,16 @@ class CmdIp(cs.Command):
         self.cell = cell
         super().__init__()
 
+    def getReplacedBuffer(self,filename):
+        with open(filename,"r") as fi:
+            buffer = fi.read()
+            buffer = self.sub(buffer,{ "CELL": self.cell,
+                                       "IP" : self.ip,
+                                       "cell": self.cell.lower(),
+                                       "ip" : self.ip.lower()
+                                      })
+        return buffer
+
     def run(self):
         if not os.path.exists(self.template):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), self.template)
@@ -83,14 +93,7 @@ class CmdIp(cs.Command):
             useCellName = True
 
 
-        with open(self.template,"r") as fi:
-            buffer = fi.read()
-            buffer = self.sub(buffer,{ "CELL": self.cell,
-                                       "IP" : self.ip,
-                                       "cell": self.cell.lower(),
-                                       "ip" : self.ip.lower()
-
-                                      })
+        buffer = self.getReplacedBuffer(self.template)
 
         self.buf =  yaml.safe_load(buffer)
 
@@ -124,14 +127,26 @@ class CmdIp(cs.Command):
 
 
     def copy(self,data):
+        replaceVars = False
+
         if not self.src:
-            return
+            path = ".." + os.path.sep + os.path.dirname(self.template) + os.path.sep
+            replaceVars = True
+        else:
+            path = ".." + os.path.sep + self.src + os.path.sep
+
         for f in data:
-            fsrc = ".." + os.path.sep + self.src + os.path.sep + f
+
+            fsrc = path + f
             self.comment("copy: '%s'" %fsrc)
             self.content.append(f)
             if(os.path.exists(fsrc)):
-                sh.copy(fsrc,f,follow_symlinks=False)
+                if(replaceVars):
+                    buffer = self.getReplacedBuffer(fsrc)
+                    with open(f,"w") as fo:
+                        fo.write(buffer)
+                else:
+                    sh.copy(fsrc,f,follow_symlinks=False)
             else:
                 self.comment("Could find %s" %fsrc)
 

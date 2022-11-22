@@ -35,11 +35,16 @@ class ResultFile(cs.Command):
 
         if("typ" in self.method):
             self.typical = self.df.median()
-        elif("3sigma" in self.method):
+        elif("3std" in self.method):
             self.typical = self.df.mean()
             std = self.df.std()
             self.minimum = self.typical - 3*std
             self.maximum = self.typical + 3*std
+        elif("std" in self.method):
+            self.typical = self.df.mean()
+            std = self.df.std()
+            self.minimum = self.typical - std
+            self.maximum = self.typical + std
         else:
             self.minimum = self.df.min()
             self.typical = self.df.median()

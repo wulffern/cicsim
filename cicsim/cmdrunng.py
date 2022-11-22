@@ -301,12 +301,19 @@ class CmdRunNg(cs.CdsConfig):
 
     def __init__(self,testbench,oformat,runsim,corners,cornername,count):
         self.testbench = testbench
+
+
         self.count = count
         self.oformat = oformat
         self.runsim = runsim
         self.corners = corners
         self.cornername = cornername
         super().__init__()
+
+        if("_" in self.testbench ):
+            self.error("Testbench name cannot contain '_'")
+            exit(1)
+
 
 
     def run(self):
