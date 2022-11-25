@@ -17,7 +17,7 @@ setuptools.setup(
     entry_points = {'console_scripts': [
         'cicsim = cicsim.cicsim:cli',
     ]},
-    install_requires = 'matplotlib numpy '.split(),
+    install_requires = 'matplotlib numpy jinja2'.split(),
     classifiers = [
         'Development Status :: 1 - Alpha',
         'Intended Audience :: Developers',
