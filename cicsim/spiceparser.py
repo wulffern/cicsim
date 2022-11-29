@@ -68,7 +68,6 @@ class SpiceParser():
 
         cktstr = re.sub("\s+"," ",cktstr)
 
-        # TODO Add support for paramters on subckt?
 
         ports = cktstr.split(" ")
         #- Remove .SUBCKT
