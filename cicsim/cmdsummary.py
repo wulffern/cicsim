@@ -42,9 +42,8 @@ class ResultFile(cs.Command):
             self.maximum = self.typical + 3*std
         elif("std" in self.method):
             self.typical = self.df.mean()
-            std = self.df.std()
-            self.minimum = self.typical - std
-            self.maximum = self.typical + std
+            self.minimum = self.typical - self.df.std()
+            self.maximum = self.typical + self.df.std()
         else:
             self.minimum = self.df.min()
             self.typical = self.df.median()

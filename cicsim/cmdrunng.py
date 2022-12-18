@@ -330,6 +330,10 @@ class CmdRunNg(cs.CdsConfig):
         simOk = True
         for corner in permutations:
             for index in range(0,self.count):
+                if(not simOk):
+                    self.error(f"Previous simulation failed, skipping {index}")
+                    continue
+
                 #- Run a simulation for a corner
                 c = Simulation(self.testbench,corner,self.runsim,self.config,index)
                 if(not c.run()):
@@ -344,6 +348,8 @@ class CmdRunNg(cs.CdsConfig):
                 pyscript = c.testbench + ".py"
                 if(simOk and os.path.exists(pyscript)):
                     pyRunLater.append(c.oname)
+
+
 
 
         endTime = datetime.datetime.now()

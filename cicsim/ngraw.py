@@ -77,6 +77,19 @@ def toDataFrames(ngarr):
         dfs.append(df)
     return dfs
 
+def toDataFrame(fraw):
+    (arrs,plots) = ngRawRead(fraw)
+    dfs = list()
+    for i in range(0,len(plots)):
+        df = pd.DataFrame(data=arrs[0],columns=plots[0]['varnames'])
+        dfs.append(df)
+
+    if(len(dfs)> 0):
+        return dfs[0]
+    else:
+        return None
+
+
 
 
 
