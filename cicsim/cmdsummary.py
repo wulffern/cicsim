@@ -106,6 +106,7 @@ class SimulationSummary(cs.Command):
 
         pass
 
+        ss += "\n"
 
 
         return ss
