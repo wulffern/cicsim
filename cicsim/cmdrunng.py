@@ -133,7 +133,9 @@ class Simulation(cs.CdsConfig):
         with open(self.oname + ".log") as fi:
             for l in fi:
                 if(re.search("(Error|ERROR):",l)):
-                    errors.append(l)
+                    #- Skip reporting error if it's only the graphics
+                    if(not re.search("no graphics interface",l)):
+                        errors.append(l)
 
         if(len(errors) > 0):
             simOk = False
