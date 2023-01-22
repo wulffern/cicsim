@@ -100,8 +100,8 @@ class CmdResults(cs.Command):
 
         text_file = open(f"results/{self.ofile}.html", "w")
         text_file.write(self.header)
-        text_file.write(df.describe().style.format(specs.format_dict()).render())
-        text_file.write(st.hide_index().render())
+        text_file.write(df.describe().style.format(specs.format_dict()).to_html())
+        text_file.write(st.hide(axis='index').to_html())
         text_file.write(self.footer)
         text_file.close()
 
