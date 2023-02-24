@@ -67,7 +67,8 @@ class SpecMinMax:
 
         css = list()
         for v in ser:
-            if(v > self.max or v < self.min):
+
+            if(self.max and self.min and (v > self.max or v < self.min)):
                 css.append('background-color:lightcoral')
             else:
                 css.append('')
@@ -81,17 +82,24 @@ class SpecMinMax:
 
         return s*self.scale
     def OK(self,v):
-        if(v > self.max or v < self.min):
+        if(self.min and self.max and (v > self.max or v < self.min)):
             return False
         else:
             return True
     def string(self,v):
-        return str.format(self.format(),v)
+        if(v):
+            return str.format(self.format(),v)
+        else:
+            return ""
 
     def stringNoUnit(self,v):
+        if(v is None):
+            return ""
         return str.format("{0:.%df}" % (self.digits),v)
 
     def markdown(self,v):
+        if(v is None):
+            return ""
         md = str.format("{0:.%df}" % (self.digits),v)
         if(self.OK(v)):
             return md
