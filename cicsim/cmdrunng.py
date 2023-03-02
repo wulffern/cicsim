@@ -62,18 +62,19 @@ class Simulation(cs.CdsConfig):
 
         super().__init__()
 
-    def run(self):
+    def run(self,ignore=False):
         res = "{cic(%s)}" % self.keys
         self.comment("Available replacements %s" %res)
 
         #- Run simulation, or not, depends on runsim
-        simOk = self.ngspice()
+        simOk = self.ngspice(ignore)
+
         if(not simOk):
             self.error(f"Simulation {self.name} failed ")
             return
 
         #- Run measurement if it exists
-        measOk = self.ngspiceMeas()
+        measOk = self.ngspiceMeas(ignore)
 
         if(simOk and measOk):
             self.parseLog()
@@ -85,7 +86,7 @@ class Simulation(cs.CdsConfig):
     def removeFile(self,filename):
         os.remove(filename) if os.path.exists(filename) else 0
 
-    def ngspice(self):
+    def ngspice(self,ignore=True):
         simOk = True
         if(self.runsim):
             tickTime = datetime.datetime.now()
@@ -142,7 +143,7 @@ class Simulation(cs.CdsConfig):
             for line in errors:
                 print(line.strip())
 
-        return simOk
+        return simOk if not ignore else True
 
     def makeSpiceFile(self,corner):
         ss = ""
@@ -206,7 +207,7 @@ class Simulation(cs.CdsConfig):
 
                 print(line,file=fo)
 
-    def ngspiceMeas(self):
+    def ngspiceMeas(self,ignore=False):
         meas_src = self.testbench + ".meas"
         meas_dst = self.oname + ".meas"
 
@@ -238,7 +239,7 @@ class Simulation(cs.CdsConfig):
         if(len(errors) > 0):
             for line in errors:
                 self.comment(line,"red")
-            return False
+            return False if not ignore else True
         else:
             return True
 
@@ -318,7 +319,7 @@ class CmdRunNg(cs.CdsConfig):
 
 
 
-    def run(self):
+    def run(self,ignore=False):
         startTime = datetime.datetime.now()
         
         self.filename = self.testbench + ".spi"
@@ -338,7 +339,7 @@ class CmdRunNg(cs.CdsConfig):
 
                 #- Run a simulation for a corner
                 c = Simulation(self.testbench,corner,self.runsim,self.config,index)
-                if(not c.run()):
+                if(not c.run(ignore)):
                     simOk = False
                     continue
 

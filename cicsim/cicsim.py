@@ -63,11 +63,12 @@ def cli():
 @click.option("--run/--no-run", default=True, help="Run simulator")
 @click.option("--count", default=1, help="Run each corner count times, useful for Monte-Carlo")
 @click.option("--name", default=None, help="Control name of run file")
-def run(testbench,oformat,run,corner,count,name):
+@click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error check")
+def run(testbench,oformat,run,corner,count,name,ignore):
     """Run a ngspice simulation of TESTBENCH
     """
     r = cs.CmdRunNg(testbench,oformat,run,corner,name,count)
-    r.run()
+    r.run(ignore)
 
 
 @cli.command()
