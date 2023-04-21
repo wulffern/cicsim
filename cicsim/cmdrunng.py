@@ -207,6 +207,7 @@ class Simulation(cs.CdsConfig):
 
                 print(line,file=fo)
 
+
     def ngspiceMeas(self,ignore=False):
         meas_src = self.testbench + ".meas"
         meas_dst = self.oname + ".meas"
@@ -295,7 +296,7 @@ class Simulation(cs.CdsConfig):
             for mg in m.groups():
                 self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
 
-                line = line.replace("{cic%s}" %mg,self.__dict__[mg])
+                line = line.replace("{cic%s}" %mg,str(self.__dict__[mg]))
         return line
 
 class CmdRunNg(cs.CdsConfig):
