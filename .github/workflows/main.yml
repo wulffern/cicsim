@@ -17,26 +17,19 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.6','3.7','3.8','3.9']
-
+    container:
+      image: wulffern/aicex:latest
+      options: --user root
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-
       # Runs a single command using the runners shell
       - name: install setup
         run: |
+          export PDK_ROOT=/opt/pdk/share/pdk
+          export PATH=/opt/eda/bin:$HOME/.local/bin:$PATH
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt 
-          pip3 install --no-deps   .
-          cd tests/sim/BFX1_CV
-          export PATH=/home/runner/.local/bin:$PATH
-          make
-          cd ../../ip
-          export PROJECT=`pwd`/sun_test_gf130n
-          cicsim ip SUN_TEST_GF130N module_template.yaml
+          pip3 install    .
+          make test
