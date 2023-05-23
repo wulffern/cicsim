@@ -111,6 +111,7 @@ class SimCalc():
         data["sfdr"] = max(ydB) - np.max(ydB[noisebins])
         data["enob"] = (data["sndr"]-1.76)/6.02
 
+
         return (data,ydB)
         
 
