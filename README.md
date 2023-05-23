@@ -20,7 +20,7 @@ This is a script package I use to control ngspice, it can
 |:--------|:----------------------------|:------------------------|
 | 0.0.1   | :white_check_mark:          | First version of cicsim |
 | 0.0.3   | All in on open source tools |                         |
-| 0.1.2   | First version on cicpy      |                         |
+| 0.1.2   | First version on pipy      |                         |
 
 # Install this module
 If you want to follow the latest and greatest
@@ -37,7 +37,8 @@ python3 -m pip install cicpy
 ```
 
 # Get started with simulation
-Head over to [wulffern/aicex](https://github.com/wulffern/aicex) to see how it works
+Head over to [Open source analog integrated circuit flow on Skywater
+130nm](https://analogicus.com/rply_ex0_sky130nm/tutorial) to see cicsim in action.
 
 # Commands
 
