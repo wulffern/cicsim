@@ -3,6 +3,7 @@
 *.log
 tmp/
 
+dist/
 *.py[cod]
 *.egg
 *.egg-info

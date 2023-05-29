@@ -5,8 +5,10 @@ dirs =  tests/ip tests/sim/ngspice/basic
 cwd = ${shell pwd}
 
 test:
+	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make test || exit  ;}
 
-	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make test ;}
+clean:
+	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make clean || exit  ;}
 
 build:
 	python3 -m build
