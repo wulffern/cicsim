@@ -19,6 +19,7 @@ class ResultFile(cs.Command):
         self.minimum = None
         self.typ = None
         self.maximum = None
+        self.typical = None
 
         if(not os.path.exists(self.src)):
             self.warning(f"Could not find {self.src}")
