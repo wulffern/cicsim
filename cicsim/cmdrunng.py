@@ -37,19 +37,25 @@ import shutil as sh
 import sys
 import importlib
 import datetime
+import hashlib
 
 
 class Simulation(cs.CdsConfig):
 
-    def __init__(self,testbench,corner,runsim,config,index):
+    def __init__(self,testbench,corner,runsim,config,index,sha=False):
          #- Permutation variables
 
         self.runsim = runsim
+        self.runmeas = True
         self.corner = corner
         self.index = index
         self.testbench = testbench
         self.rundir = f"output_{self.testbench}"
+        self.sha = sha
 
+        #- Store sha128 checksums for files
+        self.shas = dict()
+        self.oldsha  = dict()
 
         self.name =  self.testbench +  "_"+ "".join(corner)
         self.oname = self.rundir + os.path.sep + self.name
@@ -62,19 +68,72 @@ class Simulation(cs.CdsConfig):
 
         super().__init__()
 
+    def addSha(self,filename):
+        self.shas[filename] = hashlib.sha256(open(self.rundir + os.path.sep+ filename,"rb").read()).hexdigest()
+
+    def loadSha(self):
+        shafile = self.oname + ".sha"
+        if(os.path.exists(shafile)):
+            with open(shafile) as fi:
+                self.oldsha = yaml.safe_load(fi.read())
+
+    def matchSha(self,key):
+        match = True
+        if(key in self.oldsha):
+            if(self.shas[key] != self.oldsha[key]):
+                    match =  False
+        else:
+            match = False
+        return match
+
+    def matchAllSha(self):
+        match = True
+        for f in self.shas:
+            if(not self.matchSha(f)):
+                match = False
+
+        return match
+
+    def saveSha(self):
+        shafile = self.oname + ".sha"
+        with open(shafile,"w") as fo:
+            fo.write(yaml.dump(self.shas))
+
     def run(self,ignore=False):
+
+        #- Load shas
+        self.loadSha()
+
         res = "{cic(%s)}" % self.keys
         self.comment("Available replacements %s" %res)
 
+        #- Make spice file
+        if(self.runsim):
+            self.makeSpiceFile(self.corner)
+
+        #- Maybe run sim if no input files have changed
+        if(self.sha and self.matchAllSha()):
+            self.comment("No spice files have changed", "yellow")
+            self.runsim = False
+
         #- Run simulation, or not, depends on runsim
         simOk = self.ngspice(ignore)
+
 
         if(not simOk):
             self.error(f"Simulation {self.name} failed ")
             return
 
-        #- Run measurement if it exists
+        self.makeMeasFile()
+
+        #- Run measurement if it exists, check sha though
+        if(self.sha and self.matchSha(self.name + ".meas")):
+            self.comment("No meas files have changed", "yellow")
+            self.runmeas = False
         measOk = self.ngspiceMeas(ignore)
+
+
+        self.saveSha()
 
         if(simOk and measOk):
             self.parseLog()
@@ -83,14 +142,17 @@ class Simulation(cs.CdsConfig):
             return False
 
 
+
+
     def removeFile(self,filename):
         os.remove(filename) if os.path.exists(filename) else 0
 
     def ngspice(self,ignore=True):
         simOk = True
+
         if(self.runsim):
             tickTime = datetime.datetime.now()
-            self.makeSpiceFile(self.corner)
+
             self.comment(f"Running {self.name}")
 
             options = ""
@@ -127,7 +189,7 @@ class Simulation(cs.CdsConfig):
             self.comment("Corner simulation time : " + str(nextTime - tickTime))
             tickTime = nextTime
         else:
-            self.warning(f"Skipping  {self.name}")
+            self.warning(f"Skipping simulation of {self.name}.spi")
 
          #- Check logfile. ngspice does not always exit cleanly
         errors = list()
@@ -159,6 +221,7 @@ class Simulation(cs.CdsConfig):
                     ss += "*define " + c.upper() + "\n"
 
         os.makedirs(self.rundir,exist_ok=True)
+
 
         with open(self.oname + ".spi","w") as fo:
             print("cicsimgen " + self.testbench,file=fo)
@@ -201,14 +264,20 @@ class Simulation(cs.CdsConfig):
                     elif(state == 2 ):
                         buffelse += l
 
-                line = buffer
+                sfile = self.replaceLine(buffer)
 
-                line = self.replaceLine(line)
+                #- Store shas for any includes
+                incfiles = re.findall(r"\s*\.include\s+(.*)\n",sfile)
 
-                print(line,file=fo)
+                for f in incfiles:
+                    self.addSha(f)
 
+                print(sfile,file=fo)
 
-    def ngspiceMeas(self,ignore=False):
+        #- Store the Sha for the testbench
+        self.addSha(self.name + ".spi")
+
+    def makeMeasFile(self,ignore=False):
         meas_src = self.testbench + ".meas"
         meas_dst = self.oname + ".meas"
 
@@ -223,10 +292,18 @@ class Simulation(cs.CdsConfig):
                     line = self.replaceLine(line)
                     fo.write(line)
 
+        #- Store the sha for the measurement file
+        self.addSha(self.name + ".meas")
+
+    def ngspiceMeas(self,ignore=False):
+
         #- Run measurement
-        cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
-        self.comment(cmd)
-        os.system(cmd)
+        if(self.runmeas):
+            cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
+            self.comment(cmd)
+            os.system(cmd)
+        else:
+            self.comment(f"Skipping measurment run of {self.name}.meas","yellow")
 
         #- Check meas logfile. ngspice does not always exit cleanly
         errors = list()
@@ -303,7 +380,7 @@ class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,oformat,runsim,corners,cornername,count):
+    def __init__(self,testbench,oformat,runsim,corners,cornername,count,sha):
         self.testbench = testbench
 
 
@@ -312,6 +389,7 @@ class CmdRunNg(cs.CdsConfig):
         self.runsim = runsim
         self.corners = corners
         self.cornername = cornername
+        self.sha = sha
         super().__init__()
 
         if("_" in self.testbench ):
@@ -339,7 +417,7 @@ class CmdRunNg(cs.CdsConfig):
                     continue
 
                 #- Run a simulation for a corner
-                c = Simulation(self.testbench,corner,self.runsim,self.config,index)
+                c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha)
                 if(not c.run(ignore)):
                     simOk = False
                     continue
@@ -352,8 +430,6 @@ class CmdRunNg(cs.CdsConfig):
                 pyscript = c.testbench + ".py"
                 if(simOk and os.path.exists(pyscript)):
                     pyRunLater.append(c.oname)
-
-
 
 
         endTime = datetime.datetime.now()
