@@ -64,10 +64,11 @@ def cli():
 @click.option("--count", default=1, help="Run each corner count times, useful for Monte-Carlo")
 @click.option("--name", default=None, help="Control name of run file")
 @click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error check")
-def run(testbench,oformat,run,corner,count,name,ignore):
+@click.option("--sha/--no-sha", default=False, help="Check SHA of input files")
+def run(testbench,oformat,run,corner,count,name,ignore,sha):
     """Run a ngspice simulation of TESTBENCH
     """
-    r = cs.CmdRunNg(testbench,oformat,run,corner,name,count)
+    r = cs.CmdRunNg(testbench,oformat,run,corner,name,count,sha)
     r.run(ignore)
 
 
