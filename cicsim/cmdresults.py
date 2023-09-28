@@ -97,6 +97,7 @@ class CmdResults(cs.Command):
         if(not os.path.exists("results")):
             os.mkdir("results")
 
+        self.comment(f"Writing CSV results/{self.ofile}.csv")
         df.to_csv(f"results/{self.ofile}.csv")
 
         text_file = open(f"results/{self.ofile}.html", "w")

@@ -25,9 +25,6 @@
 ##
 ######################################################################
 
-# TODO Add hash of spice netlist. Don't rerun if all spice files are the same.
-#       However, what should I do about .includes?
-
 import cicsim as cs
 import re
 import os
@@ -69,7 +66,12 @@ class Simulation(cs.CdsConfig):
         super().__init__()
 
     def addSha(self,filename):
-        self.shas[filename] = hashlib.sha256(open(self.rundir + os.path.sep+ filename,"rb").read()).hexdigest()
+
+        fpath = self.rundir + os.path.sep+ filename
+        if(os.path.exists(fpath)):
+            self.shas[filename] = hashlib.sha256(open(fpath,"rb").read()).hexdigest()
+        else:
+            self.warning(f"Could not find referenced file {fpath}")
 
     def loadSha(self):
         shafile = self.oname + ".sha"
@@ -127,7 +129,7 @@ class Simulation(cs.CdsConfig):
         self.makeMeasFile()
 
         #- Run measurement if it exists, check sha though
-        if(self.sha and self.matchSha(self.name + ".meas")):
+        if(self.sha and not self.runsim and self.matchSha(self.name + ".meas")):
             self.comment("No meas files have changed", "yellow")
             self.runmeas = False
         measOk = self.ngspiceMeas(ignore)
@@ -267,7 +269,7 @@ class Simulation(cs.CdsConfig):
                 sfile = self.replaceLine(buffer)
 
                 #- Store shas for any includes
-                incfiles = re.findall(r"\s*\.include\s+(.*)\n",sfile)
+                incfiles = re.findall(r"[^\*]\s*\.include\s+(.*)\n",sfile)
 
                 for f in incfiles:
                     self.addSha(f)
