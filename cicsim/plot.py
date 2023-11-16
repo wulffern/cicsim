@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import sys
 import math
-import tikzplotlib
+#import tikzplotlib
 from .ngraw import *
 
 
