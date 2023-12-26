@@ -71,6 +71,34 @@ def run(testbench,oformat,run,corner,count,name,ignore,sha):
     r = cs.CmdRunNg(testbench,oformat,run,corner,name,count,sha)
     r.run(ignore)
 
+@cli.command()
+@click.argument("files",nargs=-1)
+def wave(files):
+    """Open waveform viewer"""
+    c = cs.CmdWave()
+    for f in files:
+        c.openFile(f)
+    c.run()
+
+
+
+@cli.command()
+@click.argument("testbench")
+@click.argument("corner",nargs=-1)
+@click.option("--oformat",default="spectre",help="spectre")
+@click.option("--run/--no-run", default=True, help="Run simulator")
+@click.option("--ocn/--no-ocn", default=True, help="Run ocean")
+#@click.option("--count", default=1, help="Run each corner count times, useful for Monte-Carlo")
+#@click.option("--name", default=None, help="Control name of run file")
+#@click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error check")
+#@click.option("--sha/--no-sha", default=False, help="Check SHA of input files")
+def srun(testbench,corner,oformat,run,ocn,count,name,ignore,sha):
+    """Run a spectre simulation of TESTBENCH
+    """
+
+    r = cs.CmdRun(testbench,oformat,run,ocn,corner)
+    r.run(ignore)
+
 
 @cli.command()
 @click.argument("filename")
