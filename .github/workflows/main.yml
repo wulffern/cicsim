@@ -29,5 +29,7 @@ jobs:
           export PDK_ROOT=/opt/pdk/share/pdk
           export PATH=/opt/eda/bin:$HOME/.local/bin:$PATH
           python3 -m pip install --upgrade pip
-          pip3 install    .
+          python3 -m pip uninstall cicsim -y
+          python3 -m pip install  .
+          cicsim --help
           make test

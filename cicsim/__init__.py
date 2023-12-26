@@ -13,11 +13,12 @@ from .cmdsimdir import *
 from .cmdsimdirng import *
 from .cmdrun import *
 from .cmdrunng import *
-from .cmdwave import *
 from .cmdsummary import *
 #from cicsim import *
 from .ngraw import *
 from .plot import *
 from .spec import *
 
-from .wavebrowser import *
+import importlib.util
+if importlib.util.find_spec("tkinter"):
+    from .cmdwave import *

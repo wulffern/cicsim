@@ -8,6 +8,12 @@ version = "0.1.4"
 authors = [
   { name="Carsten Wulff", email="carsten@wulff.no" },
 ]
+dependencies = [
+  "numpy",
+  "pandas",
+  "jinja2",
+  "matplotlib"
+]
 description = "Custom IC Creator Simulation Tools"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -16,6 +22,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
+[project.scripts]
+cicsim = "cicsim.cicsim:cli"
 
 [project.urls]
 "Homepage" = "https://github.com/wulffern/cicsim"
