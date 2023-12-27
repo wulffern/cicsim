@@ -10,7 +10,7 @@ This is a script package I use to control ngspice, it can
 - Run corner simulations
 - Create IPs (used in  [wulffern/aicex](https://github.com/wulffern/aicex) )
 - Create simulation directories
-- View waverforms
+- View waveforms
 
 # Changelog
 
