@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-#
+
+#- Controller for waves
+
 from tkinter import *
 from tkinter import ttk
 import cicsim as cs
 import os
 
+#- Data Model
 from .wavefiles import *
 
 class WaveBrowser(ttk.Frame):
+    """
+The WaveBrowser keeps track of files loaded, and shows the waves in the files.
 
+Click on a wave will ask the WaveGraph to show the plot
+    """
     def __init__(self,simfolder,graph,master=None,**kw):
 
         super().__init__(master,width=300,borderwidth=1,relief="raised",**kw)
@@ -31,7 +38,6 @@ class WaveBrowser(ttk.Frame):
 
     def fileSelected(self,event):
         fname = self.tr_files.focus()
-        print(f"Select {fname}")
         self.files.select(fname)
         self.fillColumns()
 
@@ -39,7 +45,7 @@ class WaveBrowser(ttk.Frame):
         yname = self.tr_waves.focus()
         if(yname == ""):
             return
-        self.graph.show(self.files.getSelected(),yname)
+        self.graph.show(self.files.getSelected().getWave(yname))
 
     def fillColumns(self):
         #- Clear Treeview

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-#
+
+#- Viewer for waves
+
 from tkinter import *
 from tkinter import ttk
 import tkinter
@@ -18,22 +20,30 @@ class WavePlot(ttk.PanedWindow):
         frm = ttk.Frame(self)
         self.add(frm)
         self.tree = ttk.Treeview(frm)
-        breloadAll = ttk.Button(frm,text="Reload",command=self.reloadAll)
-        bdelete = ttk.Button(frm,text="Remove",command=self.removeLine)
-        bdeleteAll = ttk.Button(frm,text="Remove All",command=self.removeAll)
-        bautosize = ttk.Button(frm,text="Auto size",command=self.autoSize)
         self.tree.grid(column=0,row=0,columnspan=2,sticky=(N,S,E,W))
-        bdelete.grid(column=0,row=1,sticky=(S,E,W))
-        bdeleteAll.grid(column=1,row=1,sticky=(S,E,W))
+
+        breloadAll = ttk.Button(frm,text="Reload",command=self.reloadAll)
         breloadAll.grid(column=0,row=2,sticky=(S,E,W))
+
+        bdelete = ttk.Button(frm,text="Remove",command=self.removeLine)
+        bdelete.grid(column=0,row=1,sticky=(S,E,W))
+
+        bdeleteAll = ttk.Button(frm,text="Remove All",command=self.removeAll)
+        bdeleteAll.grid(column=1,row=1,sticky=(S,E,W))
+
+        bautosize = ttk.Button(frm,text="Auto size",command=self.autoSize)
         bautosize.grid(column=1,row=2,sticky=(S,E,W))
+
+        #baddaxis = ttk.Button(frm,text="Add Axis",command=self.addAxis)
+        #baddaxis.grid(column=1,row=3,sticky=(S,E,W))
+
+
         frm.columnconfigure(0,weight=1)
         frm.rowconfigure(0,weight=1)
 
         self.fig = Figure(dpi=100)
-        self.ax  = self.fig.add_subplot()
-        self.ax.grid()
-        self.ax.autoscale()
+        self.gridspec = self.fig.add_gridspec(1, 1)
+
         frame = ttk.Frame(self)
         self.add(frame)
         self.canvas = FigureCanvasTkAgg(self.fig, master=frame)# A tk.DrawingArea.
@@ -47,35 +57,27 @@ class WavePlot(ttk.PanedWindow):
         self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=True)
 
         self.waves = dict()
+        self.axes = list()
+        self.index = 0
+        self.addAxis()
         pass
 
-    def show(self,wfile,ylabel):
-
-        wave = wfile.getWave(ylabel)
+    def show(self,wave):
 
         if(wave.tag in self.waves):
             return
 
-        if(wave.x is not None):
-            if(not wave.logx and not wave.logy):
-                wave.line, = self.ax.plot(wave.x,wave.y,label=wave.ylabel)
-            elif(wave.logx and not wave.logy):
-                wave.line, = self.ax.semilogx(wave.x,wave.y,label=wave.ylabel)
-            elif(not wave.logx and wave.logy):
-                wave.line, = self.ax.semilogy(wave.x,wave.y,label=wave.ylabel)
-            elif(wave.logx and wave.logy):
-                wave.line, = self.ax.loglog(wave.x,wave.y,label=wave.ylabel)
-        else:
-            wave.line, = self.ax.plot(wave.y,label=wave.ylabel)
+        #- Let the wave figure out how to plot on the axis
+        wave.plot(self.axes[self.index])
 
+        #- Set Meta info on the wave
         self.waves[wave.tag] = wave
-
-        self.tree.insert('','end',wave.tag,text=ylabel,tags=(wave.tag,))
+        self.tree.insert('','end',wave.tag,text=wave.ylabel,tags=(wave.tag,))
         self.tree.tag_configure(wave.tag,foreground=wave.line.get_color())
-        self.ax.set_xlabel(wave.xlabel)
         self.canvas.draw()
 
     def removeAll(self):
+        """Go through all waves in treeview and remove them"""
         ll = self.tree.get_children()
         for tag in ll:
             self.removeTag(tag)
@@ -83,13 +85,20 @@ class WavePlot(ttk.PanedWindow):
         self.canvas.draw()
         pass
 
+    def addAxis(self):
+        ax  = self.fig.add_subplot()
+        ax.grid()
+        ax.autoscale()
+        self.axes.append(ax)
+        self.index = len(self.axes)-1
+        pass
 
     def autoSize(self):
-        if(self.ax):
-            self.ax.relim()
-            self.ax.autoscale_view(True,True,True)
-            self.canvas.draw()
-        pass
+        for ax in self.axes:
+            if(ax):
+                ax.relim()
+                ax.autoscale_view(True,True,True)
+        self.canvas.draw()
 
     def reloadAll(self):
         ll = self.tree.get_children()
@@ -97,7 +106,6 @@ class WavePlot(ttk.PanedWindow):
             wave = self.waves[tag]
             wave.reload()
         self.autoSize()
-
         pass
 
     def removeLine(self):
@@ -115,9 +123,6 @@ class WavePlot(ttk.PanedWindow):
         if(tag in self.waves):
             self.waves[tag].deleteLine()
             del self.waves[tag]
-
-
-
 
 class WaveGraph(ttk.Frame):
 
@@ -145,15 +150,7 @@ class WaveGraph(ttk.Frame):
             w = self.nb.nametowidget(t)
             w.reloadAll()
 
-    def show(self,wfile,ylabel):
+    def show(self,wave):
         w = self.nb.nametowidget(self.nb.select())
         if(w is not None):
-            w.show(wfile,ylabel)
-
-
-        #if(x is not None):
-        #    self.ax.plot(x,y,label=ylabel)
-        #else:
-        #    self.ax.plot(y,label=ylabel)
-
-        #self.canvas.draw()
+            w.show(wave)

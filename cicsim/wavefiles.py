@@ -25,6 +25,21 @@ class Wave():
             self.line.remove()
             self.line = None
 
+    def plot(self,ax):
+        if(self.x is not None):
+            if(not self.logx and not self.logy):
+                self.line, = ax.plot(self.x,self.y,label=self.ylabel)
+            elif(self.logx and not self.logy):
+                self.line, = ax.semilogx(self.x,self.y,label=self.ylabel)
+            elif(not self.logx and self.logy):
+                self.line, = ax.semilogy(self.x,self.y,label=self.ylabel)
+            elif(self.logx and self.logy):
+                self.line, = ax.loglog(self.x,self.y,label=self.ylabel)
+        else:
+            self.line, = ax.plot(self.y,label=self.ylabel)
+
+        ax.set_xlabel(self.xlabel)
+
     def reload(self):
         self.wfile.reload()
 
@@ -76,7 +91,6 @@ class WaveFile():
                 self.df = cs.toDataFrame(self.fname)
                 self.modified = newmodified
 
-
     def getWaveNames(self):
         cols = self.df.columns
         return cols
@@ -94,9 +108,6 @@ class WaveFile():
 
     def getTag(self,yname):
         return self.fname + "/" + yname
-    
-
-
 
 
 class WaveFiles(dict):
