@@ -19,7 +19,7 @@ This is a script package I use to control ngspice, it can
 | 0.0.1   | :white_check_mark: | First version of cicsim     |
 | 0.0.3   | :white_check_mark: | All in on open source tools |
 | 0.1.2   | :white_check_mark: | First version on pipy       |
-| 0.1.3   | :white_check_mark: | First version on pipy       |
+| 0.1.3   | :white_check_mark: | github action update       |
 | 0.1.4  | :warning:          | Added waveform viewer       |
 
 # Install this module

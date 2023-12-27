@@ -75,6 +75,10 @@ def run(testbench,oformat,run,corner,count,name,ignore,sha):
 @click.argument("files",nargs=-1)
 def wave(files):
     """Open waveform viewer"""
+
+    if not importlib.util.find_spec("tkinter"):
+        print("Error: Could not find tkinter. Install python3-tk")
+
     c = cs.CmdWave()
     for f in files:
         c.openFile(f)

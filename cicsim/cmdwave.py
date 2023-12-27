@@ -30,7 +30,10 @@ class CmdWave(cs.Command):
         menubar.add_cascade(menu=menu_file,label="File")
         menubar.add_cascade(menu=menu_edit,label="Edit")
 
-        menu_file.add_command(label="Open",command=self.openFileDialog)
+        menu_file.add_command(label="New Plot",command=self.newPlot)
+        menu_file.add_command(label="Reload Plots",command=self.reloadPlots)
+        menu_file.add_command(label="Open Raw",command=self.openFileDialog)
+
 
         content = ttk.PanedWindow(root,orient=HORIZONTAL)
         height = 500
@@ -46,6 +49,12 @@ class CmdWave(cs.Command):
         root.rowconfigure(0, weight=1)
 
         pass
+
+    def newPlot(self):
+        self.graph.addPlot()
+
+    def reloadPlots(self):
+        self.graph.reloadPlots()
 
     def openFile(self,fname):
         self.browser.openFile(fname)
