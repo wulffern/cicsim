@@ -78,6 +78,9 @@ def wave(files):
 
     if not importlib.util.find_spec("tkinter"):
         print("Error: Could not find tkinter. Install python3-tk")
+        print("On mac with brew: brew install python3-tk")
+        print("On ubuntu: apt install python3-tk")
+        exit()
 
     c = cs.CmdWave()
     for f in files:
