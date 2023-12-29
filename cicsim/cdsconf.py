@@ -49,6 +49,11 @@ class CdsConfig(cs.Command):
         else:
             self.cadence = {}
 
+        if("options" in self.config):
+            self.options = self.config["options"]
+        else:
+            self.options = {}
+
 
         if(library):
             self.cadence["library"] = library
@@ -141,12 +146,11 @@ class CdsConfig(cs.Command):
         return True
 
 
-
-
-
     def getCadence(self,key):
         if(key in self.cadence):
             return self.cadence[key]
+        elif("ngspice" in self.config and key in self.config["ngspice"]):
+            return self.config["ngspice"][key]
         else:
             self.cm.error(f"Argument cadence->{key} is not specified, specify either on command line or in config file")
 

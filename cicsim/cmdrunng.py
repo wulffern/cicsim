@@ -67,7 +67,18 @@ class Simulation(cs.CdsConfig):
 
     def addSha(self,filename):
 
-        fpath = self.rundir + os.path.sep+ filename
+        #- Clean filename
+        filename = filename.replace("\"","")
+        if(" " in filename):
+            arr = filename.split(" ")
+            filename = arr[0]
+
+        if(filename.startswith("/")):
+            fpath = filename
+        else:
+            fpath = self.rundir + os.path.sep + filename
+
+
         if(os.path.exists(fpath)):
             self.shas[filename] = hashlib.sha256(open(fpath,"rb").read()).hexdigest()
         else:
@@ -209,6 +220,17 @@ class Simulation(cs.CdsConfig):
 
         return simOk if not ignore else True
 
+    def makeSimDir(self):
+
+        if("useTmpDir" in self.options and self.options["useTmpDir"]):
+            path = "/tmp/cicsim/" + os.environ["USER"] + "/" + self.library + "/" + self.cell + "/" + self.rundir
+            os.makedirs(path,exist_ok=True)
+            if(not os.path.exists(self.rundir)):
+                os.system(f"ln -s {path} {self.rundir} ")
+            pass
+        else:
+            os.makedirs(self.rundir,exist_ok=True)
+
     def makeSpiceFile(self,corner):
         ss = ""
         if("corner" in self.config):
@@ -222,17 +244,20 @@ class Simulation(cs.CdsConfig):
                 else:
                     ss += "*define " + c.upper() + "\n"
 
-        os.makedirs(self.rundir,exist_ok=True)
+        self.makeSimDir()
 
 
         with open(self.oname + ".spi","w") as fo:
-            print("cicsimgen " + self.testbench,file=fo)
-            print(ss,file=fo)
+
+            buffer = ""
+
+            buffer += "cicsimgen " + self.testbench
+            buffer += ss
 
             with open(self.testbench + ".spi","r") as fi:
                 #- Check for #defines
                 state = 0
-                buffer = ""
+
                 buffif = ""
                 buffelse = ""
                 dkey = ""
@@ -268,13 +293,26 @@ class Simulation(cs.CdsConfig):
 
                 sfile = self.replaceLine(buffer)
 
+                if("useTmpDir" in self.options and self.options["useTmpDir"]):
+                    sfile = re.sub("\.include\s+\.\./",f".include {os.getcwd()}/",sfile)
+                    sfile = re.sub("\.include\s+\"\.\./",f".include \"{os.getcwd()}/",sfile)
+                    sfile = re.sub("\.lib\s+\"\.\./",f".lib \"{os.getcwd()}/",sfile)
+                    sfile = re.sub("\.lib\s+\.\./",f".lib {os.getcwd()}/",sfile)
+
                 #- Store shas for any includes
-                incfiles = re.findall(r"[^\*]\s*\.include\s+(.*)\n",sfile)
+                incfiles = re.findall(r"\.include\s+(.*)",sfile,flags=re.MULTILINE)
 
                 for f in incfiles:
                     self.addSha(f)
 
+                libfiles = re.findall(r"\.lib\s+(.*)",sfile,flags=re.MULTILINE)
+
+
+                for f in libfiles:
+                    self.addSha(f)
+
                 print(sfile,file=fo)
+
 
         #- Store the Sha for the testbench
         self.addSha(self.name + ".spi")
