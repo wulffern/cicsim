@@ -19,29 +19,36 @@ class WavePlot(ttk.PanedWindow):
 
         frm = ttk.Frame(self)
         self.add(frm)
+
+        self.combo = ttk.Combobox(frm)
+        self.combo.grid(column=0,row=0,columnspan=2,sticky=(N,E,W))
+        self.combo.state(["readonly"])
+        self.combo.bind('<<ComboboxSelected>>', self.setAxesIndex)
+
         self.tree = ttk.Treeview(frm)
-        self.tree.grid(column=0,row=0,columnspan=2,sticky=(N,S,E,W))
+        self.tree.grid(column=0,row=1,columnspan=2,sticky=(N,S,E,W))
 
         breloadAll = ttk.Button(frm,text="Reload",command=self.reloadAll)
-        breloadAll.grid(column=0,row=2,sticky=(S,E,W))
+        breloadAll.grid(column=0,row=3,sticky=(S,E,W))
 
         bdelete = ttk.Button(frm,text="Remove",command=self.removeLine)
-        bdelete.grid(column=0,row=1,sticky=(S,E,W))
+        bdelete.grid(column=0,row=2,sticky=(S,E,W))
 
         bdeleteAll = ttk.Button(frm,text="Remove All",command=self.removeAll)
-        bdeleteAll.grid(column=1,row=1,sticky=(S,E,W))
+        bdeleteAll.grid(column=1,row=2,sticky=(S,E,W))
+
+        baddaxis = ttk.Button(frm,text="Add Axis",command=self.addAxis)
+        baddaxis.grid(column=0,row=4,sticky=(S,E,W))
 
         bautosize = ttk.Button(frm,text="Auto size",command=self.autoSize)
-        bautosize.grid(column=1,row=2,sticky=(S,E,W))
+        bautosize.grid(column=1,row=4,sticky=(S,E,W))
 
-        #baddaxis = ttk.Button(frm,text="Add Axis",command=self.addAxis)
-        #baddaxis.grid(column=1,row=3,sticky=(S,E,W))
 
 
         frm.columnconfigure(0,weight=1)
-        frm.rowconfigure(0,weight=1)
+        frm.rowconfigure(1,weight=1)
 
-        self.fig = Figure(dpi=100)
+        self.fig = Figure(dpi=90)
         self.gridspec = self.fig.add_gridspec(1, 1)
 
         frame = ttk.Frame(self)
@@ -70,9 +77,16 @@ class WavePlot(ttk.PanedWindow):
         #- Let the wave figure out how to plot on the axis
         wave.plot(self.axes[self.index])
 
+        if(self.index == 0):
+            self.axes[self.index].set_xlabel(wave.xlabel)
+
         #- Set Meta info on the wave
         self.waves[wave.tag] = wave
-        self.tree.insert('','end',wave.tag,text=wave.ylabel,tags=(wave.tag,))
+
+
+        text = "A%d: " %self.index + wave.ylabel
+
+        self.tree.insert('','end',wave.tag,text=text ,tags=(wave.tag,))
         self.tree.tag_configure(wave.tag,foreground=wave.line.get_color())
         self.canvas.draw()
 
@@ -85,12 +99,56 @@ class WavePlot(ttk.PanedWindow):
         self.canvas.draw()
         pass
 
+    def setAxesIndex(self,event):
+        self.index = self.combo.current()
+
     def addAxis(self):
-        ax  = self.fig.add_subplot()
+        if(len(self.axes) == 0):
+            ax  = self.fig.add_subplot()
+        else:
+            ax  = self.fig.add_subplot(sharex=self.axes[0])
+            ax.xaxis.set_tick_params(labelbottom=False)
+            #ax.xaxis.set_visible(False)
+
+
         ax.grid()
         ax.autoscale()
         self.axes.append(ax)
-        self.index = len(self.axes)-1
+        N = len(self.axes)
+        self.index = N-1
+
+        saxes = list()
+        for i in range(0,N):
+            saxes.append("Axes %d" %i)
+
+        self.combo['values'] = saxes
+        self.combo.current(self.index)
+
+        axes = self.fig.get_axes()
+
+        #- Find boundingrect
+        #x = 0
+        #y = 1e6
+        for a in axes:
+            pos = a.get_position()
+            #print(pos)
+
+        #height = self.fig.get_figheight()*self.fig.dpi
+        #width = self.fig.get_figwidth()*self.fig.dpi
+        width = 0.85
+        height = 0.85
+
+        x = 0.1
+        htext = 0
+        y  = 0.1 + htext
+        axh = height/N
+        for a in axes:
+            pos = [x,y,width,axh - htext]
+            #print(pos)
+            y += axh + htext
+            a.set_position(pos)
+
+        self.canvas.draw()
         pass
 
     def autoSize(self):

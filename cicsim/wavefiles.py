@@ -38,7 +38,7 @@ class Wave():
         else:
             self.line, = ax.plot(self.y,label=self.ylabel)
 
-        ax.set_xlabel(self.xlabel)
+        #ax.set_xlabel(self.xlabel)
 
     def reload(self):
         self.wfile.reload()
