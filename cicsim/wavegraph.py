@@ -43,8 +43,6 @@ class WavePlot(ttk.PanedWindow):
         bautosize = ttk.Button(frm,text="Auto size",command=self.autoSize)
         bautosize.grid(column=1,row=4,sticky=(S,E,W))
 
-
-
         frm.columnconfigure(0,weight=1)
         frm.rowconfigure(1,weight=1)
 
@@ -108,8 +106,6 @@ class WavePlot(ttk.PanedWindow):
         else:
             ax  = self.fig.add_subplot(sharex=self.axes[0])
             ax.xaxis.set_tick_params(labelbottom=False)
-            #ax.xaxis.set_visible(False)
-
 
         ax.grid()
         ax.autoscale()
@@ -127,14 +123,9 @@ class WavePlot(ttk.PanedWindow):
         axes = self.fig.get_axes()
 
         #- Find boundingrect
-        #x = 0
-        #y = 1e6
         for a in axes:
             pos = a.get_position()
-            #print(pos)
 
-        #height = self.fig.get_figheight()*self.fig.dpi
-        #width = self.fig.get_figwidth()*self.fig.dpi
         width = 0.85
         height = 0.85
 

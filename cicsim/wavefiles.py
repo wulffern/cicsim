@@ -8,15 +8,16 @@ import numpy as np
 
 class Wave():
 
-    def __init__(self,wfile,ylabel):
+    def __init__(self,wfile,key):
         self.wfile = wfile
         self.x = None
         self.y = None
         self.xlabel = "Samples"
-        self.ylabel = ylabel
+        self.key = key
+        self.ylabel = key + f" ({wfile.name})"
         self.logx = False
         self.logy = False
-        self.tag = wfile.getTag(ylabel)
+        self.tag = wfile.getTag(self.key)
         self.line = None
         self.reload()
 
@@ -48,20 +49,20 @@ class Wave():
         if("time" in keys):
             self.x = self.wfile.df["time"]
             self.xlabel = "Time [s]"
-            self.y = self.wfile.df[self.ylabel]
+            self.y = self.wfile.df[self.key]
         elif("frequency" in keys):
             self.x = self.wfile.df["frequency"]
             self.xlabel = "Frequency [Hz]"
             self.logx = True
-            self.y = self.wfile.df[self.ylabel]
+            self.y = self.wfile.df[self.key]
         elif("v-sweep" in keys):
             self.x = self.wfile.df["v-sweep"]
             self.xlabel = "Voltage [V]"
-            self.y = self.wfile.df[self.ylabel]
+            self.y = self.wfile.df[self.key]
         elif("temp-sweep" in keys):
             self.x = self.wfile.df["temp-sweep"]
             self.xlabel = "Temperature [C]"
-            self.y = self.wfile.df[self.ylabel]
+            self.y = self.wfile.df[self.key]
 
         if(self.line):
             if(self.x is not None):
