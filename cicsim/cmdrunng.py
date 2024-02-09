@@ -114,6 +114,11 @@ class Simulation(cs.CdsConfig):
 
     def run(self,ignore=False):
 
+        #- Check SHA option in config
+        if("sha" in self.options):
+            self.sha = self.options["sha"]
+
+
         #- Load shas
         self.loadSha()
 
