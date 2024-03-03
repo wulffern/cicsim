@@ -65,10 +65,13 @@ def cli():
 @click.option("--name", default=None, help="Control name of run file")
 @click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error check")
 @click.option("--sha/--no-sha", default=False, help="Check SHA of input files")
-def run(testbench,oformat,run,corner,count,name,ignore,sha):
+@click.option("--replace",default=None, help="YAML file with replacements for netlist")
+def run(testbench,oformat,run,corner,count,name,ignore,sha,replace):
     """Run a ngspice simulation of TESTBENCH
     """
     r = cs.CmdRunNg(testbench,oformat,run,corner,name,count,sha)
+    r.loadReplacements(replace)
+
     r.run(ignore)
 
 @cli.command()
