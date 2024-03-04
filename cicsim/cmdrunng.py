@@ -431,8 +431,19 @@ class Simulation(cs.CdsConfig):
 
         if(len(m) > 0):
             for mg in m:
-                self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
+                self.comment("Replacing {cic%s} = %s" %(mg,self.__dict__[mg]))
                 line = line.replace("{cic%s}" %mg,str(self.__dict__[mg]))
+
+        #- Eval expressions
+        m = re.findall("\s+\[([^\]]+)\]",line)
+        for mg in m:
+            self.comment("Evaluating %s"%mg)
+            eresult = str(eval(mg))
+            self.comment("Replacing  [%s] = %s" %(mg,eresult))
+            line = line.replace("[%s]" %mg,eresult)
+
+
+
 
         return line
 
