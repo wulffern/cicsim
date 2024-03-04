@@ -484,7 +484,7 @@ class CmdRunNg(cs.CdsConfig):
         self.filename = self.testbench + ".spi"
 
         if(not os.path.exists(self.filename)):
-            self.error(f"Testbench {self.testbench}.(spi|spice|cir) does not exists in this folder")
+            self.error(f"Testbench {self.testbench}.spi does not exists in this folder")
             return
 
         permutations = self.getPermutations(self.corners)
