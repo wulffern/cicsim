@@ -34,7 +34,7 @@ python3 -m pip install --user -e .
 If you want the latest stable
 
 ``` bash
-python3 -m pip install cicpy
+python3 -m pip install cicsim
 ```
 
 # Get started with simulation
