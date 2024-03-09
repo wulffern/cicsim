@@ -36,6 +36,8 @@ def ngRawRead(fname: str):
     count = 0
     arrs = []
     plots = []
+    names = dict()
+    ind = 0
     while (True):
         try:
             mdata = fp.readline(BSIZE_SP).split(b':', maxsplit=1)
@@ -50,9 +52,17 @@ def ngRawRead(fname: str):
                 plot['varnames'] = []
                 plot['varunits'] = []
                 for varn in range(nvars):
+
                     varspec = (fp.readline(BSIZE_SP).strip()
                                .decode('ascii').split())
                     assert(varn == int(varspec[0]))
+
+                    #- Skup duplicated variables
+                    if(varspec[1] not in names):
+                        names[varspec[1]] = 1
+                    else:
+                        varspec[1] += str(ind)
+                        ind +=1
                     plot['varnames'].append(varspec[1])
                     plot['varunits'].append(varspec[2])
             if mdata[0].lower() == b'binary':
@@ -71,6 +81,7 @@ def ngRawRead(fname: str):
 
 def toDataFrames(ngarr):
     (arrs,plots) = ngarr
+
     dfs = list()
     for i in range(0,len(plots)):
         df = pd.DataFrame(data=arrs[0],columns=plots[0]['varnames'])
@@ -79,6 +90,7 @@ def toDataFrames(ngarr):
 
 def toDataFrame(fraw):
     (arrs,plots) = ngRawRead(fraw)
+
     dfs = list()
     for i in range(0,len(plots)):
         df = pd.DataFrame(data=arrs[0],columns=plots[0]['varnames'])
