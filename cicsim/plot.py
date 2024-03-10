@@ -14,7 +14,7 @@ def plot(df,xname,yname,ptype=None,ax=None,label=""):
     if(xname not in df.columns):
         raise Exception("Could not find name %s in %s" %(xname,",".join(df.columns)))
     if(yname not in df.columns):
-        raise Exception("Could not find name %s in %s" %(xname,",".join(df.columns)))
+        raise Exception("Could not find name %s in %s" %(yname,",".join(df.columns)))
 
     x = df[xname]
     y = df[yname]
@@ -40,7 +40,10 @@ def plot(df,xname,yname,ptype=None,ax=None,label=""):
 
 
 def rawplot(fraw,xname,yname,ptype=None,axes=None):
+
+    fname = fraw
     dfs = toDataFrames(ngRawRead(fraw))
+
 
     if(len(dfs)> 0):
         df = dfs[0]
@@ -58,15 +61,15 @@ def rawplot(fraw,xname,yname,ptype=None,axes=None):
 
         for i in range(0,len(names)):
             if("same" in ptype):
-                return plot(xname,names[i],ptype,ax=axes)
+                plot(xname,names[i],ptype,ax=axes)
             else:
-                return plot(df,xname,names[i],ptype,ax=axes[i])
+                plot(df,xname,names[i],ptype,ax=axes[i])
         plt.xlabel(xname + "(" + fname + ")")
     elif(axes is not None):
-        return plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
+        plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
     else:
         f,axes = plt.subplots(1,1)
-        return plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
+        plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
 
 
 

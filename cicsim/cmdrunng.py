@@ -62,8 +62,16 @@ class Simulation(cs.CdsConfig):
 
         self.keys = "|".join(list(self.__dict__.keys()))
         self.config = config
+        self.replace = None
+        self.replace_re = None
 
         super().__init__()
+
+    def loadReplace(self,replace):
+        if(replace is None):
+            return
+        self.replace = replace
+        self.replace_re = "{(%s)}" %("|".join(self.replace.keys()))
 
     def addSha(self,filename):
 
@@ -256,7 +264,7 @@ class Simulation(cs.CdsConfig):
 
             buffer = ""
 
-            buffer += "cicsimgen " + self.testbench
+            buffer += "cicsimgen " + self.testbench + "\n\n"
             buffer += ss
 
             with open(self.testbench + ".spi","r") as fi:
@@ -411,44 +419,77 @@ class Simulation(cs.CdsConfig):
 
 
     def replaceLine(self,line):
+
+        #- Find and replace {} stuff
+        if(self.replace):
+            m = re.findall(self.replace_re,line,flags=re.MULTILINE)
+            if(len(m) > 0):
+                for mg in m:
+                    self.comment("Replacing {%s} = %s" %(mg,self.replace[mg]))
+                    line = line.replace("{%s}" %mg,str(self.replace[mg]))
+
+        #- Find and replace {cic.*} stuff
         res = "{cic(%s)}" % self.keys
-        m = re.search(res,line)
+        m = re.findall(res,line,flags=re.MULTILINE)
 
-        if(m is not None):
-            for mg in m.groups():
-                self.comment("Replacing  {cic%s} = %s" %(mg,self.__dict__[mg]))
-
+        if(len(m) > 0):
+            for mg in m:
+                self.comment("Replacing {cic%s} = %s" %(mg,self.__dict__[mg]))
                 line = line.replace("{cic%s}" %mg,str(self.__dict__[mg]))
+
+        #- Eval expressions
+        m = re.findall("\s+\[([^\]]+)\]",line)
+        for mg in m:
+            self.comment("Evaluating %s"%mg)
+            eresult = str(eval(mg))
+            self.comment("Replacing  [%s] = %s" %(mg,eresult))
+            line = line.replace("[%s]" %mg,eresult)
+
+
+
+
         return line
 
 class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,oformat,runsim,corners,cornername,count,sha):
+    def __init__(self,testbench,runsim,corners,cornername,count,sha):
         self.testbench = testbench
 
 
         self.count = count
-        self.oformat = oformat
         self.runsim = runsim
         self.corners = corners
         self.cornername = cornername
         self.sha = sha
+        self.replace = None
         super().__init__()
 
         if("_" in self.testbench ):
             self.error("Testbench name cannot contain '_'")
             exit(1)
 
+    def loadReplacements(self,freplace):
+
+        if(freplace is None):
+            return
+
+        if(not os.path.exists(freplace)):
+            raise(Exception(f"Could not find replacement file {freplace}"))
+
+        with open(freplace) as fi:
+            obj = yaml.safe_load(fi)
+        self.replace = obj
 
 
     def run(self,ignore=False):
         startTime = datetime.datetime.now()
         
         self.filename = self.testbench + ".spi"
+
         if(not os.path.exists(self.filename)):
-            self.error(f"Testbench {filename} does not exists in this folder")
+            self.error(f"Testbench {self.testbench}.spi does not exists in this folder")
             return
 
         permutations = self.getPermutations(self.corners)
@@ -463,6 +504,8 @@ class CmdRunNg(cs.CdsConfig):
 
                 #- Run a simulation for a corner
                 c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha)
+                #- Setup additional replacements
+                c.loadReplace(self.replace)
                 if(not c.run(ignore)):
                     simOk = False
                     continue
