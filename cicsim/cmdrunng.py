@@ -63,10 +63,13 @@ class Simulation(cs.CdsConfig):
         self.keys = "|".join(list(self.__dict__.keys()))
         self.config = config
         self.replace = None
+        self.replace_re = None
 
         super().__init__()
 
     def loadReplace(self,replace):
+        if(replace is None):
+            return
         self.replace = replace
         self.replace_re = "{(%s)}" %("|".join(self.replace.keys()))
 
@@ -469,6 +472,9 @@ class CmdRunNg(cs.CdsConfig):
             exit(1)
 
     def loadReplacements(self,freplace):
+
+        if(freplace is None):
+            return
 
         if(not os.path.exists(freplace)):
             raise(Exception(f"Could not find replacement file {freplace}"))
