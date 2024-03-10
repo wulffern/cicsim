@@ -454,12 +454,11 @@ class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,oformat,runsim,corners,cornername,count,sha):
+    def __init__(self,testbench,runsim,corners,cornername,count,sha):
         self.testbench = testbench
 
 
         self.count = count
-        self.oformat = oformat
         self.runsim = runsim
         self.corners = corners
         self.cornername = cornername

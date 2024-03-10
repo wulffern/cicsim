@@ -59,17 +59,16 @@ def cli():
 @cli.command()
 @click.argument("testbench")
 @click.argument("corner",nargs=-1)
-@click.option("--oformat",default="spectre",help="spectre|aimspice")
 @click.option("--run/--no-run", default=True, help="Run simulator")
 @click.option("--count", default=1, help="Run each corner count times, useful for Monte-Carlo")
 @click.option("--name", default=None, help="Control name of run file")
-@click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error check")
+@click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error checks")
 @click.option("--sha/--no-sha", default=False, help="Check SHA of input files")
 @click.option("--replace",default=None, help="YAML file with replacements for netlist")
-def run(testbench,oformat,run,corner,count,name,ignore,sha,replace):
+def run(testbench,run,corner,count,name,ignore,sha,replace):
     """Run a ngspice simulation of TESTBENCH
     """
-    r = cs.CmdRunNg(testbench,oformat,run,corner,name,count,sha)
+    r = cs.CmdRunNg(testbench,run,corner,name,count,sha)
     r.loadReplacements(replace)
 
     r.run(ignore)
