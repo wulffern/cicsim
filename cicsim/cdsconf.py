@@ -108,7 +108,6 @@ class CdsConfig(cs.Command):
 
         if(os.path.exists(filename)):
             with open(filename,"r") as fi:
-                #ys = yaml.load(fi,Loader=yaml.FullLoader)
                 ys = yaml.safe_load(fi)
 
                 if(ys == None):
@@ -156,7 +155,6 @@ class CdsConfig(cs.Command):
 
 
     def getShortName(self,corner):
-
         sname = ""
         for c in corner:
             c = c.replace(",","")
@@ -183,9 +181,11 @@ class CdsConfig(cs.Command):
                     da.append(d + " " + m )
             data = da
 
+        #TODO: Would be nice if the ordering did not chnage if there was multiple elements
         corner = []
         for d in data:
             corner.append(d.split(" "))
+
         return corner
 
     def getShortName(self,corner):
@@ -194,8 +194,6 @@ class CdsConfig(cs.Command):
             ss += c.replace(",","")
         return ss
 
-        
-    
 
     def netlist(self,top=True):
         

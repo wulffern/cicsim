@@ -179,15 +179,10 @@ class CmdResults(cs.Command):
         if(len(specs) > 0):
             df = df_all[specs.sources + ["name","type","time"]]
             df.reset_index(inplace=True)
-            #df = df[not "Index"]
             df = df.apply(specs.scale)
 
             self.printFails(specs,df)
             self.summaryToMarkdown(specs,df)
-
-
-
-
 
     header = """
 

@@ -35,13 +35,12 @@ import sys
 import importlib
 import datetime
 import hashlib
-
+import ast
 
 class Simulation(cs.CdsConfig):
 
     def __init__(self,testbench,corner,runsim,config,index,sha=False):
          #- Permutation variables
-
         self.runsim = runsim
         self.runmeas = True
         self.corner = corner
@@ -145,7 +144,6 @@ class Simulation(cs.CdsConfig):
         #- Run simulation, or not, depends on runsim
         simOk = self.ngspice(ignore)
 
-
         if(not simOk):
             self.error(f"Simulation {self.name} failed ")
             return
@@ -168,8 +166,6 @@ class Simulation(cs.CdsConfig):
             return False
 
 
-
-
     def removeFile(self,filename):
         os.remove(filename) if os.path.exists(filename) else 0
 
@@ -189,16 +185,15 @@ class Simulation(cs.CdsConfig):
                 else:
                     options = ""
 
-            cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
 
-            self.comment(cmd)
-
+            #- Remove old simulation results
             rawcmd = f"cd {self.rundir} && rm -f {self.name}*.raw"
             os.system(rawcmd)
-
             self.removeFile(self.oname + ".yaml")
 
             # Run NGSPICE
+            cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
+            self.comment(cmd)
             try:
                 self.err = os.system(cmd)
             except Exception as e:
@@ -263,8 +258,7 @@ class Simulation(cs.CdsConfig):
         with open(self.oname + ".spi","w") as fo:
 
             buffer = ""
-
-            buffer += "cicsimgen " + self.testbench + "\n\n"
+            buffer += "*cicsimgen " + self.testbench + "\n\n"
             buffer += ss
 
             with open(self.testbench + ".spi","r") as fi:
@@ -313,19 +307,16 @@ class Simulation(cs.CdsConfig):
                     sfile = re.sub("\.lib\s+\.\./",f".lib {os.getcwd()}/",sfile)
 
                 #- Store shas for any includes
-                incfiles = re.findall(r"\.include\s+(.*)",sfile,flags=re.MULTILINE)
-
+                incfiles = re.findall(r"^\s*\.include\s+(.*)",sfile,flags=re.MULTILINE)
                 for f in incfiles:
                     self.addSha(f)
 
                 libfiles = re.findall(r"\.lib\s+(.*)",sfile,flags=re.MULTILINE)
 
-
                 for f in libfiles:
                     self.addSha(f)
 
                 print(sfile,file=fo)
-
 
         #- Store the Sha for the testbench
         self.addSha(self.name + ".spi")
@@ -364,8 +355,6 @@ class Simulation(cs.CdsConfig):
             for l in fi:
                 if(re.search("Error:",l) or re.search("failed",l)):
                     errors.append(l.strip())
-#                if(re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)):
-#                    self.comment(l.strip(),"cyan")
 
         if(len(errors) > 0):
             for line in errors:
@@ -440,13 +429,14 @@ class Simulation(cs.CdsConfig):
         #- Eval expressions
         m = re.findall("\s+\[([^\]]+)\]",line)
         for mg in m:
-            self.comment("Evaluating %s"%mg)
-            eresult = str(eval(mg))
-            self.comment("Replacing  [%s] = %s" %(mg,eresult))
-            line = line.replace("[%s]" %mg,eresult)
+            try:
+                self.comment("Evaluating %s"%mg)
 
-
-
+                eresult = str(eval(mg))
+                self.comment("Replacing  [%s] = %s" %(mg,eresult))
+                line = line.replace("[%s]" %mg,eresult)
+            except Exception as e:
+                pass
 
         return line
 
@@ -456,8 +446,6 @@ class CmdRunNg(cs.CdsConfig):
 
     def __init__(self,testbench,runsim,corners,cornername,count,sha):
         self.testbench = testbench
-
-
         self.count = count
         self.runsim = runsim
         self.corners = corners
@@ -504,15 +492,16 @@ class CmdRunNg(cs.CdsConfig):
 
                 #- Run a simulation for a corner
                 c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha)
+
                 #- Setup additional replacements
                 c.loadReplace(self.replace)
+
+                #- Run simulation
                 if(not c.run(ignore)):
                     simOk = False
                     continue
 
-
                 files.append(c.oname)
-
 
                 #- Run python post parsing if py file exist and simulation is OK
                 pyscript = c.testbench + ".py"

@@ -43,9 +43,8 @@ import datetime
 
 #- Few words on the coding in this file:
 # 1. I use click, its really nice, just google "python click"
-# 2. I try the design pattern "one command, one file in commands/* that inherits commands/command.py".
+# 2. I try the design pattern "one command, one file in cmd* that inherits command.py".
 #    That's why it's instanciating a class below and doing <obj>.run()
-
 
 
 @click.group()
@@ -146,14 +145,6 @@ def simcell(library,cell,template):
     """
     c_ip = cs.CmdIp(library,template,cell=cell)
     c_ip.run()
-
-#@cli.command("ip",help=cs.CmdIp.__doc__,short_help="make ip from a YAML template file")
-#@click.argument("ip",required=True)
-#@click.argument("template",required=True)
-#@click.option("--src", default=None, help="Copy files from another IP")
-#def cmd_ip(ip,template,src):
-#    c_ip = cs.CmdIp(ip,template,src)
-#    c_ip.run()
 
 @cli.command()
 @click.argument("testbench",required=True)
