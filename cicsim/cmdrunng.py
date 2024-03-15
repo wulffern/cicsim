@@ -431,7 +431,6 @@ class Simulation(cs.CdsConfig):
         for mg in m:
             try:
                 self.comment("Evaluating %s"%mg)
-
                 eresult = str(eval(mg))
                 self.comment("Replacing  [%s] = %s" %(mg,eresult))
                 line = line.replace("[%s]" %mg,eresult)
