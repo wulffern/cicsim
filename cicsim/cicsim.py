@@ -62,7 +62,7 @@ def cli():
 @click.option("--count", default=1, help="Run each corner count times, useful for Monte-Carlo")
 @click.option("--name", default=None, help="Control name of run file")
 @click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error checks")
-@click.option("--sha/--no-sha", default=False, help="Check SHA of input files")
+@click.option("--sha/--no-sha", default=None, help="Check SHA of input files")
 @click.option("--replace",default=None, help="YAML file with replacements for netlist")
 def run(testbench,run,corner,count,name,ignore,sha,replace):
     """Run a ngspice simulation of TESTBENCH
