@@ -39,7 +39,7 @@ import ast
 
 class Simulation(cs.CdsConfig):
 
-    def __init__(self,testbench,corner,runsim,config,index,sha=False):
+    def __init__(self,testbench,corner,runsim,config,index,sha=None):
          #- Permutation variables
         self.runsim = runsim
         self.runmeas = True
@@ -122,7 +122,7 @@ class Simulation(cs.CdsConfig):
     def run(self,ignore=False):
 
         #- Check SHA option in config
-        if("sha" in self.options):
+        if(self.sha is None and "sha" in self.options):
             self.sha = self.options["sha"]
 
 
@@ -138,7 +138,7 @@ class Simulation(cs.CdsConfig):
 
         #- Maybe run sim if no input files have changed
         if(self.sha and self.matchAllSha()):
-            self.comment("No spice files have changed", "yellow")
+            self.comment("Info: No spice files have changed", "yellow")
             self.runsim = False
 
         #- Run simulation, or not, depends on runsim
@@ -151,13 +151,12 @@ class Simulation(cs.CdsConfig):
         self.makeMeasFile()
 
         #- Run measurement if it exists, check sha though
-        if(self.sha and not self.runsim and self.matchSha(self.name + ".meas")):
-            self.comment("No meas files have changed", "yellow")
-            self.runmeas = False
         measOk = self.ngspiceMeas(ignore)
 
 
-        self.saveSha()
+        #- Don't save sha if we have not run a simulation
+        if(self.runsim):
+            self.saveSha()
 
         if(simOk and measOk):
             self.parseLog()
@@ -210,7 +209,7 @@ class Simulation(cs.CdsConfig):
             self.comment("Corner simulation time : " + str(nextTime - tickTime))
             tickTime = nextTime
         else:
-            self.warning(f"Skipping simulation of {self.name}.spi")
+            self.warning(f"Info: Skipping simulation of {self.name}.spi")
 
          #- Check logfile. ngspice does not always exit cleanly
         errors = list()
