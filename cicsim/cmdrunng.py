@@ -121,7 +121,7 @@ class Simulation(cs.CdsConfig):
 
     def run(self,ignore=False):
 
-        #- Check SHA option in config
+        #- Check SHA option in config if sha is not set on command line
         if(self.sha is None and "sha" in self.options):
             self.sha = self.options["sha"]
 
@@ -151,12 +151,18 @@ class Simulation(cs.CdsConfig):
         self.makeMeasFile()
 
         #- Run measurement if it exists, check sha though
+        if(self.sha and not self.runsim and self.matchSha(self.name + ".meas")):
+            self.comment("Info: No meas files have changed", "yellow")
+            self.runmeas = False
         measOk = self.ngspiceMeas(ignore)
 
 
         #- Don't save sha if we have not run a simulation
-        if(self.runsim):
-            self.saveSha()
+        if(self.sha):
+            if(self.runsim):
+                self.saveSha()
+            else:
+                self.comment("Info: Not storing sha file, no simulation run","yellow")
 
         if(simOk and measOk):
             self.parseLog()
@@ -346,7 +352,7 @@ class Simulation(cs.CdsConfig):
             self.comment(cmd)
             os.system(cmd)
         else:
-            self.comment(f"Skipping measurment run of {self.name}.meas","yellow")
+            self.comment(f"Info: Skipping measurement run of {self.name}.meas","yellow")
 
         #- Check meas logfile. ngspice does not always exit cleanly
         errors = list()
