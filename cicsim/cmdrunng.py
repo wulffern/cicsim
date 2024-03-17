@@ -431,10 +431,11 @@ class Simulation(cs.CdsConfig):
         for mg in m:
             try:
                 self.comment("Evaluating %s"%mg)
-                eresult = str(eval(mg))
+                eresult = str(self.safe_eval(mg))
                 self.comment("Replacing  [%s] = %s" %(mg,eresult))
                 line = line.replace("[%s]" %mg,eresult)
             except Exception as e:
+                self.warning(f"Warning: could not eval [{mg}]: "  + str(e))
                 pass
 
         return line

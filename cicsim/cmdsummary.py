@@ -28,8 +28,7 @@ class ResultFile(cs.Command):
 
         self.df = pd.read_csv(self.src)
 
-
-
+        print(self.src,specs.sources)
         self.df = self.df[specs.sources]
 
         self.df.reset_index(inplace=True)
