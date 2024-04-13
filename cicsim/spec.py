@@ -56,6 +56,7 @@ class SpecMinMax:
                 else:
                     self.typ = obj["typ"]
 
+
             if("min" in obj):
                 if(type(obj["min"]) is str):
                     s  = obj["min"]
@@ -86,6 +87,11 @@ class SpecMinMax:
                 self.name = obj["name"]
             else:
                 self.name = ""
+
+            if("desc" in obj):
+                self.desc = obj["desc"]
+            else:
+                self.desc = ""
 
             #print(self.min,self.typ,self.max)
 

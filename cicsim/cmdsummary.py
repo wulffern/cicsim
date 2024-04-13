@@ -83,8 +83,9 @@ class SimulationSummary(cs.Command):
 
         for c in self.specs.sources:
             spec = self.specs[c]
-            ss += "|%s|%s | | %s  | %s | %s | %s | %s |\n" % (self.heading(spec.name),
+            ss += "|%s|%s |%s| %s  | %s | %s | %s | %s |\n" % (self.heading(spec.name),
                                                                 self.heading(c.replace("_","\\_")),
+                                                                spec.desc,
                                                                 self.heading("Spec"),
                                                                 self.heading(spec.stringNoUnit(spec.min)),
                                                                 self.heading(spec.stringNoUnit(spec.typ)),

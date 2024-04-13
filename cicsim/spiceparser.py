@@ -51,7 +51,7 @@ class SpiceParser():
                 if(not re.search(r"\s*[\+\\]\n?$",line)):
                     match = False
 
-                m = re.search("\s*.?SUBCKT\s+([^\s]+)",line,re.IGNORECASE)
+                m = re.search(r"\s*.?SUBCKT\s+([^\s]+)",line,re.IGNORECASE)
                 if(m is not None):
                     ckts.append(m.group(1))
 

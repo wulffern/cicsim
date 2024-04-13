@@ -5,6 +5,7 @@
 from tkinter import *
 from tkinter import ttk
 import cicsim as cs
+import re
 import os
 
 #- Data Model
@@ -25,16 +26,28 @@ Click on a wave will ask the WaveGraph to show the plot
         p = ttk.PanedWindow(self,orient=VERTICAL)
         p.pack(fill="both",expand=1)
 
+
         self.tr_files= ttk.Treeview(p)
         self.tr_files.bind('<<TreeviewSelect>>', self.fileSelected)
+
+        self.search = StringVar()
+        self.search.set("")
+        self.tr_search = ttk.Entry(p, textvariable=self.search)
+        self.search.trace_add("write", self.updateSearch)
+
         self.tr_waves= ttk.Treeview(p)
         self.tr_waves.bind('<<TreeviewSelect>>', self.waveSelected)
 
         p.add(self.tr_files)
+        p.add(self.tr_search)
         p.add(self.tr_waves)
 
         self.files = WaveFiles()
 
+
+    def updateSearch(self,*args):
+        self.fillColumns()
+        pass
 
     def fileSelected(self,event):
         fname = self.tr_files.focus()
@@ -54,7 +67,8 @@ Click on a wave will ask the WaveGraph to show the plot
 
         f = self.files.getSelected()
         for wn in f.getWaveNames():
-            self.tr_waves.insert('','end',wn,text=wn)
+            if(self.search.get() == "" or re.search(self.search.get(),wn)):
+                self.tr_waves.insert('','end',wn,text=wn)
 
     def openFile(self,fname):
         f = self.files.open(fname)
