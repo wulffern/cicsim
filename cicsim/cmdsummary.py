@@ -28,8 +28,14 @@ class ResultFile(cs.Command):
 
         self.df = pd.read_csv(self.src)
 
-        print(self.src,specs.sources)
-        self.df = self.df[specs.sources]
+        #- Get the lists of specs, and make sure they exists i the result file
+        specsrc = list()
+        for s in specs.sources:
+            if(s in self.df):
+                specsrc.append(s)
+
+        #print(self.src,specs.sources,specsrc)
+        self.df = self.df[specsrc]
 
         self.df.reset_index(inplace=True)
 
