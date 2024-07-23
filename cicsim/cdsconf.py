@@ -163,25 +163,27 @@ class CdsConfig(cs.Command):
 
     def getPermutations(self,corner):
         data = []
-        single = []
-        multiple = []
         for c in corner:
             if("," in c):
-                multiple.append(c.split(","))
+                da = []
+                mc = c.split(",")
+                if(len(data) > 0):
+                    for m in mc:
+                        for d in data:
+                            da.append(d + " " + m)
+                    data = da
+                else:
+                    for m in mc:
+                        data.append(m)
             else:
-                single.append(c)
+                if(len(data) > 0):
+                    da = []
+                    for d in data:
+                        da.append(d + " " + c)
+                    data = da
+                else:
+                    data.append(c)
 
-        data = []
-
-        data.append(" ".join(single))
-        for mc in multiple:
-            da = []
-            for m in mc:
-                for d in data:
-                    da.append(d + " " + m )
-            data = da
-
-        #TODO: Would be nice if the ordering did not chnage if there was multiple elements
         corner = []
         for d in data:
             corner.append(d.split(" "))
