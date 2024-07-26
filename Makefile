@@ -6,7 +6,7 @@ cwd = ${shell pwd}
 
 .PHONY: docs
 
-docs = tests/sim/ test/index test/plot
+docs = tests/sim/ tests/index tests/plot
 
 docs:
 	${foreach d, ${docs}, cd ${cwd}; cd ${d} && make docs || exit  ;}
