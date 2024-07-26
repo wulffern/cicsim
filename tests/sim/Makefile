@@ -1,3 +1,3 @@
 
 docs:
-	python ../gendoc.py run.md ../../docs/run.md
+	python3 ../gendoc.py run.md ../../docs/run.md

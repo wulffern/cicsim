@@ -2,4 +2,4 @@
 
 
 docs:
-	python ../gendoc.py plot.md ../../docs/plot.md
+	python3 ../gendoc.py plot.md ../../docs/plot.md

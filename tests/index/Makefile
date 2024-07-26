@@ -1,3 +1,3 @@
 
 docs:
-	python ../gendoc.py index.md ../../docs/index.md
+	python3 ../gendoc.py index.md ../../docs/index.md
