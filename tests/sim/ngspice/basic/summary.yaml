@@ -1,0 +1,18 @@
+description: ""
+simulations:
+   tran:
+    options:
+      noUrl: True
+      noHeading: True
+    name: Transient Analysis
+    description: |
+    data:
+      - name: Sch_typical
+        src: results/tran_Sch_typical
+        method: typical
+      - name: Sch_tempvall
+        src: results/tran_Sch_tempvall
+        method: minmax
+      - name: Sch_3std
+        src: results/tran_Sch_mc
+        method: 3std

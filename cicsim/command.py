@@ -83,6 +83,10 @@ class Command:
     def doCmd(self,cmd):
         os.system(cmd)
 
+    def doCmdWithReturn(self,cmd):
+        result = os.popen(cmd + " 2>&1").read()
+        return result
+
     def sub(self,buffer,keyval):
         """Replace ${NAME} constructs in buffer with values from 'dict' or shell environment"""
         for (k,v) in keyval.items():

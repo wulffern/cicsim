@@ -113,11 +113,23 @@ def srun(testbench,corner,oformat,run,ocn,count,name,ignore,sha):
 @click.argument("xname")
 @click.argument("yname")
 @click.option("--ptype",default="", help="Plot options")
-def plot(filename,xname,yname,ptype):
+@click.option("--show/--no-show",default=True,help="Show plot or not")
+@click.option("--fname",default="", help="Plot filename")
+def plot(filename,xname,yname,ptype,show,fname):
     """Plot from rawfile
+
+Example:\n
+    Plot vp and vn versus time.\n
+    $ cicsim plot test.raw time "v(vp),v(vn)"
+
+    Plot vp and vn in the same plot\n
+    $ cicsim plot test.raw time "v(vp),v(vn)" --ptype "same"
+
+
     """
-    cs.rawplot(filename,xname,yname,ptype)
-    plt.show()
+    cs.rawplot(filename,xname,yname,ptype,fname=fname)
+    if(show):
+        plt.show()
 
 @cli.command()
 @click.argument("runfile")

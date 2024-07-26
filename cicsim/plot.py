@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sys
+from .command import *
 import math
 #import tikzplotlib
 from .ngraw import *
@@ -11,10 +12,14 @@ from .ngraw import *
 
 def plot(df,xname,yname,ptype=None,ax=None,label=""):
 
+    cmd = Command()
     if(xname not in df.columns):
-        raise Exception("Could not find name %s in %s" %(xname,",".join(df.columns)))
+        cmd.error("Could not find name %s in %s" %(xname,",".join(df.columns)))
+        exit()
     if(yname not in df.columns):
-        raise Exception("Could not find name %s in %s" %(yname,",".join(df.columns)))
+        cmd.error("Could not find name %s in %s" %(xname,",".join(df.columns)))
+        exit()
+        #raise Exception("Could not find name %s in %s" %(yname,",".join(df.columns)))
 
     x = df[xname]
     y = df[yname]
@@ -39,9 +44,9 @@ def plot(df,xname,yname,ptype=None,ax=None,label=""):
     return (x,y)
 
 
-def rawplot(fraw,xname,yname,ptype=None,axes=None):
+def rawplot(fraw,xname,yname,ptype=None,axes=None,fname=None):
 
-    fname = fraw
+
     dfs = toDataFrames(ngRawRead(fraw))
 
 
@@ -61,10 +66,10 @@ def rawplot(fraw,xname,yname,ptype=None,axes=None):
 
         for i in range(0,len(names)):
             if("same" in ptype):
-                plot(xname,names[i],ptype,ax=axes)
+                plot(df,xname,names[i],ptype,ax=axes)
             else:
                 plot(df,xname,names[i],ptype,ax=axes[i])
-        plt.xlabel(xname + "(" + fname + ")")
+        plt.xlabel(xname + "(" + fraw + ")")
     elif(axes is not None):
         plot(df,xname,yname,ptype,axes,label=" %s" %fraw)
     else:
@@ -78,8 +83,10 @@ def rawplot(fraw,xname,yname,ptype=None,axes=None):
     #if("tikz" in ptype):
     #    tikzplotlib.save(fname.replace(".csv",".pgf"))
 
-    if("pdf" in ptype):
-        plt.savefig(fname.replace(".raw",".pdf"))
+
+
+    if(fname is not None):
+        plt.savefig(fname)
 
     #if("pdf" not in ptype):
     #    plt.show()

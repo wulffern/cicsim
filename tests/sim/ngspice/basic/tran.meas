@@ -7,5 +7,6 @@ echo "MEAS_START"
 
 meas tran vx avg v(vx)
 
+
 echo "MEAS_END"
 .endc

@@ -7,14 +7,17 @@ import pandas as pd
 
 class ResultFile(cs.Command):
 
-    def __init__(self,dataitem,specs):
+    def __init__(self,dataitem,specs,options={}):
         self.name = dataitem["name"]
         self.src = dataitem["src"] + ".csv"
         self.html = dataitem["src"] + ".html"
         self.method = dataitem["method"]
         super().__init__()
 
-        self.link = f"<a href='{self.html}'>" + self.name + "</a>"
+        if("noUrl" in options and options["noUrl"]):
+            self.link = self.name
+        else:
+            self.link = f"<a href='{self.html}'>" + self.name + "</a>"
         self.df = None
         self.minimum = None
         self.typ = None
@@ -67,11 +70,17 @@ class SimulationSummary(cs.Command):
         self.name = obj["name"]
         self.data = obj["data"]
         self.description = obj["description"]
+
+        if("options" in obj):
+            self.options = obj["options"]
+        else:
+            self.options = {}
+
         self.results = list()
         super().__init__()
 
         for k in self.data:
-            self.results.append(ResultFile(k,self.specs))
+            self.results.append(ResultFile(k,self.specs,options=self.options))
 
     def heading(self,ss):
         if(ss is None or ss == ""):
@@ -81,7 +90,11 @@ class SimulationSummary(cs.Command):
 
     def to_markdown(self):
 
-        ss = f"""### {self.name} ({self.tag})\n
+        if("noHeading" in self.options):
+            ss = ""
+        else:
+            ss = f"""### {self.name} ({self.tag})\n"""
+        ss += f"""
 {self.description}\n\n
 |**Name**|**Parameter**|**Description**| |**Min**|**Typ**|**Max**| Unit|
 |:---|:---|:---|---:|:---:|:---:|:---:| ---:|

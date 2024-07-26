@@ -2,7 +2,12 @@
 .idea
 *.log
 tmp/
-
+*.run
+*.csv
+*.svg
+*.pdf
+*.raw
+*.html
 dist/
 *.py[cod]
 *.egg

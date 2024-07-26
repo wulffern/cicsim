@@ -1,10 +1,10 @@
 ,vx,name,type,time,OK
-0,0.8143887,tran_SchTlVl,Sch,Mon Mar 11 23:13:54 2024,True
-1,0.797955,tran_SchThVl,Sch,Mon Mar 11 23:13:54 2024,False
-2,0.7977975,tran_SchTtVl,Sch,Mon Mar 11 23:13:54 2024,False
-3,1.002549,tran_SchTlVh,Sch,Mon Mar 11 23:13:54 2024,False
-4,0.9905758,tran_SchThVh,Sch,Mon Mar 11 23:13:54 2024,True
-5,1.030446,tran_SchTtVh,Sch,Mon Mar 11 23:13:54 2024,False
-6,0.9379127,tran_SchTlVt,Sch,Mon Mar 11 23:13:53 2024,True
-7,0.9361333,tran_SchThVt,Sch,Mon Mar 11 23:13:53 2024,True
-8,0.9314228,tran_SchTtVt,Sch,Mon Mar 11 23:13:53 2024,True
+0,0.8175678,tran_SchTlVl,Sch,Fri Jul 26 21:35:48 2024,True
+1,0.8074042,tran_SchThVl,Sch,Fri Jul 26 21:35:48 2024,True
+2,0.8460043,tran_SchTtVl,Sch,Fri Jul 26 21:35:47 2024,True
+3,0.9730862,tran_SchTlVh,Sch,Fri Jul 26 21:35:47 2024,True
+4,1.014926,tran_SchThVh,Sch,Fri Jul 26 21:35:47 2024,False
+5,0.9905487,tran_SchTtVh,Sch,Fri Jul 26 21:35:47 2024,True
+6,0.9079983,tran_SchTlVt,Sch,Fri Jul 26 21:35:47 2024,True
+7,0.9261183,tran_SchThVt,Sch,Fri Jul 26 21:35:47 2024,True
+8,0.9122864,tran_SchTtVt,Sch,Fri Jul 26 21:35:47 2024,True

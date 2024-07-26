@@ -1,6 +1,11 @@
 
 vx:
   src: vx
+  name: Divider voltage
   min: 0.8
   typ: 0.9
   max: 1.0
+  scale: 1
+  digits: 2
+  unit: V
+
