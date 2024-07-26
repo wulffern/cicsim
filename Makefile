@@ -4,10 +4,12 @@ dirs =   tests/sim/ngspice/basic
 
 cwd = ${shell pwd}
 
+.PHONY: docs
+
 docs = tests/sim/ test/index test/plot
 
 docs:
-	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make docs || exit  ;}
+	${foreach d, ${docs}, cd ${cwd}; cd ${d} && make docs || exit  ;}
 
 test:
 	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make test || exit  ;}
