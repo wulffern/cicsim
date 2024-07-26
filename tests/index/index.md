@@ -26,7 +26,7 @@ I sometimes release a version to pypi, so you can do
 python3 -m pip install cicsim
 ```
 
-# Install latest and greatest 
+## Install latest and greatest 
 
 ```
 git clone https://github.com/wulffern/cicsim
