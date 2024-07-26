@@ -49,9 +49,12 @@ import datetime
 
 @click.group()
 def cli():
-    """Custom IC Creator Simulator Tools
+    """Custom Integrated Circuit Simulation
 
     This package provides helper scripts for simulating integrated circuits
+
+    Check website for more information : http://analogicus.com/cicsim/
+
     """
     pass
 

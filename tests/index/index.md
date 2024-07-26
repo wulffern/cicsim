@@ -37,5 +37,7 @@ python3 -m pip install --user -e .
 
 ## Other sources and demos 
 
-[Tutorial on analog simulation and cicsim](https://analogicus.com/rply_ex0_sky130nm/tutorial)
-[Advanced Integrated Circuits Examples](https://analogicus.com/aicex/started/)
+- [Tutorial on analog simulation and
+cicsim](https://analogicus.com/rply_ex0_sky130nm/tutorial)
+
+- [Advanced Integrated Circuits Examples](https://analogicus.com/aicex/started/)
