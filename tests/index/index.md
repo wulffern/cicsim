@@ -18,6 +18,24 @@ run: cicsim --help
 -->
 
 
+## Install stable version 
+
+I sometimes release a version to pypi, so you can do 
+
+```
+python3 -m pip install cicsim
+```
+
+# Install latest and greatest 
+
+```
+git clone https://github.com/wulffern/cicsim
+cd cicsim
+python3 -m pip install --user -e .
+```
+
+
 ## Other sources and demos 
 
 [Tutorial on analog simulation and cicsim](https://analogicus.com/rply_ex0_sky130nm/tutorial)
+[Advanced Integrated Circuits Examples](https://analogicus.com/aicex/started/)
