@@ -55,8 +55,8 @@ class Wave():
             self.xlabel = "Frequency [Hz]"
             self.logx = True
             self.y = self.wfile.df[self.key]
-        elif("v-sweep" in keys):
-            self.x = self.wfile.df["v-sweep"]
+        elif("v(v-sweep)" in keys):
+            self.x = self.wfile.df["v(v-sweep)"]
             self.xlabel = "Voltage [V]"
             self.y = self.wfile.df[self.key]
         elif("temp-sweep" in keys):

@@ -244,6 +244,46 @@ class Simulation(cs.CdsConfig):
         else:
             os.makedirs(self.rundir,exist_ok=True)
 
+    def parseIfdef(self,fi):
+        buffer = ""
+        #- Check for #defines
+        state = 0
+        buffif = ""
+        buffelse = ""
+        dkey = ""
+        for l in fi:
+            if(l.startswith("#ifdef")):
+                d = re.split("\s+",l)
+                dkey = d[1]
+                state = 1
+                continue
+                #l = "*" + l
+            if(l.startswith("#else")):
+                state = 2
+                #l = "*" + l
+                continue
+            if(l.startswith("#endif")):
+                if(dkey in self.corner):
+                    buffer += buffif
+                else:
+                    buffer += buffelse
+                state = 0
+                dkey = 0
+                buffif = ""
+                buffelse = ""
+                continue
+                #l = "*" + l
+
+            if(state == 0):
+                buffer += l
+            elif(state == 1 ):
+                buffif += l
+            elif(state == 2 ):
+                buffelse += l
+        return buffer
+
+
+            
     def makeSpiceFile(self,corner):
         ss = ""
         if("corner" in self.config):
@@ -264,45 +304,15 @@ class Simulation(cs.CdsConfig):
 
             buffer = ""
             buffer += "*cicsimgen " + self.testbench + "\n\n"
+
+            #- Add seed so runs become reproducible
+            buffer += f".param SEED={self.index}\n"
+
             buffer += ss
 
             with open(self.testbench + ".spi","r") as fi:
-                #- Check for #defines
-                state = 0
 
-                buffif = ""
-                buffelse = ""
-                dkey = ""
-                for l in fi:
-                    if(l.startswith("#ifdef")):
-                        d = re.split("\s+",l)
-                        dkey = d[1]
-                        state = 1
-                        continue
-                        #l = "*" + l
-                    if(l.startswith("#else")):
-                        state = 2
-                        #l = "*" + l
-                        continue
-                    if(l.startswith("#endif")):
-                        if(dkey in corner):
-                            buffer += buffif
-                        else:
-                            buffer += buffelse
-                        state = 0
-                        dkey = 0
-                        buffif = ""
-                        buffelse = ""
-                        continue
-                        #l = "*" + l
-
-                    if(state == 0):
-                        buffer += l
-                    elif(state == 1 ):
-                        buffif += l
-                    elif(state == 2 ):
-                        buffelse += l
-
+                buffer += self.parseIfdef(fi)
                 sfile = self.replaceLine(buffer)
 
                 if("useTmpDir" in self.options and self.options["useTmpDir"]):
@@ -313,6 +323,11 @@ class Simulation(cs.CdsConfig):
 
                 #- Store shas for any includes
                 incfiles = re.findall(r"^\s*\.include\s+(.*)",sfile,flags=re.MULTILINE)
+                for f in incfiles:
+                    self.addSha(f)
+
+                #- Add non-spice sha's
+                incfiles = re.findall(r"^\s*\*#include\s+(.*)",sfile,flags=re.MULTILINE)
                 for f in incfiles:
                     self.addSha(f)
 
@@ -337,9 +352,9 @@ class Simulation(cs.CdsConfig):
         #- Create the measurement file
         with open(meas_src) as fi:
             with open(meas_dst,"w") as fo:
-                for line in fi:
-                    line = self.replaceLine(line)
-                    fo.write(line)
+                buffer = self.parseIfdef(fi)
+                buffer = self.replaceLine(buffer)
+                fo.write(buffer)
 
         #- Store the sha for the measurement file
         self.addSha(self.name + ".meas")

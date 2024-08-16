@@ -1,10 +1,12 @@
 
 
+
+
 dirs =   tests/sim/ngspice/basic
 
 cwd = ${shell pwd}
 
-.PHONY: docs
+.PHONY: docs build
 
 docs = tests/sim/ tests/index tests/plot
 
