@@ -77,7 +77,8 @@ def run(testbench,run,corner,count,name,ignore,sha,replace):
 
 @cli.command()
 @click.argument("files",nargs=-1)
-def wave(files):
+@click.option("--x",default=None,help="Specify x-axis")
+def wave(files,x):
     """Open waveform viewer"""
 
     if not importlib.util.find_spec("tkinter"):
@@ -86,7 +87,7 @@ def wave(files):
         print("On ubuntu: apt install python3-tk")
         exit()
 
-    c = cs.CmdWave()
+    c = cs.CmdWave(x)
     for f in files:
         c.openFile(f)
     c.run()

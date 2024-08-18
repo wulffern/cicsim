@@ -8,7 +8,8 @@ import numpy as np
 
 class Wave():
 
-    def __init__(self,wfile,key):
+    def __init__(self,wfile,key,xaxis):
+        self.xaxis = xaxis
         self.wfile = wfile
         self.x = None
         self.y = None
@@ -63,6 +64,10 @@ class Wave():
             self.x = self.wfile.df["temp-sweep"]
             self.xlabel = "Temperature [C]"
             self.y = self.wfile.df[self.key]
+        elif(self.xaxis in keys):
+            self.x = self.wfile.df[self.xaxis]
+            self.xlabel = " "
+            self.y = self.wfile.df[self.key]
 
         if(self.line):
             if(self.x is not None):
@@ -73,7 +78,8 @@ class Wave():
 
 class WaveFile():
 
-    def __init__(self,fname):
+    def __init__(self,fname,xaxis):
+        self.xaxis = xaxis
         self.fname = fname
         self.name = os.path.basename(fname)
         self.waves = dict()
@@ -99,7 +105,7 @@ class WaveFile():
     def getWave(self,yname):
 
         if(yname not in self.waves):
-            wave = Wave(self,yname)
+            wave = Wave(self,yname,self.xaxis)
             self.waves[yname] = wave
 
         wave = self.waves[yname]
@@ -117,8 +123,8 @@ class WaveFiles(dict):
         self.current = None
         pass
 
-    def open(self,fname):
-        self[fname] = WaveFile(fname)
+    def open(self,fname,xaxis):
+        self[fname] = WaveFile(fname,xaxis)
         self.current = fname
         return self[fname]
 

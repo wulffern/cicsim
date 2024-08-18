@@ -17,8 +17,9 @@ The WaveBrowser keeps track of files loaded, and shows the waves in the files.
 
 Click on a wave will ask the WaveGraph to show the plot
     """
-    def __init__(self,simfolder,graph,master=None,**kw):
+    def __init__(self,simfolder,graph,xaxis,master=None,**kw):
 
+        self.xaxis = xaxis
         super().__init__(master,width=300,borderwidth=1,relief="raised",**kw)
         self.simfolder=simfolder
         self.graph = graph
@@ -71,6 +72,6 @@ Click on a wave will ask the WaveGraph to show the plot
                 self.tr_waves.insert('','end',wn,text=wn)
 
     def openFile(self,fname):
-        f = self.files.open(fname)
+        f = self.files.open(fname,self.xaxis)
         self.tr_files.insert('','end',f.fname,text=f.name)
         self.fillColumns()

@@ -20,7 +20,7 @@ from .wavegraph import *
 
 
 class CmdWave(cs.Command):
-    def __init__(self):
+    def __init__(self,xaxis):
         super().__init__()
 
         root = tkinter.Tk()
@@ -43,7 +43,7 @@ class CmdWave(cs.Command):
         content = ttk.PanedWindow(root,orient=HORIZONTAL)
         height = 500
         self.graph = WaveGraph(content,height=height)
-        self.browser = WaveBrowser(content,self.graph,height=height)
+        self.browser = WaveBrowser(content,self.graph,xaxis,height=height)
         content.grid(column=0,row=0,sticky=(N,S,E,W))
         content.add(self.browser)
         content.add(self.graph)
