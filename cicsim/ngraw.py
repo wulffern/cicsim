@@ -69,7 +69,7 @@ def ngRawRead(fname: str):
                 rowdtype = np.dtype({'names': plot['varnames'],
                                      'formats': [np.complex_ if b'complex'
                                                  in plot[b'flags']
-                                                 else np.float_]*nvars})
+                                                 else np.float64]*nvars})
                 # We should have all the metadata by now
                 arrs.append(np.fromfile(fp, dtype=rowdtype, count=npoints))
                 plots.append(plot)
