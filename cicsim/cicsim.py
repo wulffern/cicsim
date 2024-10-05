@@ -163,6 +163,25 @@ def simcell(library,cell,template):
     c_ip.run()
 
 @cli.command()
+@click.argument("template",required=True)
+@click.argument("options",required=True)
+def template(template,options):
+    """Run an IP template with <options> YAML file
+    """
+
+    if(not os.path.exists(options)):
+        raise Exception(f"Could not find file {options}")
+
+    with open(options) as fi:
+        obj = yaml.safe_load(fi)
+
+    if("library" not in obj):
+        raise Exception("I must have 'library' defined in the options file")
+
+    c_ip = cs.CmdIp(obj["library"],template,options=obj)
+    c_ip.run()
+
+@cli.command()
 @click.argument("testbench",required=True)
 @click.argument("source",required=True)
 @click.argument("cell",required=True)

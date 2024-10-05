@@ -24,6 +24,8 @@ This is a script package I use to control ngspice, it can
 | 0.1.5   | :white_check_mark: | Update waveform viewer          |
 | 0.1.6   | :white_check_mark: | wave: added search. Added docs  |
 | 0.1.7   | :white_check_mark: | Bugfix: ngraw deprecated float_ |
+| 0.1.8   | :white_check_mark: | Added template command                                |
+
 
 
 
