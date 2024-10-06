@@ -143,10 +143,16 @@ class CmdIp(cs.Command):
         replaceVars = False
 
         if not self.src:
-            path = ".." + os.path.sep + os.path.dirname(self.template) + os.path.sep
+            if(self.template.startswith("/")):
+                path = os.path.dirname(self.template) + os.path.sep
+            else:
+                path = ".." + os.path.sep + os.path.dirname(self.template) + os.path.sep
             replaceVars = True
         else:
-            path = ".." + os.path.sep + self.src + os.path.sep
+            if(self.src.startswith("/")):
+                path = self.src + os.path.sep
+            else:
+                path = ".." + os.path.sep + self.src + os.path.sep
 
         for f in data:
 

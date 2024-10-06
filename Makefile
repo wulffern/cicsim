@@ -20,6 +20,8 @@ clean:
 	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make clean || exit  ;}
 
 build:
+	-rm -rf build
+	-rm -rf dist
 	python3 -m build
 
 test_upload:
