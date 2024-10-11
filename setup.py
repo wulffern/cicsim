@@ -14,7 +14,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="cicsim",
-    version="0.1.9",
+    version="0.1.10",
     author="Carsten Wulff",
     author_email="carsten@wulff.no",
     description="Custom IC Creator Simulation Tools",

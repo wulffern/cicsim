@@ -90,13 +90,13 @@ class Command:
     def sub(self,buffer,keyval):
         """Replace ${NAME} constructs in buffer with values from 'dict' or shell environment"""
         for (k,v) in keyval.items():
-            buffer = re.sub('\${%s}'%k,v,buffer)
-        m = re.search('\${([^}]+)}',buffer)
+            buffer = re.sub(r'\${%s}'%k,str(v),buffer)
+        m = re.search(r'\${([^}]+)}',buffer)
         if(m):
             for var in m.groups():
                 val = os.getenv(var)
                 if(val):
-                    buffer = re.sub('\${%s}' %var,val,buffer)
+                    buffer = re.sub(r'\${%s}' %var,val,buffer)
         return buffer
 
     def safe_eval(self,s):

@@ -71,13 +71,13 @@ class CmdIp(cs.Command):
         self.src = src
         self.cell = cell
         self.options = options
+        print(options)
 
         super().__init__()
 
     def getReplacedBuffer(self,filename):
         with open(filename,"r") as fi:
             buffer = fi.read()
-
             repl = { "CELL": self.cell,
                                        "IP" : self.ip,
                                        "cell": self.cell.lower(),
@@ -86,7 +86,9 @@ class CmdIp(cs.Command):
 
             # Merge dicts
             if(self.options is not None):
-                repl = {**repl,**self.options}
+                for r in repl:
+                    self.options[r] = repl[r]
+                repl = self.options
 
             
             buffer = self.sub(buffer,repl)
@@ -98,7 +100,7 @@ class CmdIp(cs.Command):
 
         useCellName = False
         if(not self.cell):
-            self.cell = re.sub("_[^\_]+$","",self.ip)
+            self.cell = re.sub(r"_[^\_]+$","",self.ip)
         else:
             useCellName = True
 
@@ -113,8 +115,9 @@ class CmdIp(cs.Command):
             dir = self.cell
 
         if(self.options is not None):
-            if("docdir" in self.options):
-                dir = self.options["docdir"]
+            if("doc" in self.options):
+                if("dest" in self.options["doc"]):
+                    dir = self.options["doc"]["dest"]
         os.makedirs(dir)
         os.chdir(dir)
 
