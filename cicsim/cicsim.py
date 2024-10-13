@@ -165,7 +165,8 @@ def simcell(library,cell,template):
 @cli.command()
 @click.argument("template",required=True)
 @click.argument("options",required=True)
-def template(template,options):
+@click.option("--dname",default=None,help="Directory to generate")
+def template(template,options,dname):
     """Run an IP template with <options> YAML file
     """
 
@@ -178,7 +179,7 @@ def template(template,options):
     if("library" not in obj):
         raise Exception("I must have 'library' defined in the options file")
 
-    c_ip = cs.CmdIp(obj["library"],template,options=obj)
+    c_ip = cs.CmdIp(obj["library"],template,options=obj,dname=dname)
     c_ip.run()
 
 @cli.command()

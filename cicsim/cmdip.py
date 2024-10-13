@@ -59,15 +59,16 @@ class CmdIp(cs.Command):
 
       Before the file is read as YAML it will replace ${NAME} type variables in the following order.\n
        - ${IP} = IP \n
-       - ${CELL} = re.sub("_[^\_]+$","",IP) \n
+       - ${CELL} = re.sub("_[^_]+$","",IP) \n
        - Environment variables, i.e ${USER} \n
 
     """
     
 
-    def __init__(self,ip,template,src=None,cell=None,options=None):
+    def __init__(self,ip,template,src=None,cell=None,options=None,dname=None):
         self.ip = ip
         self.template = template
+        self.dname = dname
         self.src = src
         self.cell = cell
         self.options = options
@@ -100,7 +101,7 @@ class CmdIp(cs.Command):
 
         useCellName = False
         if(not self.cell):
-            self.cell = re.sub(r"_[^\_]+$","",self.ip)
+            self.cell = re.sub(r"_[^_]+$","",self.ip)
         else:
             useCellName = True
 
@@ -114,10 +115,9 @@ class CmdIp(cs.Command):
         if(useCellName):
             dir = self.cell
 
-        if(self.options is not None):
-            if("doc" in self.options):
-                if("dest" in self.options["doc"]):
-                    dir = self.options["doc"]["dest"]
+        if(self.dname is not None):
+            dir = self.dname
+
         os.makedirs(dir)
         os.chdir(dir)
 

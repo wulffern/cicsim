@@ -14,18 +14,20 @@ This is a script package I use to control ngspice, it can
 
 # Changelog
 
-| Version | Comment                         |
-|:--------|:--------------------------------|
-| 0.0.1   | First version of cicsim         |
-| 0.0.3   | All in on open source tools     |
-| 0.1.2   | First version on pipy           |
-| 0.1.3   | github action update            |
-| 0.1.4   | Added waveform viewer           |
-| 0.1.5   | Update waveform viewer          |
-| 0.1.6   | wave: added search. Added docs  |
-| 0.1.7   | Bugfix: ngraw deprecated float_ |
-| 0.1.8   | Added template command          |
-| 0.1.9   | Bugfix: allow absolute path in template command|
+| Version | Comment                                         |
+|:--------|:------------------------------------------------|
+| 0.0.1   | First version of cicsim                         |
+| 0.0.3   | All in on open source tools                     |
+| 0.1.2   | First version on pipy                           |
+| 0.1.3   | github action update                            |
+| 0.1.4   | Added waveform viewer                           |
+| 0.1.5   | Update waveform viewer                          |
+| 0.1.6   | wave: added search. Added docs                  |
+| 0.1.7   | Bugfix: ngraw deprecated float_                 |
+| 0.1.8   | Added template command                          |
+| 0.1.9   | Bugfix: allow absolute path in template command |
+| 0.1.11  | Added directory name option (dname) to template |
+
 
 
 
