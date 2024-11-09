@@ -107,11 +107,14 @@ class SimCalc():
 
         data = {}
         data["sndr"] = 20*np.log10(s/n)
+
         data["amp"] = max(ydB)
+        data["sndrfs"] = data["sndr"] - data["amp"]
         data["sfdr"] = max(ydB) - np.max(ydB[noisebins])
         data["enob"] = (data["sndr"]-1.76)/6.02
-
-
+        data["enobfs"] = (data["sndrfs"]-1.76)/6.02
+        data["fbin"] = fbin
+        data["nbpt"] = M
         return (data,ydB)
         
 
