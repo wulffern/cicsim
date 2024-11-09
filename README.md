@@ -27,6 +27,8 @@ This is a script package I use to control ngspice, it can
 | 0.1.8   | Added template command                          |
 | 0.1.9   | Bugfix: allow absolute path in template command |
 | 0.1.11  | Added directory name option (dname) to template |
+| 0.1.12  | Added sndrfs and enobfs to fftWithHanning       |
+
 
 
 
