@@ -29,6 +29,7 @@ import yaml
 import sys
 import os
 import numpy as np
+import cicsim as cs
 
 class SimCalc():
     def __init__(self):
@@ -128,5 +129,12 @@ def SimCalcYaml(function):
             with open(fnyaml,"r") as fi:
                 obj = yaml.safe_load(fi)
             df = pd.DataFrame([obj])
+        function(fname,df)
+    return wrapper
+
+def SimCalcRaw(function):
+    def wrapper(fname):
+        fnraw = fname + ".raw"
+        df = cs.toDataFrame(fnraw)
         function(fname,df)
     return wrapper
