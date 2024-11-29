@@ -104,12 +104,12 @@ def wave(files,x):
 #@click.option("--name", default=None, help="Control name of run file")
 #@click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error check")
 #@click.option("--sha/--no-sha", default=False, help="Check SHA of input files")
-def srun(testbench,corner,oformat,run,ocn,count,name,ignore,sha):
+def srun(testbench,corner,oformat,run,ocn):
     """Run a spectre simulation of TESTBENCH
     """
 
     r = cs.CmdRun(testbench,oformat,run,ocn,corner)
-    r.run(ignore)
+    r.run()
 
 
 @cli.command()
