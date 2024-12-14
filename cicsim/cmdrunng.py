@@ -253,7 +253,7 @@ class Simulation(cs.CdsConfig):
         dkey = ""
         for l in fi:
             if(l.startswith("#ifdef")):
-                d = re.split("\s+",l)
+                d = re.split(r"\s+",l)
                 dkey = d[1]
                 state = 1
                 continue
@@ -316,10 +316,10 @@ class Simulation(cs.CdsConfig):
                 sfile = self.replaceLine(buffer)
 
                 if("useTmpDir" in self.options and self.options["useTmpDir"]):
-                    sfile = re.sub("\.include\s+\.\./",f".include {os.getcwd()}/",sfile)
-                    sfile = re.sub("\.include\s+\"\.\./",f".include \"{os.getcwd()}/",sfile)
-                    sfile = re.sub("\.lib\s+\"\.\./",f".lib \"{os.getcwd()}/",sfile)
-                    sfile = re.sub("\.lib\s+\.\./",f".lib {os.getcwd()}/",sfile)
+                    sfile = re.sub(r"\.include\s+\.\./",f".include {os.getcwd()}/",sfile)
+                    sfile = re.sub(r"\.include\s+\"\.\./",f".include \"{os.getcwd()}/",sfile)
+                    sfile = re.sub(r"\.lib\s+\"\.\./",f".lib \"{os.getcwd()}/",sfile)
+                    sfile = re.sub(r"\.lib\s+\.\./",f".lib {os.getcwd()}/",sfile)
 
                 #- Store shas for any includes
                 incfiles = re.findall(r"^\s*\.include\s+(.*)",sfile,flags=re.MULTILINE)
@@ -391,7 +391,7 @@ class Simulation(cs.CdsConfig):
         with open(self.oname + ".log") as fi:
             for l in fi:
                 if(analysis and re.search("=",l)):
-                    m = re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)
+                    m = re.search(r"^([^\s]+)\s*=\s*([^\s]+)\s",l)
                     if(m):
                         key = m.groups()[0].strip()
                         val = m.groups()[1].strip()
@@ -411,14 +411,14 @@ class Simulation(cs.CdsConfig):
             with open(measlog) as fi:
                 for l in fi:
                     if(analysis and re.search("=",l)):
-                        m = re.search("^([^\s]+)\s*=\s*([^\s]+)\s",l)
+                        m = re.search(r"^([^\s]+)\s*=\s*([^\s]+)\s",l)
                         if(m):
                             key = m.groups()[0].strip()
                             val = m.groups()[1].strip()
                             data[key] = float(val)
-                    if(re.search("^\s*MEAS_START",l)):
+                    if(re.search(r"^\s*MEAS_START",l)):
                         analysis = True
-                    if(re.search("^\s*MEAS_END",l)):
+                    if(re.search(r"^\s*MEAS_END",l)):
                         analysis = False
 
         yamlfile = self.oname + ".yaml"
@@ -504,6 +504,7 @@ class CmdRunNg(cs.CdsConfig):
         pyRunLater = list()
         files = list()
         simOk = True
+
         for corner in permutations:
             for index in range(0,self.count):
                 if(not simOk):

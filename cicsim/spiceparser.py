@@ -44,7 +44,7 @@ class SpiceParser():
                 if(match):
                     cktbuff.append(line)
 
-                if(re.search(f"\s*.?SUBCKT\s+{subckt}\s+",line,re.IGNORECASE)):
+                if(re.search(fr"\s*.?SUBCKT\s+{subckt}\s+",line,re.IGNORECASE)):
                     match = True
                     cktbuff.append(line)
 
@@ -66,7 +66,7 @@ class SpiceParser():
 
             cktstr += line
 
-        cktstr = re.sub("\s+"," ",cktstr)
+        cktstr = re.sub(r"\s+"," ",cktstr)
 
 
         ports = cktstr.split(" ")

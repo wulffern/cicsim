@@ -158,7 +158,7 @@ quit
     def run(self):
         if(self.makeDirectory()):
             os.chdir(self.cell)
-            mk = """
+            mk = r"""
 TB=tran
 VIEW=Sch
 #VIEW=Lay

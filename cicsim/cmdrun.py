@@ -164,11 +164,11 @@ END
                     yamlprint = list()
                     for line in fi:
 
-                        line = re.sub("\?result",f" ?resultsDir cicResultsDir ?result",line)
+                        line = re.sub(r"\?result",f" ?resultsDir cicResultsDir ?result",line)
 
-                        m = re.search(";\s*yamlprint\s(.*)$",line)
+                        m = re.search(r";\s*yamlprint\s(.*)$",line)
                         if(m):
-                            ll = re.split("\s*,\s*",m.group(1))
+                            ll = re.split(r"\s*,\s*",m.group(1))
                             for l in ll:
                                 yamlprint.append(l)
                         buffer += line
