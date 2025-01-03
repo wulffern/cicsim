@@ -130,7 +130,7 @@ class Simulation(cs.CdsConfig):
         self.loadSha()
 
         res = "{cic(%s)}" % self.keys
-        self.comment("Available replacements %s" %res)
+        self.comment("Info: Available replacements %s" %res)
 
         #- Make spice file
         if(self.runsim):
@@ -145,7 +145,7 @@ class Simulation(cs.CdsConfig):
         simOk = self.ngspice(ignore)
 
         if(not simOk):
-            self.error(f"Simulation {self.name} failed ")
+            self.error(f"Info: Simulation {self.name} failed ")
             return
 
         self.makeMeasFile()
@@ -180,7 +180,7 @@ class Simulation(cs.CdsConfig):
         if(self.runsim):
             tickTime = datetime.datetime.now()
 
-            self.comment(f"Running {self.name}")
+            self.comment(f"Info: Running {self.name}")
 
             options = ""
             includes = ""
@@ -198,7 +198,7 @@ class Simulation(cs.CdsConfig):
 
             # Run NGSPICE
             cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
-            self.comment(cmd)
+            self.comment("Cmd : " + cmd,color="cyan")
             try:
                 self.err = os.system(cmd)
             except Exception as e:
@@ -212,7 +212,7 @@ class Simulation(cs.CdsConfig):
                 simOk = False
 
             nextTime = datetime.datetime.now()
-            self.comment("Corner simulation time : " + str(nextTime - tickTime))
+            self.comment("Info: Corner simulation time : " + str(nextTime - tickTime))
             tickTime = nextTime
         else:
             self.warning(f"Info: Skipping simulation of {self.name}.spi")
@@ -364,7 +364,7 @@ class Simulation(cs.CdsConfig):
         #- Run measurement
         if(self.runmeas):
             cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
-            self.comment(cmd)
+            self.comment("Cmd : " + cmd,color="cyan")
             os.system(cmd)
         else:
             self.comment(f"Info: Skipping measurement run of {self.name}.meas","yellow")
@@ -423,7 +423,7 @@ class Simulation(cs.CdsConfig):
 
         yamlfile = self.oname + ".yaml"
         with open(yamlfile,"w") as fo:
-            self.comment(f"Writing {yamlfile}")
+            self.comment(f"Info: Writing {yamlfile}")
             yaml.dump(data,fo)
 
 
@@ -434,7 +434,7 @@ class Simulation(cs.CdsConfig):
             m = re.findall(self.replace_re,line,flags=re.MULTILINE)
             if(len(m) > 0):
                 for mg in m:
-                    self.comment("Replacing {%s} = %s" %(mg,self.replace[mg]))
+                    self.comment("Info: Replacing {%s} = %s" %(mg,self.replace[mg]))
                     line = line.replace("{%s}" %mg,str(self.replace[mg]))
 
         #- Find and replace {cic.*} stuff
@@ -443,16 +443,16 @@ class Simulation(cs.CdsConfig):
 
         if(len(m) > 0):
             for mg in m:
-                self.comment("Replacing {cic%s} = %s" %(mg,self.__dict__[mg]))
+                self.comment("Info: Replacing {cic%s} = %s" %(mg,self.__dict__[mg]))
                 line = line.replace("{cic%s}" %mg,str(self.__dict__[mg]))
 
         #- Eval expressions
-        m = re.findall("\s+\[([^\]]+)\]",line)
+        m = re.findall(r"\s+\[([^\]]+)\]",line)
         for mg in m:
             try:
-                self.comment("Evaluating %s"%mg)
+                self.comment("Info: Evaluating %s"%mg)
                 eresult = str(self.safe_eval(mg))
-                self.comment("Replacing  [%s] = %s" %(mg,eresult))
+                self.comment("Info: Replacing  [%s] = %s" %(mg,eresult))
                 line = line.replace("[%s]" %mg,eresult)
             except Exception as e:
                 self.warning(f"Warning: could not eval [{mg}]: "  + str(e))
@@ -550,7 +550,7 @@ class CmdRunNg(cs.CdsConfig):
                 sys.path.append(os.getcwd())
                 tb = importlib.import_module(self.testbench)
                 for perm in pyRunLater:
-                    self.comment(f"Running {self.testbench}.py with {perm}")
+                    self.comment(f"Info: Running {self.testbench}.py with {perm}")
                     tb.main(perm)
             #- Extract results
             r = cs.CmdResults(runfile)
