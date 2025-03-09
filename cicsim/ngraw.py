@@ -67,7 +67,7 @@ def ngRawRead(fname: str):
                     plot['varunits'].append(varspec[2])
             if mdata[0].lower() == b'binary':
                 rowdtype = np.dtype({'names': plot['varnames'],
-                                     'formats': [np.complex_ if b'complex'
+                                     'formats': [np.complex128 if b'complex'
                                                  in plot[b'flags']
                                                  else np.float64]*nvars})
                 # We should have all the metadata by now

@@ -60,6 +60,10 @@ class Wave():
             self.x = self.wfile.df["v(v-sweep)"]
             self.xlabel = "Voltage [V]"
             self.y = self.wfile.df[self.key]
+        elif("i(i-sweep)" in keys):
+            self.x = self.wfile.df["i(i-sweep)"]
+            self.xlabel = "Current [I]"
+            self.y = self.wfile.df[self.key]
         elif("temp-sweep" in keys):
             self.x = self.wfile.df["temp-sweep"]
             self.xlabel = "Temperature [C]"
