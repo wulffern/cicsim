@@ -76,6 +76,16 @@ def run(testbench,run,corner,count,name,ignore,sha,replace):
     r.run(ignore)
 
 @cli.command()
+@click.argument("name")
+@click.argument("runfiles",nargs=-1)
+def archive(name,runfiles):
+    """Save a cicisim run output
+    """
+    r = cs.CmdArchive(name)
+
+    r.archiveAll(runfiles)
+
+@cli.command()
 @click.argument("files",nargs=-1)
 @click.option("--x",default=None,help="Specify x-axis")
 def wave(files,x):
