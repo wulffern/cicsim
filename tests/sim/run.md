@@ -26,7 +26,7 @@ expects that everything is defined within that spice file.
 Take the spice netlist below as an example. 
 
 <!--cat: 
-file: ngspice/basic/output_tran/tran_SchThVh.spi
+file: ngspice/basic/tran_SchTtVt.spi
 language: spice
 lines: 6
 -->
@@ -311,14 +311,6 @@ The python script can do whatever you want.
 
 
 
-
-
-
-
-
-
-
-
 ## Advanced features 
 
 ### ifdef/else
@@ -463,6 +455,19 @@ running the simulation.
 I find it a useful feature to check if I've modified anything. Also, I don't
 need to worry about re-running simulations. If nothing has changed, then the
 simulation won't run.
+
+## Archive
+
+Use the `cicsim archive` command if you want to save a simulation set for a later date, for example if you intend
+to re-run your typical simulation, but you really want to save the old
+simulation do
+
+<!--run_output:
+run: cd ngspice/basic ; cicsim archive "My Sim" tran_Sch_typical.run tran_Sch_mc.run
+-->
+
+
+
 
 ## Further information 
 

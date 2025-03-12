@@ -43,7 +43,7 @@ import json
 class CmdResults(cs.Command):
     """ Summarize results of TESTBENCH """
 
-    def __init__(self,runfile,runname=None):
+    def __init__(self,runfile,runname=None,color=True):
         if(runname is None):
             self.runname = runfile.replace(".run","")
         else:
@@ -51,7 +51,7 @@ class CmdResults(cs.Command):
         self.runfile = runfile
         self.ofile = runfile.replace(".run","")
         self.testbench = re.sub("_.*","",runfile)
-        super().__init__()
+        super().__init__(color=color)
 
     def summaryToMarkdown(self,specs,df_all):
         with open(f"results/{self.ofile}.md","w") as fo:

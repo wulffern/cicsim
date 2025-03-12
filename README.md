@@ -30,7 +30,7 @@ This is a script package I use to control ngspice, it can
 | 0.1.12  | Added sndrfs and enobfs to fftWithHanning       |
 | 0.1.13  | Added docs                                      |
 | 0.1.14  | Nothing exiting                                 |
-| 0.1.15  | Added "archive" command to save old simulations |
+| 0.1.15  | Added "archive" command to save old simulations. Added "--no-color" option |
 
 
 

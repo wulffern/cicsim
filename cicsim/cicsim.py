@@ -48,7 +48,9 @@ import datetime
 
 
 @click.group()
-def cli():
+@click.option("--color/--no-color",default=True,help="Enable/Disable color output")
+@click.pass_context
+def cli(ctx,color):
     """Custom Integrated Circuit Simulation
 
     This package provides helper scripts for simulating integrated circuits
@@ -56,6 +58,8 @@ def cli():
     Check website for more information : http://analogicus.com/cicsim/
 
     """
+    ctx.obj = dict()
+    ctx.obj["color"] = color
     pass
 
 @cli.command()
@@ -67,10 +71,12 @@ def cli():
 @click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error checks")
 @click.option("--sha/--no-sha", default=None, help="Check SHA of input files")
 @click.option("--replace",default=None, help="YAML file with replacements for netlist")
-def run(testbench,run,corner,count,name,ignore,sha,replace):
+@click.pass_context
+def run(ctx,testbench,run,corner,count,name,ignore,sha,replace):
     """Run a ngspice simulation of TESTBENCH
     """
-    r = cs.CmdRunNg(testbench,run,corner,name,count,sha)
+
+    r = cs.CmdRunNg(testbench,run,corner,name,count,sha,ctx.obj["color"])
     r.loadReplacements(replace)
 
     r.run(ignore)
@@ -78,10 +84,12 @@ def run(testbench,run,corner,count,name,ignore,sha,replace):
 @cli.command()
 @click.argument("name")
 @click.argument("runfiles",nargs=-1)
-def archive(name,runfiles):
+@click.pass_context
+def archive(ctx,name,runfiles):
     """Save a cicisim run output
     """
-    r = cs.CmdArchive(name)
+
+    r = cs.CmdArchive(name,ctx.obj["color"])
 
     r.archiveAll(runfiles)
 

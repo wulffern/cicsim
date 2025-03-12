@@ -42,15 +42,15 @@ expects that everything is defined within that spice file.
 
 Take the spice netlist below as an example. 
 
-ngspice/basic/output_tran/tran_SchThVh.spi:
+ngspice/basic/tran_SchTtVt.spi:
 ```spice
 *cicsimgen tran
 
+.param SEED=0
 
-.option TEMP=125
+.option TEMP=27
 
-.param vdda = 1.98
-
+.param vdda = 1.8
 
 ```
 
@@ -109,9 +109,9 @@ And I get a summary of the simulation results.
 |**Name**|**Parameter**|**Description**| |**Min**|**Typ**|**Max**| Unit|
 |:---|:---|:---|---:|:---:|:---:|:---:| ---:|
 |**Divider voltage**|**vx** || **Spec**  | **0.80** | **0.90** | **1.00** | **V** |
-| | | |Sch_typical| | 0.92 |  | |
-| | | |Sch_tempvall|0.80 | 0.87 | <span style='color:red'>**1.02**</span> | |
-| | | |Sch_3std|0.85 | 0.90 | 0.95 | |
+| | | |Sch_typical| | 0.93 |  | |
+| | | |Sch_tempvall|0.81 | 0.90 | <span style='color:red'>**1.03**</span> | |
+| | | |Sch_3std|0.84 | 0.91 | 0.98 | |
 
 
 
@@ -422,14 +422,6 @@ The python script can do whatever you want.
 
 
 
-
-
-
-
-
-
-
-
 ## Advanced features 
 
 ### ifdef/else
@@ -574,6 +566,37 @@ running the simulation.
 I find it a useful feature to check if I've modified anything. Also, I don't
 need to worry about re-running simulations. If nothing has changed, then the
 simulation won't run.
+
+## Archive
+
+Use the `cicsim archive` command if you want to save a simulation set for a later date, for example if you intend
+to re-run your typical simulation, but you really want to save the old
+simulation do
+
+```bash
+cd ngspice/basic ; cicsim archive "My Sim" tran_Sch_typical.run tran_Sch_mc.run
+```
+
+```bash
+[32mInfo: cp output_tran/tran_SchTtVt* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: writing archive/2025-03-12_09-17_My_Sim_tran_Sch_typical.run[0m
+[32mInfo: cp output_tran/tran_SchTtVt* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_1* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_2* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_3* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_4* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_5* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_6* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_7* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_8* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: cp output_tran/tran_SchTtVt_9* archive/2025-03-12_09-17_My_Sim[0m
+[32mInfo: writing archive/2025-03-12_09-17_My_Sim_tran_Sch_mc.run[0m
+
+```
+
+
+
+
 
 ## Further information 
 

@@ -6,13 +6,13 @@ import datetime
 
 class CmdArchive(cs.Command):
 
-    def __init__(self,name):
+    def __init__(self,name,color=True):
 
         dt = datetime.datetime.now()
 
         self.date =dt.strftime("%Y-%m-%d_%H-%M")
         self.fullname = "archive" + os.path.sep +  self.date + "_" + name.replace(" ","_")
-        super().__init__()
+        super().__init__(color)
         pass
 
     def archiveAll(self,runfiles):

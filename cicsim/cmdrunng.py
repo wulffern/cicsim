@@ -39,7 +39,7 @@ import ast
 
 class Simulation(cs.CdsConfig):
 
-    def __init__(self,testbench,corner,runsim,config,index,sha=None):
+    def __init__(self,testbench,corner,runsim,config,index,sha=None,color=True):
          #- Permutation variables
         self.runsim = runsim
         self.runmeas = True
@@ -64,7 +64,7 @@ class Simulation(cs.CdsConfig):
         self.replace = None
         self.replace_re = None
 
-        super().__init__()
+        super().__init__(color=color)
 
     def loadReplace(self,replace):
         if(replace is None):
@@ -464,7 +464,7 @@ class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,runsim,corners,cornername,count,sha):
+    def __init__(self,testbench,runsim,corners,cornername,count,sha,color=True):
         self.testbench = testbench
         self.count = count
         self.runsim = runsim
@@ -472,7 +472,9 @@ class CmdRunNg(cs.CdsConfig):
         self.cornername = cornername
         self.sha = sha
         self.replace = None
-        super().__init__()
+        self.color = color
+
+        super().__init__(color=color)
 
         if("_" in self.testbench ):
             self.error("Testbench name cannot contain '_'")
@@ -512,7 +514,7 @@ class CmdRunNg(cs.CdsConfig):
                     continue
 
                 #- Run a simulation for a corner
-                c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha)
+                c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha,self.color)
 
                 #- Setup additional replacements
                 c.loadReplace(self.replace)
@@ -553,7 +555,7 @@ class CmdRunNg(cs.CdsConfig):
                     self.comment(f"Info: Running {self.testbench}.py with {perm}")
                     tb.main(perm)
             #- Extract results
-            r = cs.CmdResults(runfile)
+            r = cs.CmdResults(runfile,color=self.color)
             r.run()
         else:
             self.warning("Skipping post processing, one simulation failed")

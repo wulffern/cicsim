@@ -1,6 +1,6 @@
 ---
 layout: page
-title:  Plot 
+title:  plot 
 math: true
 ---
 
@@ -38,7 +38,7 @@ Usage: cicsim plot [OPTIONS] FILENAME XNAME YNAME
 
       Plot vp and vn in the same plot
 
-      $ cicsim plot test.raw time "v(vp),v(vn)" --ptype same"
+      $ cicsim plot test.raw time "v(vp),v(vn)" --ptype "same"
 
 
 
@@ -72,7 +72,7 @@ cicsim plot test.raw time "somenode"  --no-show
 ```
 
 ```bash
-2024-07-26 21:01:51.515 Python[37610:36971999] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/kl/9ll03nm54z32xx822qj_5vz80000gp/T/org.python.python.savedState
+2025-03-12 09:17:41.497 Python[90386:386793816] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/rk/945ntwx556l83qk8p1t64zdw0000gn/T/org.python.python.savedState
 [31mError: Could not find name time in time,i(vibp),v(c1a_1v8),v(c1b_1v8),v(c2a_1v8),v(c2b_1v8),v(cmp_o),v(coarse),v(d_coarse),v(d_fine),v(d_state),v(idac_o0),v(idac_o1),v(idac_o2),v(idac_o3),v(res_n_1v8),v(state0),v(valid),v(vn),v(vp),v(xdut.idac_o<0>),v(xdut.x1.bp0),v(xdut.x1.bp1),v(xdut.x1.bp2),v(xdut.x1.bp3),v(xdut.x1.bp4),v(xdut.x1.bp5),v(xdut.x1.bp6),v(xdut.x1.bp7),v(xdut.x1.pwr_n),v(xdut.x1.vd),v(xdut.x1.vgp),v(xdut.x1.vs)[0m
 
 ```

@@ -33,7 +33,7 @@ rcfg = "cicsim.yaml"
 
 class CdsConfig(cs.Command):
 
-    def __init__(self,library=None,cell=None,view=None):
+    def __init__(self,library=None,cell=None,view=None,color=True):
         self.config = None
         self.cm = cs.Command()
         pparent = ".." + os.path.sep + ".." + os.path.sep + rcfg
@@ -62,7 +62,8 @@ class CdsConfig(cs.Command):
         if(view):
             self.cadence["view"] = view
 
-        super().__init__()
+
+        super().__init__(color)
 
     @property
     def library(self):

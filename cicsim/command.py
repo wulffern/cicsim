@@ -50,11 +50,16 @@ class colors:
 
 class Command:
 
-    def __init__(self):
+    def __init__(self,color=True):
         self.indentstr = "|-"
         self.indent = 0
+        self.color = color
 
     def getColor(self,color):
+
+        if(not self.color):
+            return ""
+
         if(color in colors.fg):
             return colors.fg[color]
         else:
