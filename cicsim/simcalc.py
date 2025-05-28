@@ -72,7 +72,7 @@ class SimCalc():
 
         return (data,ydB)
 
-    def fftWithHanning(self,ser):
+    def fftWithHanning(self,ser,maxnoisebin=None):
         N = len(ser)
         pwr2 = np.floor(np.log2(N))
         M = int(2**pwr2)
@@ -98,7 +98,12 @@ class SimCalc():
 
         sigbins = [-3,-2,-1,0,1,2,3] + fbin
 
-        noisebins = np.arange(0,int(M/2)-1,1)
+        if(maxnoisebin is not None):
+            print(maxnoisebin)
+            noisebins = np.arange(0,int(maxnoisebin),1)
+        else:
+            noisebins = np.arange(0,int(M/2)-1,1)
+
         noisebins[sigbins] = 0
         noisebins[0:2] = 0
 
