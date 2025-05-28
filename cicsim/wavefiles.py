@@ -48,30 +48,30 @@ class Wave():
         keys = self.wfile.df.columns
 
         if("time" in keys):
-            self.x = self.wfile.df["time"]
+            self.x = self.wfile.df["time"].to_numpy()
             self.xlabel = "Time [s]"
-            self.y = self.wfile.df[self.key]
+            self.y = self.wfile.df[self.key].to_numpy()
         elif("frequency" in keys):
-            self.x = self.wfile.df["frequency"]
+            self.x = self.wfile.df["frequency"].to_numpy()
             self.xlabel = "Frequency [Hz]"
             self.logx = True
-            self.y = self.wfile.df[self.key]
+            self.y = self.wfile.df[self.key].to_numpy()
         elif("v(v-sweep)" in keys):
-            self.x = self.wfile.df["v(v-sweep)"]
+            self.x = self.wfile.df["v(v-sweep)"].to_numpy()
             self.xlabel = "Voltage [V]"
-            self.y = self.wfile.df[self.key]
+            self.y = self.wfile.df[self.key].to_numpy()
         elif("i(i-sweep)" in keys):
-            self.x = self.wfile.df["i(i-sweep)"]
+            self.x = self.wfile.df["i(i-sweep)"].to_numpy()
             self.xlabel = "Current [I]"
-            self.y = self.wfile.df[self.key]
+            self.y = self.wfile.df[self.key].to_numpy()
         elif("temp-sweep" in keys):
-            self.x = self.wfile.df["temp-sweep"]
+            self.x = self.wfile.df["temp-sweep"].to_numpy()
             self.xlabel = "Temperature [C]"
-            self.y = self.wfile.df[self.key]
+            self.y = self.wfile.df[self.key].to_numpy()
         elif(self.xaxis in keys):
-            self.x = self.wfile.df[self.xaxis]
+            self.x = self.wfile.df[self.xaxis].to_numpy()
             self.xlabel = " "
-            self.y = self.wfile.df[self.key]
+            self.y = self.wfile.df[self.key].to_numpy()
 
         if(self.line):
             if(self.x is not None):
