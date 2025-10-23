@@ -374,6 +374,8 @@ class Simulation(cs.CdsConfig):
         with open(self.oname + ".logm") as fi:
             for l in fi:
                 if(re.search("Error:",l) or re.search("failed",l)):
+
+                    #- Skip the "No netlist" message in ngspice-45 and on
                     if(re.search("incomplete or empty netlist",l)):
                         continue
                     errors.append(l.strip())
