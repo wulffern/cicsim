@@ -374,6 +374,8 @@ class Simulation(cs.CdsConfig):
         with open(self.oname + ".logm") as fi:
             for l in fi:
                 if(re.search("Error:",l) or re.search("failed",l)):
+                    if(re.search("incomplete or empty netlist",l)):
+                        continue
                     errors.append(l.strip())
 
         if(len(errors) > 0):

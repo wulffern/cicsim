@@ -14,7 +14,7 @@ dependencies = [
   "jinja2",
   "matplotlib"
 ]
-license = { text = "MIT" }
+license = "MIT"
 description = "Custom IC Creator Simulation Tools"
 readme = "README.md"
 requires-python = ">=3.8"

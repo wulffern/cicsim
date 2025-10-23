@@ -93,7 +93,7 @@ class SimulationSummary(cs.Command):
         if("noHeading" in self.options):
             ss = ""
         else:
-            ss = f"""### {self.name} ({self.tag})\n"""
+            ss = f"""#### {self.name} ({self.tag})\n"""
         ss += f"""
 {self.description}\n\n
 |**Name**|**Parameter**|**Description**| |**Min**|**Typ**|**Max**| Unit|

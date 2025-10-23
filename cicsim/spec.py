@@ -119,6 +119,13 @@ class SpecMinMax:
             return False
         else:
             return True
+
+    def Near(self,v):
+
+        if(self.min and self.max and ((v*0.95) > self.max or (v*1.05) < self.min)):
+            return False
+        else:
+            return True
     def string(self,v):
         if(v):
             return str.format(self.format(),v)
@@ -136,6 +143,9 @@ class SpecMinMax:
         md = str.format("{0:.%df}" % (self.digits),v)
         if(self.OK(v)):
             return md
+        elif(self.Near(v)):
+
+            return "<span style='color:orange'>**" + md + "**</span>"
         else:
             return "<span style='color:red'>**" + md + "**</span>"
 
