@@ -36,6 +36,8 @@ import importlib
 import datetime
 import hashlib
 import ast
+import inspect
+import numpy as np
 
 class Simulation(cs.CdsConfig):
 
@@ -46,6 +48,7 @@ class Simulation(cs.CdsConfig):
         self.corner = corner
         self.index = index
         self.testbench = testbench
+        self.pyscript = testbench + ".py"
         self.rundir = f"output_{self.testbench}"
         self.sha = sha
 
@@ -306,7 +309,7 @@ class Simulation(cs.CdsConfig):
             buffer += "*cicsimgen " + self.testbench + "\n\n"
 
             #- Add seed so runs become reproducible
-            buffer += f".param SEED={self.index}\n"
+            buffer += f".option SEED={self.index+1}\n"
 
             buffer += ss
 
@@ -412,8 +415,46 @@ class Simulation(cs.CdsConfig):
         measlog = self.oname + ".logm"
         if(os.path.exists(measlog)):
             analysis = False
+            prepareTable = False
+            table = False
+            table_data = list()
+            table_header = None
             with open(measlog) as fi:
                 for l in fi:
+
+
+                    if(analysis):
+                        #print(table,prepareTable,l)
+                            # Parse tables
+                        if(not prepareTable and re.search("^---------------------------------",l)):
+                            prepareTable = True
+                            continue
+                        #print(l,end="")
+                        #print(re.search(r"^\d",l))
+                        if(table and not prepareTable and (not re.search(r"^\d",l) )):
+                            table = False
+
+                        if(prepareTable and re.search("^Index",l)):
+                            arr = re.split("\s+",l)
+                            table_header = arr[1:]
+                            table = True
+                            continue
+
+                        if(table and not prepareTable):
+                            arr = re.split("\s+",l)
+
+                            for k,v in zip(table_header,arr[1:]):
+                                if(v== ""):
+                                    continue
+                                if(k not in data):
+                                    data[k] = list()
+                                data[k].append(float(v))
+
+
+                        if(prepareTable):
+                            prepareTable = False
+
+                    #- Find key=val pairs
                     if(analysis and re.search("=",l)):
                         m = re.search(r"^([^\s]+)\s*=\s*([^\s]+)\s",l)
                         if(m):
@@ -531,9 +572,8 @@ class CmdRunNg(cs.CdsConfig):
                 files.append(c.oname)
 
                 #- Run python post parsing if py file exist and simulation is OK
-                pyscript = c.testbench + ".py"
-                if(simOk and os.path.exists(pyscript)):
-                    pyRunLater.append(c.oname)
+                if(simOk and os.path.exists(c.pyscript)):
+                    pyRunLater.append(c)
 
 
         endTime = datetime.datetime.now()
@@ -554,10 +594,13 @@ class CmdRunNg(cs.CdsConfig):
             #- Run python
             if(len(pyRunLater) > 0):
                 sys.path.append(os.getcwd())
-                tb = importlib.import_module(self.testbench)
-                for perm in pyRunLater:
-                    self.comment(f"Info: Running {self.testbench}.py with {perm}")
-                    tb.main(perm)
+                tb = importlib.import_module(c.testbench)
+                for c in pyRunLater:
+                    self.comment(f"Info: Running {c.testbench}.py with {c.oname}")
+                    if(len(inspect.signature(tb.main).parameters) > 1):
+                        tb.main(c.oname,c.corner)
+                    else:
+                        tb.main(c.oname)
             #- Extract results
             r = cs.CmdResults(runfile,color=self.color)
             r.run()
