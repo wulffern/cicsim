@@ -435,13 +435,13 @@ class Simulation(cs.CdsConfig):
                             table = False
 
                         if(prepareTable and re.search("^Index",l)):
-                            arr = re.split("\s+",l)
+                            arr = re.split(r"\s+",l)
                             table_header = arr[1:]
                             table = True
                             continue
 
                         if(table and not prepareTable):
-                            arr = re.split("\s+",l)
+                            arr = re.split(r"\s+",l)
 
                             for k,v in zip(table_header,arr[1:]):
                                 if(v== ""):
