@@ -9,7 +9,7 @@ math: true
 
 ## Command
 ```bash
-cicsim run --help
+cicsim --no-color run --help
 ```
 
 ```bash
@@ -109,9 +109,9 @@ And I get a summary of the simulation results.
 |**Name**|**Parameter**|**Description**| |**Min**|**Typ**|**Max**| Unit|
 |:---|:---|:---|---:|:---:|:---:|:---:| ---:|
 |**Divider voltage**|**vx** || **Spec**  | **0.80** | **0.90** | **1.00** | **V** |
-| | | |Sch_typical| | 0.93 |  | |
-| | | |Sch_tempvall|0.81 | 0.90 | <span style='color:red'>**1.03**</span> | |
-| | | |Sch_3std|0.84 | 0.91 | 0.98 | |
+| | | |Sch_typical| | 0.91 |  | |
+| | | |Sch_tempvall|0.82 | 0.91 | 1.00 | |
+| | | |Sch_3std|0.87 | 0.91 | 0.95 | |
 
 
 
@@ -136,7 +136,7 @@ It's always worth the effort to go the extra mile to setup automatic simulations
 
 _Warning_: I wrote `cicsim`  for me, no-one else. That means, it might not be for you. 
 
-I've forced approx 50 students to use `cicsim`, and in the end, I do think they
+I've forced approx 100 students to use `cicsim`, and in the end, I do think they
 understood why it's necessary. You may also understand one day. 
    
    
@@ -478,7 +478,7 @@ temp_sweep: -25 0 25 50 75 100
 And running 
 
 ```
-cicsim run  --replace replace.yaml --name Sch_typical tran Sch Gt Kss Tt Vl
+cicsim  run  --replace replace.yaml --name Sch_typical tran Sch Gt Kss Tt Vl
 ```
 
 In the testbench I have the line 
@@ -569,28 +569,28 @@ simulation won't run.
 
 ## Archive
 
-Use the `cicsim archive` command if you want to save a simulation set for a later date, for example if you intend
+Use the `cicsim  archive` command if you want to save a simulation set for a later date, for example if you intend
 to re-run your typical simulation, but you really want to save the old
 simulation do
 
 ```bash
-cd ngspice/basic ; cicsim archive "My Sim" tran_Sch_typical.run tran_Sch_mc.run
+cd ngspice/basic ; cicsim --no-color archive "My Sim" tran_Sch_typical.run tran_Sch_mc.run
 ```
 
 ```bash
-[32mInfo: cp output_tran/tran_SchTtVt* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: writing archive/2025-03-12_09-17_My_Sim_tran_Sch_typical.run[0m
-[32mInfo: cp output_tran/tran_SchTtVt* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_1* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_2* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_3* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_4* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_5* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_6* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_7* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_8* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: cp output_tran/tran_SchTtVt_9* archive/2025-03-12_09-17_My_Sim[0m
-[32mInfo: writing archive/2025-03-12_09-17_My_Sim_tran_Sch_mc.run[0m
+Info: cp output_tran/tran_SchTtVt* archive/2025-12-29_19-31_My_Sim[0m
+Info: writing archive/2025-12-29_19-31_My_Sim_tran_Sch_typical.run[0m
+Info: cp output_tran/tran_SchTtVt* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_1* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_2* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_3* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_4* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_5* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_6* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_7* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_8* archive/2025-12-29_19-31_My_Sim[0m
+Info: cp output_tran/tran_SchTtVt_9* archive/2025-12-29_19-31_My_Sim[0m
+Info: writing archive/2025-12-29_19-31_My_Sim_tran_Sch_mc.run[0m
 
 ```
 
@@ -598,9 +598,7 @@ cd ngspice/basic ; cicsim archive "My Sim" tran_Sch_typical.run tran_Sch_mc.run
 
 
 
-## Further information 
 
-For a tutorial on `cicsim` I'd recommend [rply\_ex0\_sky130nm](https://analogicus.com/rply_ex0_sky130nm/tutorial)
 
 
 

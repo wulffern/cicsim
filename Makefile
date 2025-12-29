@@ -33,4 +33,4 @@ upload:
 JEKYLL_VERSION=3.8
 SITE=${shell pwd}/docs
 jstart:
-	docker run --rm --name aicex_docs --volume="${SITE}:/srv/jekyll" -p 3002:4000 -it jekyll/jekyll:${JEKYLL_VERSION} jekyll serve --watch --drafts
+	docker run --rm --name cicsim_docs --volume="${SITE}:/srv/jekyll" -p 3002:4000 -it jekyll/jekyll:${JEKYLL_VERSION} jekyll serve --watch --drafts

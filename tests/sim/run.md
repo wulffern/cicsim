@@ -9,7 +9,7 @@ math: true
 
 ## Command
 <!--run_output:
-run: cicsim run --help
+run: cicsim --no-color run --help
 -->
 
 
@@ -92,7 +92,7 @@ It's always worth the effort to go the extra mile to setup automatic simulations
 
 _Warning_: I wrote `cicsim`  for me, no-one else. That means, it might not be for you. 
 
-I've forced approx 50 students to use `cicsim`, and in the end, I do think they
+I've forced approx 100 students to use `cicsim`, and in the end, I do think they
 understood why it's necessary. You may also understand one day. 
    
    
@@ -367,7 +367,7 @@ temp_sweep: -25 0 25 50 75 100
 And running 
 
 ```
-cicsim run  --replace replace.yaml --name Sch_typical tran Sch Gt Kss Tt Vl
+cicsim  run  --replace replace.yaml --name Sch_typical tran Sch Gt Kss Tt Vl
 ```
 
 In the testbench I have the line 
@@ -458,20 +458,18 @@ simulation won't run.
 
 ## Archive
 
-Use the `cicsim archive` command if you want to save a simulation set for a later date, for example if you intend
+Use the `cicsim  archive` command if you want to save a simulation set for a later date, for example if you intend
 to re-run your typical simulation, but you really want to save the old
 simulation do
 
 <!--run_output:
-run: cd ngspice/basic ; cicsim archive "My Sim" tran_Sch_typical.run tran_Sch_mc.run
+run: cd ngspice/basic ; cicsim --no-color archive "My Sim" tran_Sch_typical.run tran_Sch_mc.run
 -->
 
 
 
 
-## Further information 
 
-For a tutorial on `cicsim` I'd recommend [rply\_ex0\_sky130nm](https://analogicus.com/rply_ex0_sky130nm/tutorial)
 
 
 
