@@ -95,7 +95,44 @@ def archive(ctx,name,runfiles):
 @click.option("--backend",default="tk",type=click.Choice(["tk","pg"]),
               help="GUI backend: tk (tkinter+matplotlib) or pg (PySide6+pyqtgraph)")
 def wave(files,x,backend):
-    """Open waveform viewer"""
+    """Open waveform viewer.
+
+    Interactive waveform viewer for SPICE simulation results (.raw files).
+
+    \b
+    Keyboard shortcuts (both backends):
+      A              Set cursor A at mouse position
+      B              Set cursor B at mouse position
+      Escape         Clear cursors
+      F              Auto scale (fit all)
+      R              Reload all waveforms
+      L              Toggle legend
+      Ctrl+O         Open raw file
+      Ctrl+P         Export to PDF
+      Ctrl+N         New plot tab (pg backend)
+      Ctrl+Q         Quit
+
+    \b
+    Mouse (pg backend):
+      Scroll             Zoom x-axis
+      Shift+Scroll       Zoom y-axis
+      Shift+Right-drag   Zoom x-axis
+      Ctrl+Right-drag    Zoom y-axis
+      Left-drag          Pan
+
+    \b
+    Browser (pg backend):
+      Click wave     Add to plot
+      Right-click    Remove from plot
+      Flat checkbox  Toggle hierarchy / flat list
+
+    \b
+    Backends:
+      tk   Default. Uses tkinter + matplotlib. No extra dependencies.
+      pg   Uses PySide6 + pyqtgraph. Install: pip install cicsim[pg]
+           Features: hierarchical wave browser, automatic dual Y-axes
+           (left/right by unit), GPU-accelerated rendering.
+    """
 
     if backend == "pg":
         try:
