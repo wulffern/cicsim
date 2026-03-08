@@ -12,9 +12,9 @@ import re
 import numpy as np
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTreeWidget, QTreeWidgetItem, QLineEdit, QTabWidget,
-    QPushButton, QLabel, QTextEdit, QFileDialog, QDialog)
+    QPushButton, QLabel, QCheckBox, QTextEdit, QFileDialog, QDialog)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QFont, QShortcut, QPainter
 
@@ -140,6 +140,7 @@ class PgWaveBrowser(QWidget):
         self.file_tree.setHeaderLabel("Files")
         self.file_tree.currentItemChanged.connect(self._file_selected)
 
+        search_row = QHBoxLayout()
         self.search = QLineEdit()
         self.search.setPlaceholderText("Regex filter...")
         self.search.setToolTip(
@@ -157,6 +158,12 @@ class PgWaveBrowser(QWidget):
             "  ^i\\(       current signals"
         )
         self.search.textChanged.connect(self._fill_waves)
+        self._flat_mode = False
+        self.flat_cb = QCheckBox("Flat")
+        self.flat_cb.setToolTip("Show flat list instead of hierarchy")
+        self.flat_cb.toggled.connect(self._toggle_flat)
+        search_row.addWidget(self.search)
+        search_row.addWidget(self.flat_cb)
 
         self.wave_tree = QTreeWidget()
         self.wave_tree.setHeaderLabel("Waves")
@@ -165,7 +172,7 @@ class PgWaveBrowser(QWidget):
         self.wave_tree.customContextMenuRequested.connect(self._wave_context)
 
         layout.addWidget(self.file_tree, 1)
-        layout.addWidget(self.search)
+        layout.addLayout(search_row)
         layout.addWidget(self.wave_tree, 3)
 
     def openFile(self, fname):
@@ -196,12 +203,25 @@ class PgWaveBrowser(QWidget):
             self.files.select(fname)
             self._fill_waves()
 
+    def _toggle_flat(self, checked):
+        self._flat_mode = checked
+        self._fill_waves()
+
     @staticmethod
     def _parse_hierarchy(name):
-        """Split 'v(a.b.c)' → ['v', 'a', 'b', 'c'] for tree display."""
+        """Split 'v(xdut.x1.node)' → ['xdut', 'x1', 'v(node)'].
+
+        The instance path forms the hierarchy; the leaf keeps v()/i().
+        """
         m = re.match(r'^([vi])\((.+)\)$', name)
         if m:
-            return [m.group(1)] + m.group(2).split('.')
+            prefix = m.group(1)
+            inner = m.group(2)
+            parts = inner.split('.')
+            if len(parts) > 1:
+                leaf = "%s(%s)" % (prefix, parts[-1])
+                return parts[:-1] + [leaf]
+            return [name]
         return [name]
 
     def _fill_waves(self):
@@ -214,6 +234,14 @@ class PgWaveBrowser(QWidget):
 
         names = [n for n in f.getWaveNames()
                  if not pattern or re.search(pattern, n, re.IGNORECASE)]
+
+        if self._flat_mode:
+            for name in sorted(names):
+                item = QTreeWidgetItem([name])
+                item.setData(0, Qt.UserRole, name)
+                self.wave_tree.addTopLevelItem(item)
+                self._color_if_plotted(item, f, name)
+            return
 
         root = {}
         for name in names:
@@ -327,6 +355,8 @@ class PgWavePlot(QWidget):
         self.plot = self.gw.addPlot(row=0, col=0)
         self.plot.showGrid(x=True, y=True, alpha=0.3)
         self.plot.vb.wheelEvent = lambda ev: self._on_wheel(ev)
+        self._orig_mouseDragEvent = self.plot.vb.mouseDragEvent
+        self.plot.vb.mouseDragEvent = self._on_mouse_drag
 
         self._unit_vb = {}
         self._right_vb = None
@@ -376,6 +406,7 @@ class PgWavePlot(QWidget):
             self.plot.vb.sigResized.connect(self._sync_right_vb)
             self._sync_right_vb()
             self._right_vb.wheelEvent = lambda ev: self._on_wheel(ev)
+            self._right_vb.mouseDragEvent = self._on_mouse_drag
 
         self._unit_vb[yunit] = self._right_vb
         if yunit:
@@ -622,6 +653,34 @@ class PgWavePlot(QWidget):
             self.plot.vb.setXRange(new_lo, new_hi, padding=0)
 
         event.accept()
+
+    def _on_mouse_drag(self, ev, axis=None):
+        mods = ev.modifiers()
+        if ev.button() == Qt.RightButton and (
+                mods & Qt.ShiftModifier or mods & Qt.ControlModifier):
+            ev.accept()
+            if ev.isFinish():
+                return
+            delta = ev.pos() - ev.lastPos()
+            vb = self.plot.vb
+            vr = vb.viewRange()
+            w = vb.width()
+            h = vb.height()
+            if mods & Qt.ShiftModifier:
+                dx = delta.x() / w
+                xlo, xhi = vr[0]
+                xspan = xhi - xlo
+                vb.setXRange(xlo + dx * xspan, xhi - dx * xspan, padding=0)
+            elif mods & Qt.ControlModifier:
+                dy = delta.y() / h
+                for vbox in self._all_viewboxes():
+                    yr = vbox.viewRange()[1]
+                    ylo, yhi = yr
+                    yspan = yhi - ylo
+                    vbox.setYRange(ylo - dy * yspan, yhi + dy * yspan,
+                                   padding=0)
+        else:
+            self._orig_mouseDragEvent(ev, axis)
 
     # --- Delta text on plot ---
 
@@ -920,10 +979,12 @@ class PgWaveWindow(QMainWindow):
             "  L             Toggle legend\n"
             "\n"
             "Mouse\n"
-            "  Left-drag     Pan\n"
-            "  Scroll        Zoom x-axis\n"
-            "  Shift+Scroll  Zoom y-axis\n"
-            "  Right-click   Context menu\n"
+            "  Left-drag          Pan\n"
+            "  Scroll             Zoom x-axis\n"
+            "  Shift+Scroll       Zoom y-axis\n"
+            "  Shift+Right-drag   Zoom x-axis\n"
+            "  Ctrl+Right-drag    Zoom y-axis\n"
+            "  Right-click        Context menu\n"
             "\n"
             "Browser\n"
             "  Click wave    Add to plot\n"
