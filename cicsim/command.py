@@ -79,7 +79,8 @@ class Command:
         subprocess.run(cmd, shell=True)
 
     def doCmdWithReturn(self,cmd):
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+        result = subprocess.run(cmd, shell=True, text=True,
+                                stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
         return result.stdout
 

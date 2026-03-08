@@ -1,5 +1,7 @@
 
 
 
+PYTHON ?= python3
+
 docs:
-	python3 ../gendoc.py plot.md ../../docs/plot.md
+	${PYTHON} ../gendoc.py plot.md ../../docs/plot.md

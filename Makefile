@@ -2,19 +2,24 @@
 
 
 
+PYTHON ?= python3
+
 dirs =   tests/sim/ngspice/basic
 
 cwd = ${shell pwd}
 
 .PHONY: docs build
 
-docs = tests/sim/ tests/index tests/plot
+docs = tests/sim/ tests/index tests/plot tests/wave tests/results tests/summary tests/srun tests/simcell tests/template tests/portreplace tests/archive
 
 docs:
-	${foreach d, ${docs}, cd ${cwd}; cd ${d} && make docs || exit  ;}
+	${foreach d, ${docs}, cd ${cwd}; cd ${d} && make docs PYTHON=${PYTHON} || exit  ;}
 
-test:
-	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make test || exit  ;}
+unit_test:
+	cd ${cwd} && ${PYTHON} -m unittest discover -s tests/unittests/ -p 'test_*.py' -v
+
+test: unit_test
+	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make test PYTHON=${PYTHON} || exit  ;}
 
 clean:
 	${foreach d, ${dirs}, cd ${cwd}; cd ${d} && make clean || exit  ;}
@@ -22,13 +27,13 @@ clean:
 build:
 	-rm -rf build
 	-rm -rf dist
-	python3 -m build
+	${PYTHON} -m build
 
 test_upload:
-	python3 -m twine upload -u __token__ --repository testpypi dist/*
+	${PYTHON} -m twine upload -u __token__ --repository testpypi dist/*
 
 upload:
-	python3 -m twine upload -u __token__ --repository pypi dist/*
+	${PYTHON} -m twine upload -u __token__ --repository pypi dist/*
 
 JEKYLL_VERSION=3.8
 SITE=${shell pwd}/docs

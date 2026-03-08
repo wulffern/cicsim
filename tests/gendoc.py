@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
+import logging
 import click
 import os
+import shutil
+import subprocess
 import yaml
 import re
 import cicsim as cs
+
+logger = logging.getLogger("cicsim")
 
 class GenDoc(cs.Command):
 
@@ -15,8 +20,8 @@ class GenDoc(cs.Command):
         ourl = odir + os.path.sep + "assets"+ os.path.sep + iurl
 
         if(not os.path.exists(ourl)):
-            os.system(obj["run"])
-            os.system("cp " + iurl + " " + ourl)
+            subprocess.run(obj["run"], shell=True)
+            shutil.copy2(iurl, ourl)
 
         ss += f"![](/cicsim/assets/{iurl})"
         return ss
@@ -81,7 +86,7 @@ class GenDoc(cs.Command):
                             o = getattr(self,cmd)
                         except Exception as e:
                             print(e)
-                            self.error("Don't know how to support command '%s'" %cmd)
+                            logger.error("Don't know how to support command '%s'" %cmd)
                             o = None
                         if(o):
                             fo.write(o(buff,odir))

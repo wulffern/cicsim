@@ -1,3 +1,4 @@
+PYTHON ?= python3
 
 docs:
-	python3 ../gendoc.py run.md ../../docs/run.md
+	${PYTHON} ../gendoc.py run.md ../../docs/run.md
