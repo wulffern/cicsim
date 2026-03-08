@@ -26,12 +26,15 @@
 ######################################################################
 
 
+import logging
 import cicsim as cs
 import re
 import os
 import errno
 import yaml
 import shutil as sh
+
+logger = logging.getLogger("cicsim")
 
 
 class CmdIp(cs.Command):
@@ -129,7 +132,7 @@ class CmdIp(cs.Command):
                 o = getattr(self,k)
 
             except Exception as e:
-                self.error("Don't know how to support command '%s'" %k)
+                logger.error("Don't know how to support command '%s'" %k)
                 o = None
             if(o):
                 o(v)
@@ -137,7 +140,7 @@ class CmdIp(cs.Command):
     def dirs(self,data):
         """ Create dirs from a list of directories"""
         for d in data:
-            self.comment("dirs: make '%s'" %d)
+            logger.info("dirs: make '%s'" %d)
             self.content.append(d)
             os.makedirs(d)
 
@@ -160,7 +163,7 @@ class CmdIp(cs.Command):
         for f in data:
 
             fsrc = path + f
-            self.comment("copy: '%s'" %fsrc)
+            logger.info("copy: '%s'" %fsrc)
             self.content.append(f)
             if(os.path.exists(fsrc)):
                 if(replaceVars):
@@ -170,19 +173,19 @@ class CmdIp(cs.Command):
                 else:
                     sh.copy(fsrc,f,follow_symlinks=False)
             else:
-                self.comment("Could not find %s" %fsrc)
+                logger.warning("Could not find %s" %fsrc)
 
     def create(self,data):
         for (k,v) in data.items():
             self.content.append(k)
             with open(k,"w") as fo:
-                self.comment("create: '%s'" %k)
+                logger.info("create: '%s'" %k)
                 fo.write(v)
 
     def do(self,data):
         for k in data:
-            self.comment("do: '%s'" %k)
+            logger.info("do: '%s'" %k)
             self.doCmd(k)
 
     def echo(self,data):
-        self.comment(data)
+        logger.info(data)

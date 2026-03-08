@@ -26,6 +26,7 @@
 ######################################################################
 
 
+import logging
 import cicsim as cs
 import re
 import os
@@ -33,6 +34,8 @@ import subprocess
 import yaml
 import sys
 import importlib
+
+logger = logging.getLogger("cicsim")
 
 class CmdRun(cs.CdsConfig):
     """ Create a simulation directory
@@ -92,7 +95,7 @@ END
 
         cmd = f"spectre  {options} {includes}  -E -raw " + self.fname.replace(".scs",".psf") + f" {self.fname}"
         
-        self.comment(cmd)
+        logger.debug(cmd)
         return subprocess.run(cmd, shell=True, cwd=self.rundir).returncode
 
     def makeSpectreFile(self,fsource,corner,fdest):
@@ -124,7 +127,7 @@ END
         
         filename = self.testbench + ".scs"
         if(not os.path.exists(filename)):
-            self.error(f"Testbench '{filename}' does not exist in this folder")
+            logger.error(f"Testbench '{filename}' does not exist in this folder")
             return
 
         permutations = self.getPermutations(self.corners)
@@ -135,16 +138,16 @@ END
         for p in permutations:
             fname = f"output_{self.testbench}" + os.path.sep + self.testbench +  "_"+ "".join(p)
             path = fname + ".scs"
-            self.comment(f"Running  {path}")
+            logger.info(f"Running  {path}")
             simOk = True
             if(self.runsim):
                 self.makeSpectreFile(filename,p,path)
-                self.comment(f"Running {p}")
+                logger.info(f"Running {p}")
                 if(self.spectre() > 0):
                     simOk = False
 
             if(not simOk):
-                self.error("Simulation failed ")
+                logger.error("Simulation failed")
                 continue
 
 
@@ -196,7 +199,7 @@ END
 
         if(len(oceanRunLater) == 1 and self.ocn):
             ocnfo = oceanRunLater[0]
-            self.comment(f"Running ocean {ocnfo}")
+            logger.info(f"Running ocean {ocnfo}")
             subprocess.run(f"ocean -nograph -replay {ocnfo} -log {ocnfo}.log", shell=True)
         elif(len(oceanRunLater) > 1 and self.ocn):
             buff = ""
@@ -206,7 +209,7 @@ END
 
             with open(focean_all,"w") as fo:
                 fo.write(buff)
-            self.comment(f"Running ocean {focean_all}")
+            logger.info(f"Running ocean {focean_all}")
             subprocess.run(f"ocean -nograph -replay {focean_all} -log {focean_all}.log", shell=True)
 
 
@@ -215,5 +218,5 @@ END
             sys.path.append(os.getcwd())
             tb = importlib.import_module(self.testbench)
             for perm in pyRunLater:
-                self.comment(f"Running {self.testbench}.py with {perm}")
+                logger.info(f"Running {self.testbench}.py with {perm}")
                 tb.main(perm)

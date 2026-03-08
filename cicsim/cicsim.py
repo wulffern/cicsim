@@ -27,18 +27,15 @@
 ######################################################################
 
 import yaml
-import errno
-import json
 import click
 import sys
 import re
 import os
 import cicsim as cs
+from cicsim.command import setup_logging
 import importlib
-import glob
 import pandas as pd
 import matplotlib.pyplot as plt
-import datetime
 
 
 #- Few words on the coding in this file:
@@ -58,9 +55,8 @@ def cli(ctx,color):
     Check website for more information : http://analogicus.com/cicsim/
 
     """
+    setup_logging(color=color)
     ctx.obj = dict()
-    ctx.obj["color"] = color
-    pass
 
 @cli.command()
 @click.argument("testbench")
@@ -76,7 +72,7 @@ def run(ctx,testbench,run,corner,count,name,ignore,sha,replace):
     """Run a ngspice simulation of TESTBENCH
     """
 
-    r = cs.CmdRunNg(testbench,run,corner,name,count,sha,ctx.obj["color"])
+    r = cs.CmdRunNg(testbench,run,corner,name,count,sha)
     r.loadReplacements(replace)
 
     r.run(ignore)
@@ -89,7 +85,7 @@ def archive(ctx,name,runfiles):
     """Save a cicisim run output
     """
 
-    r = cs.CmdArchive(name,ctx.obj["color"])
+    r = cs.CmdArchive(name)
 
     r.archiveAll(runfiles)
 

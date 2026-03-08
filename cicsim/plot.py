@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 
+import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sys
 from .command import *
 import math
-#import tikzplotlib
 from .ngraw import *
+
+logger = logging.getLogger("cicsim")
 
 
 def plot(df,xname,yname,ptype=None,ax=None,label=""):
 
-    cmd = Command()
     if(xname not in df.columns):
-        cmd.error("Could not find name %s in %s" %(xname,",".join(df.columns)))
+        logger.error("Could not find name %s in %s" %(xname,",".join(df.columns)))
         exit()
     if(yname not in df.columns):
-        cmd.error("Could not find name %s in %s" %(xname,",".join(df.columns)))
+        logger.error("Could not find name %s in %s" %(yname,",".join(df.columns)))
         exit()
         #raise Exception("Could not find name %s in %s" %(yname,",".join(df.columns)))
 

@@ -25,18 +25,20 @@
 ##
 ######################################################################
 
+import logging
 import yaml
 import os
 import subprocess
 import cicsim as cs
 
+logger = logging.getLogger("cicsim")
+
 rcfg = "cicsim.yaml"
 
 class CdsConfig(cs.Command):
 
-    def __init__(self,library=None,cell=None,view=None,color=True):
+    def __init__(self,library=None,cell=None,view=None):
         self.config = None
-        self.cm = cs.Command()
         pparent = ".." + os.path.sep + ".." + os.path.sep + rcfg
         if(os.path.exists(pparent)):
             self.readYamlConfig(pparent)
@@ -64,7 +66,7 @@ class CdsConfig(cs.Command):
             self.cadence["view"] = view
 
 
-        super().__init__(color)
+        super().__init__()
 
     @property
     def library(self):
@@ -121,12 +123,12 @@ class CdsConfig(cs.Command):
                     self.config = self.merge(self.config,ys)
                     
         else:
-            self.cm.error(f"Could not find config file '{filename}'")
+            logger.error(f"Could not find config file '{filename}'")
 
     def makeDirectory(self):
         
         if(os.path.exists(self.cell)):
-            self.cm.error(f"I refuse to override the simulation directory '{self.cell}'. You should delete it.\nIf you'r trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
+            logger.error(f"I refuse to override the simulation directory '{self.cell}'. You should delete it.\nIf you're trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
             return False
 
         os.makedirs(self.cell)
@@ -153,7 +155,7 @@ class CdsConfig(cs.Command):
         elif("ngspice" in self.config and key in self.config["ngspice"]):
             return self.config["ngspice"][key]
         else:
-            self.cm.error(f"Argument cadence->{key} is not specified, specify either on command line or in config file")
+            logger.error(f"Argument cadence->{key} is not specified, specify either on command line or in config file")
 
 
     def getShortName(self,corner):

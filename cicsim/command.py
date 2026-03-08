@@ -28,64 +28,52 @@
 import os
 import re
 import ast
+import logging
 import math
 import operator
 import subprocess
 
+logger = logging.getLogger("cicsim")
 
-class colors:
-    '''Colors class:
-    reset all colors with colors.reset
-    
-    '''
-    reset='\033[0m'
-    bold='\033[01m'
-    disable='\033[02m'
-    fg = {
-        "red" : '\033[31m',
-        "green" : '\033[32m',
-        "blue" : '\033[34m',
-        "cyan" :'\033[36m',
-        "yellow" :'\033[93m',
-        "default": '',
+
+class ColoredFormatter(logging.Formatter):
+    COLORS = {
+        logging.DEBUG: '\033[36m',
+        logging.INFO: '\033[32m',
+        logging.WARNING: '\033[93m',
+        logging.ERROR: '\033[31m',
+        logging.CRITICAL: '\033[31m',
     }
+    RESET = '\033[0m'
+
+    def format(self, record):
+        msg = super().format(record)
+        color = self.COLORS.get(record.levelno, '')
+        return f"{color}{msg}{self.RESET}"
+
+
+def setup_logging(color=True, level=logging.INFO):
+    """Configure the cicsim logger with optional colored output."""
+    log = logging.getLogger("cicsim")
+    log.setLevel(level)
+    log.handlers.clear()
+
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+
+    if color:
+        formatter = ColoredFormatter("%(message)s")
+    else:
+        formatter = logging.Formatter("%(levelname)-7s | %(message)s")
+
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
+
 
 class Command:
 
-    def __init__(self,color=True):
-        self.indentstr = "|-"
-        self.indent = 0
-        self.color = color
-
-    def getColor(self,color):
-
-        if(not self.color):
-            return ""
-
-        if(color in colors.fg):
-            return colors.fg[color]
-        else:
-            return colors.fg["default"]
-
-    def getIndent(self,nextindent=None):
-
-        if(nextindent is None):
-            nextindent = self.indent
-        
-        if(nextindent == 0):
-            return ""
-        else:
-            return self.indentstr + self.getIndent(nextindent-1)
-
-    def comment(self,ss,color="green"):
-        print(self.getIndent() + self.getColor(color) + ss  + colors.reset)
-
-    def warning(self,ss):
-        self.comment(ss,"yellow")
-
-    def error(self,ss):
-        ss_h = "Error: "
-        self.comment(ss_h + ss,"red")
+    def __init__(self):
+        pass
 
     def doCmd(self,cmd):
         subprocess.run(cmd, shell=True)

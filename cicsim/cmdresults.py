@@ -26,6 +26,7 @@
 ######################################################################
 
 
+import logging
 import cicsim as cs
 import re
 import os
@@ -35,12 +36,14 @@ import pandas as pd
 import numpy as np
 import time
 
+logger = logging.getLogger("cicsim")
+
 
 
 class CmdResults(cs.Command):
     """ Summarize results of TESTBENCH """
 
-    def __init__(self,runfile,runname=None,color=True):
+    def __init__(self,runfile,runname=None):
         if(runname is None):
             self.runname = runfile.replace(".run","")
         else:
@@ -48,7 +51,7 @@ class CmdResults(cs.Command):
         self.runfile = runfile
         self.ofile = runfile.replace(".run","")
         self.testbench = re.sub("_.*","",runfile)
-        super().__init__(color=color)
+        super().__init__()
 
     def summaryToMarkdown(self,specs,df_all):
         with open(f"results/{self.ofile}.md","w") as fo:
@@ -93,7 +96,7 @@ class CmdResults(cs.Command):
         if(not os.path.exists("results")):
             os.mkdir("results")
 
-        self.comment(f"Writing CSV results/{self.ofile}.csv")
+        logger.info(f"Writing CSV results/{self.ofile}.csv")
         df.to_csv(f"results/{self.ofile}.csv")
 
         with open(f"results/{self.ofile}.html", "w") as text_file:
@@ -163,7 +166,7 @@ class CmdResults(cs.Command):
 
         df_all = self.readYaml()
         if(df_all is None):
-            self.warning("No results found in yaml file")
+            logger.warning("No results found in yaml file")
             return
 
         #-Print all results

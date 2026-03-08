@@ -25,6 +25,7 @@
 ##
 ######################################################################
 
+import logging
 import cicsim as cs
 import re
 import os
@@ -37,9 +38,11 @@ import inspect
 import subprocess
 import numpy as np
 
+logger = logging.getLogger("cicsim")
+
 class Simulation(cs.CdsConfig):
 
-    def __init__(self,testbench,corner,runsim,config,index,sha=None,color=True):
+    def __init__(self,testbench,corner,runsim,config,index,sha=None):
          #- Permutation variables
         self.runsim = runsim
         self.runmeas = True
@@ -65,7 +68,7 @@ class Simulation(cs.CdsConfig):
         self.replace = None
         self.replace_re = None
 
-        super().__init__(color=color)
+        super().__init__()
 
     def loadReplace(self,replace):
         if(replace is None):
@@ -91,7 +94,7 @@ class Simulation(cs.CdsConfig):
             with open(fpath,"rb") as f:
                 self.shas[filename] = hashlib.sha256(f.read()).hexdigest()
         else:
-            self.warning(f"Could not find referenced file {fpath}")
+            logger.warning(f"Could not find referenced file {fpath}")
 
     def loadSha(self):
         shafile = self.oname + ".sha"
@@ -132,7 +135,7 @@ class Simulation(cs.CdsConfig):
         self.loadSha()
 
         res = "{cic(%s)}" % self.keys
-        self.comment("Info: Available replacements %s" %res)
+        logger.info("Available replacements %s" %res)
 
         #- Make spice file
         if(self.runsim):
@@ -140,21 +143,21 @@ class Simulation(cs.CdsConfig):
 
         #- Maybe run sim if no input files have changed
         if(self.sha and self.matchAllSha()):
-            self.comment("Info: No spice files have changed", "yellow")
+            logger.warning("No spice files have changed")
             self.runsim = False
 
         #- Run simulation, or not, depends on runsim
         simOk = self.ngspice(ignore)
 
         if(not simOk):
-            self.error(f"Info: Simulation {self.name} failed ")
+            logger.error(f"Simulation {self.name} failed")
             return
 
         self.makeMeasFile()
 
         #- Run measurement if it exists, check sha though
         if(self.sha and not self.runsim and self.matchSha(self.name + ".meas")):
-            self.comment("Info: No meas files have changed", "yellow")
+            logger.warning("No meas files have changed")
             self.runmeas = False
         measOk = self.ngspiceMeas(ignore)
 
@@ -164,7 +167,7 @@ class Simulation(cs.CdsConfig):
             if(self.runsim):
                 self.saveSha()
             else:
-                self.comment("Info: Not storing sha file, no simulation run","yellow")
+                logger.warning("Not storing sha file, no simulation run")
 
         if(simOk and measOk):
             self.parseLog()
@@ -182,7 +185,7 @@ class Simulation(cs.CdsConfig):
         if(self.runsim):
             tickTime = datetime.datetime.now()
 
-            self.comment(f"Info: Running {self.name}")
+            logger.info(f"Running {self.name}")
 
             options = ""
             includes = ""
@@ -200,23 +203,23 @@ class Simulation(cs.CdsConfig):
 
             # Run NGSPICE
             cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
-            self.comment("Cmd : " + cmd,color="cyan")
+            logger.debug("Cmd: " + cmd)
             try:
                 result = subprocess.run(cmd, shell=True)
                 self.err = result.returncode
             except KeyboardInterrupt:
                 sys.exit(2)
             except Exception as e:
-                print(e)
+                logger.error(str(e))
 
             if(self.err > 0):
                 simOk = False
 
             nextTime = datetime.datetime.now()
-            self.comment("Info: Corner simulation time : " + str(nextTime - tickTime))
+            logger.info("Corner simulation time: " + str(nextTime - tickTime))
             tickTime = nextTime
         else:
-            self.warning(f"Info: Skipping simulation of {self.name}.spi")
+            logger.warning(f"Skipping simulation of {self.name}.spi")
 
          #- Check logfile. ngspice does not always exit cleanly
         errors = list()
@@ -367,10 +370,10 @@ class Simulation(cs.CdsConfig):
         #- Run measurement
         if(self.runmeas):
             cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
-            self.comment("Cmd : " + cmd,color="cyan")
+            logger.debug("Cmd: " + cmd)
             subprocess.run(cmd, shell=True)
         else:
-            self.comment(f"Info: Skipping measurement run of {self.name}.meas","yellow")
+            logger.warning(f"Skipping measurement run of {self.name}.meas")
 
         #- Check meas logfile. ngspice does not always exit cleanly
         errors = list()
@@ -388,7 +391,7 @@ class Simulation(cs.CdsConfig):
 
         if(len(errors) > 0):
             for line in errors:
-                self.comment(line,"red")
+                logger.error(line)
             return False if not ignore else True
         else:
             return True
@@ -471,7 +474,7 @@ class Simulation(cs.CdsConfig):
 
         yamlfile = self.oname + ".yaml"
         with open(yamlfile,"w") as fo:
-            self.comment(f"Info: Writing {yamlfile}")
+            logger.info(f"Writing {yamlfile}")
             yaml.dump(data,fo)
 
 
@@ -482,7 +485,7 @@ class Simulation(cs.CdsConfig):
             m = re.findall(self.replace_re,line,flags=re.MULTILINE)
             if(len(m) > 0):
                 for mg in m:
-                    self.comment("Info: Replacing {%s} = %s" %(mg,self.replace[mg]))
+                    logger.info("Replacing {%s} = %s" %(mg,self.replace[mg]))
                     line = line.replace("{%s}" %mg,str(self.replace[mg]))
 
         #- Find and replace {cic.*} stuff
@@ -491,19 +494,19 @@ class Simulation(cs.CdsConfig):
 
         if(len(m) > 0):
             for mg in m:
-                self.comment("Info: Replacing {cic%s} = %s" %(mg,self.__dict__[mg]))
+                logger.info("Replacing {cic%s} = %s" %(mg,self.__dict__[mg]))
                 line = line.replace("{cic%s}" %mg,str(self.__dict__[mg]))
 
         #- Eval expressions
         m = re.findall(r"\s+\[([^\]]+)\]",line)
         for mg in m:
             try:
-                self.comment("Info: Evaluating %s"%mg)
+                logger.info("Evaluating %s"%mg)
                 eresult = str(self.safe_eval(mg))
-                self.comment("Info: Replacing  [%s] = %s" %(mg,eresult))
+                logger.info("Replacing  [%s] = %s" %(mg,eresult))
                 line = line.replace("[%s]" %mg,eresult)
             except Exception as e:
-                self.warning(f"Warning: could not eval [{mg}]: "  + str(e))
+                logger.warning(f"Could not eval [{mg}]: {e}")
                 pass
 
         return line
@@ -512,7 +515,7 @@ class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,runsim,corners,cornername,count,sha,color=True):
+    def __init__(self,testbench,runsim,corners,cornername,count,sha):
         self.testbench = testbench
         self.count = count
         self.runsim = runsim
@@ -520,12 +523,11 @@ class CmdRunNg(cs.CdsConfig):
         self.cornername = cornername
         self.sha = sha
         self.replace = None
-        self.color = color
 
-        super().__init__(color=color)
+        super().__init__()
 
         if("_" in self.testbench ):
-            self.error("Testbench name cannot contain '_'")
+            logger.error("Testbench name cannot contain '_'")
             exit(1)
 
     def loadReplacements(self,freplace):
@@ -547,7 +549,7 @@ class CmdRunNg(cs.CdsConfig):
         self.filename = self.testbench + ".spi"
 
         if(not os.path.exists(self.filename)):
-            self.error(f"Testbench {self.testbench}.spi does not exists in this folder")
+            logger.error(f"Testbench {self.testbench}.spi does not exist in this folder")
             return
 
         permutations = self.getPermutations(self.corners)
@@ -558,11 +560,11 @@ class CmdRunNg(cs.CdsConfig):
         for corner in permutations:
             for index in range(0,self.count):
                 if(not simOk):
-                    self.error(f"Previous simulation failed, skipping {index}")
+                    logger.error(f"Previous simulation failed, skipping {index}")
                     continue
 
                 #- Run a simulation for a corner
-                c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha,self.color)
+                c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha)
 
                 #- Setup additional replacements
                 c.loadReplace(self.replace)
@@ -580,7 +582,7 @@ class CmdRunNg(cs.CdsConfig):
 
 
         endTime = datetime.datetime.now()
-        self.comment("Total simulation time : " + str(endTime - startTime))
+        logger.info("Total simulation time: " + str(endTime - startTime))
 
         #- Make runfile
         if(self.cornername):
@@ -599,13 +601,13 @@ class CmdRunNg(cs.CdsConfig):
                 sys.path.append(os.getcwd())
                 tb = importlib.import_module(c.testbench)
                 for c in pyRunLater:
-                    self.comment(f"Info: Running {c.testbench}.py with {c.oname}")
+                    logger.info(f"Running {c.testbench}.py with {c.oname}")
                     if(len(inspect.signature(tb.main).parameters) > 1):
                         tb.main(c.oname,c.corner)
                     else:
                         tb.main(c.oname)
             #- Extract results
-            r = cs.CmdResults(runfile,color=self.color)
+            r = cs.CmdResults(runfile)
             r.run()
         else:
-            self.warning("Skipping post processing, one simulation failed")
+            logger.warning("Skipping post processing, one simulation failed")

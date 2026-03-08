@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
+import logging
 import cicsim as cs
 import os
 import yaml
 import pandas as pd
+
+logger = logging.getLogger("cicsim")
 
 class ResultFile(cs.Command):
 
@@ -27,7 +30,7 @@ class ResultFile(cs.Command):
         self.typical = None
 
         if(not os.path.exists(self.src)):
-            self.warning(f"Could not find {self.src}")
+            logger.warning(f"Could not find {self.src}")
             return
 
 
@@ -143,7 +146,7 @@ class Summary(cs.Command):
         super().__init__()
 
         if(not os.path.exists(self.filename)):
-            self.error(f"Could not find {self.filename}")
+            logger.error(f"Could not find {self.filename}")
             exit()
 
         with open(self.filename) as fi:

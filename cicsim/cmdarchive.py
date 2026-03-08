@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 #
+import logging
 import cicsim as cs
 import glob
 import os
 import shutil
 import datetime
 
+logger = logging.getLogger("cicsim")
+
 class CmdArchive(cs.Command):
 
-    def __init__(self,name,color=True):
+    def __init__(self,name):
 
         dt = datetime.datetime.now()
 
         self.date =dt.strftime("%Y-%m-%d_%H-%M")
         self.fullname = "archive" + os.path.sep +  self.date + "_" + name.replace(" ","_")
-        super().__init__(color)
-        pass
+        super().__init__()
 
     def archiveAll(self,runfiles):
         for f in runfiles:
@@ -42,10 +44,10 @@ class CmdArchive(cs.Command):
 
 
             for src in glob.glob(f"{f}*"):
-                self.comment(f"Info: cp {src} {self.fullname}")
+                logger.info(f"cp {src} {self.fullname}")
                 shutil.copy2(src, self.fullname)
 
-        self.comment(f"Info: writing {newrun}")
+        logger.info(f"Writing {newrun}")
         with open(newrun,"w") as fo:
             for f in newrunfiles:
                 fo.write(f)

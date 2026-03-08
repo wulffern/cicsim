@@ -25,9 +25,12 @@
 ##
 ######################################################################
 
+import logging
 import cicsim as cs
 import os
 import yaml
+
+logger = logging.getLogger("cicsim")
 
 
 
@@ -52,7 +55,7 @@ class CmdSimDir(cs.CdsConfig):
     def makeDirectory(self):
 
         if(os.path.exists(self.cell)):
-            self.cm.error(f"I refuse to override the simulation directory '{self.cell}'. You should delete it.\nIf you'r trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
+            logger.error(f"I refuse to override the simulation directory '{self.cell}'. You should delete it.\nIf you're trying to simulate another library with the same cell name, don't do that. Always have unique cellnames cross libraries.")
             return False
 
         os.makedirs(self.cell)
