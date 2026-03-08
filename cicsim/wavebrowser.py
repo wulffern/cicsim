@@ -36,6 +36,11 @@ Click on a wave will ask the WaveGraph to show the plot
         self.tr_search = ttk.Entry(p, textvariable=self.search)
         self.search.trace_add("write", self.updateSearch)
 
+        self._tooltip = None
+        self._tooltip_id = None
+        self.tr_search.bind('<Enter>', self._show_tooltip)
+        self.tr_search.bind('<Leave>', self._hide_tooltip)
+
         self.tr_waves= ttk.Treeview(p)
         self.tr_waves.bind('<<TreeviewSelect>>', self.waveSelected)
 
@@ -45,6 +50,47 @@ Click on a wave will ask the WaveGraph to show the plot
 
         self.files = WaveFiles()
 
+
+    _REGEX_HELP = (
+        "Regex search filter\n"
+        "─────────────────────\n"
+        ".        any character\n"
+        ".*       match anything\n"
+        "^abc     starts with abc\n"
+        "abc$     ends with abc\n"
+        "[abc]    a, b, or c\n"
+        "[^abc]   not a, b, or c\n"
+        "a|b      a or b\n"
+        "\\(       literal (\n"
+        "\\d       any digit\n"
+        "Examples:\n"
+        "  v\\(.*out   signals matching v(...out\n"
+        "  ^i\\(       current signals\n"
+        "  vdd|vss    vdd or vss"
+    )
+
+    def _show_tooltip(self, event):
+        self._tooltip_id = self.tr_search.after(500, self._create_tooltip)
+
+    def _hide_tooltip(self, event=None):
+        if self._tooltip_id:
+            self.tr_search.after_cancel(self._tooltip_id)
+            self._tooltip_id = None
+        if self._tooltip:
+            self._tooltip.destroy()
+            self._tooltip = None
+
+    def _create_tooltip(self):
+        x = self.tr_search.winfo_rootx() + 20
+        y = self.tr_search.winfo_rooty() + self.tr_search.winfo_height() + 4
+        self._tooltip = Toplevel(self.tr_search)
+        self._tooltip.wm_overrideredirect(True)
+        self._tooltip.wm_geometry("+%d+%d" % (x, y))
+        label = Label(self._tooltip, text=self._REGEX_HELP,
+                      justify=LEFT, font=("Courier", 10),
+                      bg="#2b2b2b", fg="#e0e0e0",
+                      borderwidth=1, relief="solid", padx=6, pady=4)
+        label.pack()
 
     def updateSearch(self,*args):
         self.fillColumns()
