@@ -101,7 +101,7 @@ class SpecMinMax:
         css = list()
         for v in ser:
 
-            if(self.max and self.min and (v > self.max or v < self.min)):
+            if(self.min is not None and self.max is not None and (v > self.max or v < self.min)):
                 css.append('background-color:lightcoral')
             else:
                 css.append('')
@@ -115,14 +115,14 @@ class SpecMinMax:
 
         return s*self.scale
     def OK(self,v):
-        if(self.min and self.max and (v > self.max or v < self.min)):
+        if(self.min is not None and self.max is not None and (v > self.max or v < self.min)):
             return False
         else:
             return True
 
     def Near(self,v):
 
-        if(self.min and self.max and ((v*0.95) > self.max or (v*1.05) < self.min)):
+        if(self.min is not None and self.max is not None and ((v*0.95) > self.max or (v*1.05) < self.min)):
             return False
         else:
             return True
