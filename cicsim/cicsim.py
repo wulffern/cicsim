@@ -92,16 +92,28 @@ def archive(ctx,name,runfiles):
 @cli.command()
 @click.argument("files",nargs=-1)
 @click.option("--x",default=None,help="Specify x-axis")
-def wave(files,x):
+@click.option("--backend",default="tk",type=click.Choice(["tk","pg"]),
+              help="GUI backend: tk (tkinter+matplotlib) or pg (PySide6+pyqtgraph)")
+def wave(files,x,backend):
     """Open waveform viewer"""
 
-    if not importlib.util.find_spec("tkinter"):
-        print("Error: Could not find tkinter. Install python3-tk")
-        print("On mac with brew: brew install python3-tk")
-        print("On ubuntu: apt install python3-tk")
-        exit()
+    if backend == "pg":
+        try:
+            from cicsim.cmdwave_pg import CmdWavePg
+        except ImportError as e:
+            print("Error: pyqtgraph backend requires PySide6 and pyqtgraph")
+            print("Install with: pip install PySide6 pyqtgraph")
+            print(f"  ({e})")
+            sys.exit(1)
+        c = CmdWavePg(x)
+    else:
+        if not importlib.util.find_spec("tkinter"):
+            print("Error: Could not find tkinter. Install python3-tk")
+            print("On mac with brew: brew install python3-tk")
+            print("On ubuntu: apt install python3-tk")
+            sys.exit(1)
+        c = cs.CmdWave(x)
 
-    c = cs.CmdWave(x)
     for f in files:
         c.openFile(f)
     c.run()

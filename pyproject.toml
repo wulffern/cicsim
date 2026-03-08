@@ -33,6 +33,9 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
+[project.optional-dependencies]
+pg = ["PySide6", "pyqtgraph"]
+
 [project.scripts]
 cicsim = "cicsim.cicsim:cli"
 
