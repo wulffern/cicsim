@@ -92,16 +92,65 @@ def archive(ctx,name,runfiles):
 @cli.command()
 @click.argument("files",nargs=-1)
 @click.option("--x",default=None,help="Specify x-axis")
-def wave(files,x):
-    """Open waveform viewer"""
+@click.option("--backend",default="tk",type=click.Choice(["tk","pg"]),
+              help="GUI backend: tk (tkinter+matplotlib) or pg (PySide6+pyqtgraph)")
+def wave(files,x,backend):
+    """Open waveform viewer.
 
-    if not importlib.util.find_spec("tkinter"):
-        print("Error: Could not find tkinter. Install python3-tk")
-        print("On mac with brew: brew install python3-tk")
-        print("On ubuntu: apt install python3-tk")
-        exit()
+    Interactive waveform viewer for SPICE simulation results (.raw files).
 
-    c = cs.CmdWave(x)
+    \b
+    Keyboard shortcuts (both backends):
+      A              Set cursor A at mouse position
+      B              Set cursor B at mouse position
+      Escape         Clear cursors
+      F              Auto scale (fit all)
+      R              Reload all waveforms
+      L              Toggle legend
+      Ctrl+O         Open raw file
+      Ctrl+P         Export to PDF
+      Ctrl+N         New plot tab (pg backend)
+      Ctrl+Q         Quit
+
+    \b
+    Mouse (pg backend):
+      Scroll             Zoom x-axis
+      Shift+Scroll       Zoom y-axis
+      Shift+Right-drag   Zoom x-axis
+      Ctrl+Right-drag    Zoom y-axis
+      Left-drag          Pan
+
+    \b
+    Browser (pg backend):
+      Click wave     Add to plot
+      Right-click    Remove from plot
+      Flat checkbox  Toggle hierarchy / flat list
+
+    \b
+    Backends:
+      tk   Default. Uses tkinter + matplotlib. No extra dependencies.
+      pg   Uses PySide6 + pyqtgraph. Install: pip install cicsim[pg]
+           Features: hierarchical wave browser, automatic dual Y-axes
+           (left/right by unit), GPU-accelerated rendering.
+    """
+
+    if backend == "pg":
+        try:
+            from cicsim.cmdwave_pg import CmdWavePg
+        except ImportError as e:
+            print("Error: pyqtgraph backend requires PySide6 and pyqtgraph")
+            print("Install with: pip install PySide6 pyqtgraph")
+            print(f"  ({e})")
+            sys.exit(1)
+        c = CmdWavePg(x)
+    else:
+        if not importlib.util.find_spec("tkinter"):
+            print("Error: Could not find tkinter. Install python3-tk")
+            print("On mac with brew: brew install python3-tk")
+            print("On ubuntu: apt install python3-tk")
+            sys.exit(1)
+        c = cs.CmdWave(x)
+
     for f in files:
         c.openFile(f)
     c.run()

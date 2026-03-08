@@ -40,17 +40,19 @@ class Wave():
             self.line = None
 
     def plot(self,ax):
-        if(self.x is not None):
+        x = np.real(self.x) if self.x is not None else None
+        y = np.real(self.y) if self.y is not None else self.y
+        if(x is not None):
             if(not self.logx and not self.logy):
-                self.line, = ax.plot(self.x,self.y,label=self.ylabel)
+                self.line, = ax.plot(x,y,label=self.ylabel)
             elif(self.logx and not self.logy):
-                self.line, = ax.semilogx(self.x,self.y,label=self.ylabel)
+                self.line, = ax.semilogx(x,y,label=self.ylabel)
             elif(not self.logx and self.logy):
-                self.line, = ax.semilogy(self.x,self.y,label=self.ylabel)
+                self.line, = ax.semilogy(x,y,label=self.ylabel)
             elif(self.logx and self.logy):
-                self.line, = ax.loglog(self.x,self.y,label=self.ylabel)
+                self.line, = ax.loglog(x,y,label=self.ylabel)
         else:
-            self.line, = ax.plot(self.y,label=self.ylabel)
+            self.line, = ax.plot(y,label=self.ylabel)
 
         if self.xunit:
             ax.xaxis.set_major_formatter(EngFormatter(unit=self.xunit))
