@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cicsim"
-version = "0.1.17"
+version = "0.1.18"
 authors = [
   { name="Carsten Wulff", email="carsten@wulff.no" },
 ]
