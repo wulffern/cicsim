@@ -54,8 +54,7 @@ python3 -m pip install cicsim
 ```
 
 # Get started with simulation
-Head over to [Open source analog integrated circuit flow on Skywater
-130nm](https://analogicus.com/rply_ex0_sky130nm/tutorial) to see cicsim in action.
+Head over to [Sky130nm tutorial](https://analogicus.com/aic2026/sky130nm_tutorial) to see cicsim in action.
 
 # Get started with waveform viewer
 
