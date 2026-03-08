@@ -31,9 +31,10 @@ This is a script package I use to control ngspice, it can
 | 0.1.13  | Added docs                                      |
 | 0.1.14  | Nothing exiting                                 |
 | 0.1.15  | Added "archive" command to save old simulations. Added "--no-color" option |
-
-
-
+| 0.1.16  | Fixed ngspice-45 compatibility. Fixed regex escapes. Fixed seed value handling |
+| 0.1.17  | Updated docs and spec |
+| 0.1.18  | Code quality overhaul: replaced os.system with subprocess, replaced eval with ast.literal_eval, migrated to Python logging module, added documentation for all CLI commands, removed setup.py in favor of pyproject.toml |
+| 0.1.19  | Wave viewer overhaul: measurement cursors (A/B) with delta readout, scroll-wheel zoom, keyboard shortcuts, engineering notation on axes (EngFormatter), Export PDF, legend toggle, regex search tooltip, Help menu. Fixed pyproject.toml license for Python 3.8. Added unit tests |
 
 
 
@@ -72,20 +73,43 @@ cicsim wave output_tran/tran_SchGtTtKffVh_*
 
 ![](wave.png)
 
+## Wave viewer keyboard shortcuts
+
+| Key | Action |
+|:-------------|:-------------------------------|
+| `a` | Set cursor A at mouse position |
+| `b` | Set cursor B at mouse position |
+| `Escape` | Clear cursors |
+| `f` | Auto scale (fit) |
+| `r` | Reload all waves |
+| `l` | Toggle legend |
+| `Delete` | Remove selected wave |
+| `Ctrl+O` | Open raw file |
+| `Ctrl+P` | Export PDF |
+| `Ctrl+N` | New plot tab |
+| `Ctrl+A` | Add axis |
+| `Ctrl+Q` | Quit |
+| Scroll | Zoom x-axis |
+| Shift+Scroll | Zoom y-axis |
+
 
 # Commands
 
 ``` 
 Usage: cicsim [OPTIONS] COMMAND [ARGS]...
 
-  Custom IC Creator Simulator Tools
+  Custom Integrated Circuit Simulation
 
   This package provides helper scripts for simulating integrated circuits
 
+  Check website for more information : http://analogicus.com/cicsim/
+
 Options:
-  --help  Show this message and exit.
+  --color / --no-color  Enable/Disable color output
+  --help                Show this message and exit.
 
 Commands:
+  archive      Save a cicsim run output
   plot         Plot from rawfile
   portreplace  Replace ${PORTS} and ${VPORTS} with the subcircuit ports...
   results      Results of single runfile
@@ -93,5 +117,6 @@ Commands:
   simcell      Create a ngspice simulation directory for a Cell
   srun         Run a spectre simulation of TESTBENCH
   summary      Generate simulation summary for results
+  template     Run an IP template with <options> YAML file
   wave         Open waveform viewer
 ```
