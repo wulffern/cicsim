@@ -12,7 +12,10 @@ dependencies = [
   "numpy",
   "pandas",
   "jinja2",
-  "matplotlib"
+  "matplotlib",
+  "click",
+  "pyyaml",
+  "tabulate",
 ]
 description = "Custom IC Creator Simulation Tools"
 readme = "README.md"

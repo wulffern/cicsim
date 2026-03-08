@@ -28,15 +28,13 @@
 import cicsim as cs
 import re
 import os
-import errno
 import yaml
-import shutil as sh
 import sys
 import importlib
 import datetime
 import hashlib
-import ast
 import inspect
+import subprocess
 import numpy as np
 
 class Simulation(cs.CdsConfig):
@@ -90,7 +88,8 @@ class Simulation(cs.CdsConfig):
 
 
         if(os.path.exists(fpath)):
-            self.shas[filename] = hashlib.sha256(open(fpath,"rb").read()).hexdigest()
+            with open(fpath,"rb") as f:
+                self.shas[filename] = hashlib.sha256(f.read()).hexdigest()
         else:
             self.warning(f"Could not find referenced file {fpath}")
 
@@ -196,20 +195,19 @@ class Simulation(cs.CdsConfig):
 
             #- Remove old simulation results
             rawcmd = f"cd {self.rundir} && rm -f {self.name}*.raw"
-            os.system(rawcmd)
+            subprocess.run(rawcmd, shell=True)
             self.removeFile(self.oname + ".yaml")
 
             # Run NGSPICE
             cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
             self.comment("Cmd : " + cmd,color="cyan")
             try:
-                self.err = os.system(cmd)
+                result = subprocess.run(cmd, shell=True)
+                self.err = result.returncode
+            except KeyboardInterrupt:
+                sys.exit(2)
             except Exception as e:
                 print(e)
-
-            #- Exit directly if Ctrl-C is pressed
-            if(self.err == 2):
-                exit()
 
             if(self.err > 0):
                 simOk = False
@@ -222,12 +220,14 @@ class Simulation(cs.CdsConfig):
 
          #- Check logfile. ngspice does not always exit cleanly
         errors = list()
-        with open(self.oname + ".log") as fi:
-            for l in fi:
-                if(re.search("(Error|ERROR):",l)):
-                    #- Skip reporting error if it's only the graphics
-                    if(not re.search("no graphics interface",l)):
-                        errors.append(l)
+        logfile = self.oname + ".log"
+        if(os.path.exists(logfile)):
+            with open(logfile) as fi:
+                for l in fi:
+                    if(re.search("(Error|ERROR):",l)):
+                        #- Skip reporting error if it's only the graphics
+                        if(not re.search("no graphics interface",l)):
+                            errors.append(l)
 
         if(len(errors) > 0):
             simOk = False
@@ -242,7 +242,7 @@ class Simulation(cs.CdsConfig):
             path = "/tmp/cicsim/" + os.environ["USER"] + "/" + self.library + "/" + self.cell + "/" + self.rundir
             os.makedirs(path,exist_ok=True)
             if(not os.path.exists(self.rundir)):
-                os.system(f"ln -s {path} {self.rundir} ")
+                os.symlink(path, self.rundir)
             pass
         else:
             os.makedirs(self.rundir,exist_ok=True)
@@ -368,13 +368,16 @@ class Simulation(cs.CdsConfig):
         if(self.runmeas):
             cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
             self.comment("Cmd : " + cmd,color="cyan")
-            os.system(cmd)
+            subprocess.run(cmd, shell=True)
         else:
             self.comment(f"Info: Skipping measurement run of {self.name}.meas","yellow")
 
         #- Check meas logfile. ngspice does not always exit cleanly
         errors = list()
-        with open(self.oname + ".logm") as fi:
+        measlogfile = self.oname + ".logm"
+        if not os.path.exists(measlogfile):
+            return True
+        with open(measlogfile) as fi:
             for l in fi:
                 if(re.search("Error:",l) or re.search("failed",l)):
 

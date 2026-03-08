@@ -33,6 +33,7 @@ import errno
 import yaml
 import shutil as sh
 
+
 class CmdIp(cs.Command):
     """Make IP from a TEMPLATE YAML file
     
@@ -72,7 +73,6 @@ class CmdIp(cs.Command):
         self.src = src
         self.cell = cell
         self.options = options
-        print(options)
 
         super().__init__()
 
@@ -170,7 +170,7 @@ class CmdIp(cs.Command):
                 else:
                     sh.copy(fsrc,f,follow_symlinks=False)
             else:
-                self.comment("Could find %s" %fsrc)
+                self.comment("Could not find %s" %fsrc)
 
     def create(self,data):
         for (k,v) in data.items():

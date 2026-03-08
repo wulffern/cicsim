@@ -28,7 +28,9 @@
 import os
 import re
 import ast
+import math
 import operator
+import subprocess
 
 
 class colors:
@@ -86,22 +88,46 @@ class Command:
         self.comment(ss_h + ss,"red")
 
     def doCmd(self,cmd):
-        os.system(cmd)
+        subprocess.run(cmd, shell=True)
 
     def doCmdWithReturn(self,cmd):
-        result = os.popen(cmd + " 2>&1").read()
-        return result
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                                stderr=subprocess.STDOUT)
+        return result.stdout
 
     def sub(self,buffer,keyval):
-        """Replace ${NAME} constructs in buffer with values from 'dict' or shell environment"""
+        """Replace ${NAME} constructs in buffer with values from 'dict' or shell environment.
+        When a value contains newlines, the replacement is indented to match the line where
+        ${NAME} appears so that YAML parses the whole block as one scalar (fixes issue #26:
+        first line of schematic description was lost because unindented following lines were
+        parsed as new keys).
+        """
         for (k,v) in keyval.items():
-            buffer = re.sub(r'\${%s}'%k,str(v),buffer)
+            s = str(v)
+            if '\n' in s:
+                # Preserve line indent so multi-line value is parsed as one scalar
+                pattern = r'^( *)(.*?)\$\{%s\}(.*)$' % re.escape(k)
+                def repl(m):
+                    indent = m.group(1)
+                    replacement = '\n'.join(indent + line for line in s.split('\n'))
+                    return m.group(1) + m.group(2) + replacement + m.group(3)
+                buffer = re.sub(pattern, repl, buffer, flags=re.MULTILINE)
+            else:
+                buffer = re.sub(r'\${%s}' % k, s, buffer)
         m = re.search(r'\${([^}]+)}',buffer)
         if(m):
             for var in m.groups():
                 val = os.getenv(var)
                 if(val):
-                    buffer = re.sub(r'\${%s}' %var,val,buffer)
+                    if '\n' in val:
+                        pattern = r'^( *)(.*?)\$\{%s\}(.*)$' % re.escape(var)
+                        def repl(m):
+                            indent = m.group(1)
+                            replacement = '\n'.join(indent + line for line in val.split('\n'))
+                            return m.group(1) + m.group(2) + replacement + m.group(3)
+                        buffer = re.sub(pattern, repl, buffer, flags=re.MULTILINE)
+                    else:
+                        buffer = re.sub(r'\${%s}' % var, val, buffer)
         return buffer
 
     def safe_eval(self,s):
@@ -136,10 +162,6 @@ class Command:
         def _eval(node):
             if isinstance(node, ast.Expression):
                 return _eval(node.body)
-            elif isinstance(node, ast.Str):
-                return node.s
-            elif isinstance(node, ast.Num):
-                return node.value
             elif isinstance(node, ast.Constant):
                 return node.value
             elif isinstance(node, ast.BinOp):

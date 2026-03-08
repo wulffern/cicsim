@@ -7,7 +7,9 @@ import pandas as pd
 
 class ResultFile(cs.Command):
 
-    def __init__(self,dataitem,specs,options={}):
+    def __init__(self,dataitem,specs,options=None):
+        if options is None:
+            options = {}
         self.name = dataitem["name"]
         self.src = dataitem["src"] + ".csv"
         self.html = dataitem["src"] + ".html"
@@ -167,6 +169,7 @@ class CmdSummary(cs.Command):
     def __init__(self,filename,output):
         self.filename = filename
         self.output = output
+        super().__init__()
 
     def run(self):
 

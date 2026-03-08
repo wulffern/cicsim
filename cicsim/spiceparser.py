@@ -55,7 +55,7 @@ class SpiceParser():
                 if(m is not None):
                     ckts.append(m.group(1))
 
-        if(cktbuff is None):
+        if not cktbuff:
             cktopt= difflib.get_close_matches(subckt,ckts)
             print(f"Error: Could not find '{subckt}', maybe you meant " + str(cktopt))
             return
@@ -75,11 +75,6 @@ class SpiceParser():
         #- Remove subckt name
         ports.pop(0)
 
-        # TODO Is this dirty hackish?? Let's see if it fails in the future
-        for i in range(0,len(ports)):
-            if(ports[i] == ""):
-                ports.pop(i)
-                i = i-1
-
+        ports = [p for p in ports if p]
 
         return ports

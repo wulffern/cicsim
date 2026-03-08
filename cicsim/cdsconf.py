@@ -27,6 +27,7 @@
 
 import yaml
 import os
+import subprocess
 import cicsim as cs
 
 rcfg = "cicsim.yaml"
@@ -222,8 +223,8 @@ exit()
             fo.write(scr)
 
 
-        os.system(f"cd {self.cdsdir};ocean  < netlist.ocean")
+        subprocess.run(f"cd {self.cdsdir};ocean  < netlist.ocean", shell=True)
         fname = self.netlistname
 
         if(not os.path.exists(fname)):
-            os.system(f"ln -s {self.cell}/spectre/{self.view}/netlist/netlist {fname}")
+            os.symlink(f"{self.cell}/spectre/{self.view}/netlist/netlist", fname)

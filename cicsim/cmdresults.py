@@ -29,14 +29,11 @@
 import cicsim as cs
 import re
 import os
-import errno
 import yaml
-import shutil as sh
 import glob
 import pandas as pd
 import numpy as np
 import time
-import json
 
 
 
@@ -77,14 +74,13 @@ class CmdResults(cs.Command):
 
     def allToMarkdown(self,df_all):
         print("\n\n# All corners")
-        print(dfg.describe().reset_index().to_markdown(tablefmt="github"))
+        print(df_all.describe().reset_index().to_markdown(tablefmt="github"))
         print(df_all.to_markdown(index=False,tablefmt="github"))
 
     def allToHtml(self,df_all):
         html = df_all.to_html()
-        text_file = open(f"{self.ofile}.html", "w")
-        text_file.write(html)
-        text_file.close()
+        with open(f"{self.ofile}.html", "w") as text_file:
+            text_file.write(html)
 
     def printFails(self,specs,df):
 
@@ -100,12 +96,11 @@ class CmdResults(cs.Command):
         self.comment(f"Writing CSV results/{self.ofile}.csv")
         df.to_csv(f"results/{self.ofile}.csv")
 
-        text_file = open(f"results/{self.ofile}.html", "w")
-        text_file.write(self.header)
-        text_file.write(df.describe().style.format(specs.format_dict()).to_html())
-        text_file.write(st.hide(axis='index').to_html())
-        text_file.write(self.footer)
-        text_file.close()
+        with open(f"results/{self.ofile}.html", "w") as text_file:
+            text_file.write(self.header)
+            text_file.write(df.describe().style.format(specs.format_dict()).to_html())
+            text_file.write(st.hide(axis='index').to_html())
+            text_file.write(self.footer)
 
 
     def readCsv(self):

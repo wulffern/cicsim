@@ -27,6 +27,7 @@
 
 #!/usr/bin/env python3
 
+import ast
 import cicsim as cs
 import os
 import yaml
@@ -52,7 +53,7 @@ class SpecMinMax:
                     self.sources.append(obj["src"])
             if("typ" in obj):
                 if(type(obj["typ"]) is str):
-                    self.typ = eval(obj["typ"])
+                    self.typ = ast.literal_eval(obj["typ"])
                 else:
                     self.typ = obj["typ"]
 
@@ -63,7 +64,7 @@ class SpecMinMax:
                     if("%" in s):
                         self.min = self.typ*(1 + float(s.replace("%",""))/100)
                     else:
-                        self.min = eval(s)
+                        self.min = ast.literal_eval(s)
                 else:
                     self.min = obj["min"]
 
@@ -73,7 +74,7 @@ class SpecMinMax:
                     if("%" in s):
                         self.max = self.typ*(1 + float(s.replace("%",""))/100)
                     else:
-                        self.max = eval(s)
+                        self.max = ast.literal_eval(s)
                 else:
                     self.max = obj["max"]
             if("scale" in obj):

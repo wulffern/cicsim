@@ -50,11 +50,10 @@ def rawplot(fraw,xname,yname,ptype=None,axes=None,fname=None):
     dfs = toDataFrames(ngRawRead(fraw))
 
 
-    if(len(dfs)> 0):
-        df = dfs[0]
+    if(len(dfs) == 0):
+        raise ValueError("No plots found in .raw file")
 
-    else:
-        raise "You have multiple plots in .raw file, that's not supported"
+    df = dfs[0]
 
     if("," in yname):
         names = yname.split(",")

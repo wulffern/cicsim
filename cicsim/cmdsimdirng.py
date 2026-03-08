@@ -27,6 +27,7 @@
 
 import cicsim as cs
 import os
+import subprocess
 import yaml
 
 
@@ -203,5 +204,5 @@ clean:
             mk = mk.replace("{library}",self.library)
             with open("Makefile","w") as fo:
                 fo.write(mk)
-            os.system("make netlist")
+            subprocess.run("make netlist", shell=True)
             self.writeSpiceTestbench("tran.spi")

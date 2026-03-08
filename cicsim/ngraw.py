@@ -31,51 +31,50 @@ def ngRawRead(fname: str):
     #         1       v(out)  voltage
     #         2       v(in)   voltage
     # Binary:
-    fp = open(fname, 'rb')
-    plot = {}
-    count = 0
-    arrs = []
-    plots = []
-    names = dict()
-    ind = 0
-    while (True):
-        try:
-            mdata = fp.readline(BSIZE_SP).split(b':', maxsplit=1)
-        except:
-            raise
-        if len(mdata) == 2:
-            if mdata[0].lower() in MDATA_LIST:
-                plot[mdata[0].lower()] = mdata[1].strip()
-            if mdata[0].lower() == b'variables':
-                nvars = int(plot[b'no. variables'])
-                npoints = int(plot[b'no. points'])
-                plot['varnames'] = []
-                plot['varunits'] = []
-                for varn in range(nvars):
+    with open(fname, 'rb') as fp:
+        plot = {}
+        count = 0
+        arrs = []
+        plots = []
+        names = dict()
+        ind = 0
+        while (True):
+            try:
+                mdata = fp.readline(BSIZE_SP).split(b':', maxsplit=1)
+            except:
+                raise
+            if len(mdata) == 2:
+                if mdata[0].lower() in MDATA_LIST:
+                    plot[mdata[0].lower()] = mdata[1].strip()
+                if mdata[0].lower() == b'variables':
+                    nvars = int(plot[b'no. variables'])
+                    npoints = int(plot[b'no. points'])
+                    plot['varnames'] = []
+                    plot['varunits'] = []
+                    for varn in range(nvars):
 
-                    varspec = (fp.readline(BSIZE_SP).strip()
-                               .decode('ascii').split())
-                    assert(varn == int(varspec[0]))
+                        varspec = (fp.readline(BSIZE_SP).strip()
+                                   .decode('ascii').split())
+                        assert(varn == int(varspec[0]))
 
-                    #- Skup duplicated variables
-                    if(varspec[1] not in names):
-                        names[varspec[1]] = 1
-                    else:
-                        varspec[1] += str(ind)
-                        ind +=1
-                    plot['varnames'].append(varspec[1])
-                    plot['varunits'].append(varspec[2])
-            if mdata[0].lower() == b'binary':
-                rowdtype = np.dtype({'names': plot['varnames'],
-                                     'formats': [np.complex128 if b'complex'
-                                                 in plot[b'flags']
-                                                 else np.float64]*nvars})
-                # We should have all the metadata by now
-                arrs.append(np.fromfile(fp, dtype=rowdtype, count=npoints))
-                plots.append(plot)
-                fp.readline() # Read to the end of line
-        else:
-            break
+                        #- Skip duplicated variables
+                        if(varspec[1] not in names):
+                            names[varspec[1]] = 1
+                        else:
+                            varspec[1] += str(ind)
+                            ind +=1
+                        plot['varnames'].append(varspec[1])
+                        plot['varunits'].append(varspec[2])
+                if mdata[0].lower() == b'binary':
+                    rowdtype = np.dtype({'names': plot['varnames'],
+                                         'formats': [np.complex128 if b'complex'
+                                                     in plot[b'flags']
+                                                     else np.float64]*nvars})
+                    arrs.append(np.fromfile(fp, dtype=rowdtype, count=npoints))
+                    plots.append(plot)
+                    fp.readline()
+            else:
+                break
 
     return (arrs, plots)
 
@@ -84,7 +83,7 @@ def toDataFrames(ngarr):
 
     dfs = list()
     for i in range(0,len(plots)):
-        df = pd.DataFrame(data=arrs[0],columns=plots[0]['varnames'])
+        df = pd.DataFrame(data=arrs[i],columns=plots[i]['varnames'])
         dfs.append(df)
     return dfs
 
@@ -93,7 +92,7 @@ def toDataFrame(fraw):
 
     dfs = list()
     for i in range(0,len(plots)):
-        df = pd.DataFrame(data=arrs[0],columns=plots[0]['varnames'])
+        df = pd.DataFrame(data=arrs[i],columns=plots[i]['varnames'])
         dfs.append(df)
 
     if(len(dfs)> 0):
@@ -106,5 +105,5 @@ def toDataFrame(fraw):
 
 
 if __name__ == '__main__':
-    arrs, plots = rawread('test.raw')
+    arrs, plots = ngRawRead('test.raw')
     print(arrs)

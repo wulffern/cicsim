@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 #
 import cicsim as cs
+import glob
 import os
+import shutil
 import datetime
 
 class CmdArchive(cs.Command):
@@ -39,9 +41,9 @@ class CmdArchive(cs.Command):
             newrunfiles.append(fb)
 
 
-            cmd = f"cp {f}* {self.fullname}"
-            self.comment("Info: " + cmd)
-            os.system(cmd)
+            for src in glob.glob(f"{f}*"):
+                self.comment(f"Info: cp {src} {self.fullname}")
+                shutil.copy2(src, self.fullname)
 
         self.comment(f"Info: writing {newrun}")
         with open(newrun,"w") as fo:

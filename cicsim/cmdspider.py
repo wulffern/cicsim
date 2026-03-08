@@ -34,9 +34,6 @@ import numpy as np
 import re
 import os
 import io
-import errno
-import yaml
-import shutil as sh
 
 class CmdSpider(cs.Command):
     """Make spinder plots from csv file
@@ -49,7 +46,7 @@ class CmdSpider(cs.Command):
 
     def loadFile(self):
         if(not os.path.exists(self.fname)):
-            print("Could not find self.fname")
+            print(f"Could not find {self.fname}")
             return
 
         buffer = ""

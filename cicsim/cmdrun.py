@@ -29,9 +29,8 @@
 import cicsim as cs
 import re
 import os
-import errno
+import subprocess
 import yaml
-import shutil as sh
 import sys
 import importlib
 
@@ -94,7 +93,7 @@ END
         cmd = f"spectre  {options} {includes}  -E -raw " + self.fname.replace(".scs",".psf") + f" {self.fname}"
         
         self.comment(cmd)
-        return os.system(f"cd {self.rundir}; {cmd}")
+        return subprocess.run(cmd, shell=True, cwd=self.rundir).returncode
 
     def makeSpectreFile(self,fsource,corner,fdest):
 
@@ -125,7 +124,7 @@ END
         
         filename = self.testbench + ".scs"
         if(not os.path.exists(filename)):
-            self.error("Testbench '{filename}' does not exists in this folder")
+            self.error(f"Testbench '{filename}' does not exist in this folder")
             return
 
         permutations = self.getPermutations(self.corners)
@@ -198,7 +197,7 @@ END
         if(len(oceanRunLater) == 1 and self.ocn):
             ocnfo = oceanRunLater[0]
             self.comment(f"Running ocean {ocnfo}")
-            os.system(f"ocean -nograph -replay {ocnfo} -log {ocnfo}.log")
+            subprocess.run(f"ocean -nograph -replay {ocnfo} -log {ocnfo}.log", shell=True)
         elif(len(oceanRunLater) > 1 and self.ocn):
             buff = ""
             for focn in oceanRunLater:
@@ -208,7 +207,7 @@ END
             with open(focean_all,"w") as fo:
                 fo.write(buff)
             self.comment(f"Running ocean {focean_all}")
-            os.system(f"ocean -nograph -replay {focean_all} -log {focean_all}.log")
+            subprocess.run(f"ocean -nograph -replay {focean_all} -log {focean_all}.log", shell=True)
 
 
         #- Run python
