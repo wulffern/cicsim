@@ -3,6 +3,7 @@
 import cicsim as cs
 import os
 import numpy as np
+from matplotlib.ticker import EngFormatter
 
 #- Model for wavefiles
 
@@ -18,9 +19,20 @@ class Wave():
         self.ylabel = key + f" ({wfile.name})"
         self.logx = False
         self.logy = False
+        self.xunit = ""
+        self.yunit = self._infer_yunit(key)
         self.tag = wfile.getTag(self.key)
         self.line = None
         self.reload()
+
+    @staticmethod
+    def _infer_yunit(key):
+        kl = key.lower()
+        if kl.startswith("v(") or kl.startswith("v-"):
+            return "V"
+        if kl.startswith("i(") or kl.startswith("i-"):
+            return "A"
+        return ""
 
     def deleteLine(self):
         if(self.line):
@@ -40,7 +52,10 @@ class Wave():
         else:
             self.line, = ax.plot(self.y,label=self.ylabel)
 
-        #ax.set_xlabel(self.xlabel)
+        if self.xunit:
+            ax.xaxis.set_major_formatter(EngFormatter(unit=self.xunit))
+        if self.yunit:
+            ax.yaxis.set_major_formatter(EngFormatter(unit=self.yunit))
 
     def reload(self):
         self.wfile.reload()
@@ -49,28 +64,34 @@ class Wave():
 
         if("time" in keys):
             self.x = self.wfile.df["time"].to_numpy()
-            self.xlabel = "Time [s]"
+            self.xlabel = "Time"
+            self.xunit = "s"
             self.y = self.wfile.df[self.key].to_numpy()
         elif("frequency" in keys):
             self.x = self.wfile.df["frequency"].to_numpy()
-            self.xlabel = "Frequency [Hz]"
+            self.xlabel = "Frequency"
+            self.xunit = "Hz"
             self.logx = True
             self.y = self.wfile.df[self.key].to_numpy()
         elif("v(v-sweep)" in keys):
             self.x = self.wfile.df["v(v-sweep)"].to_numpy()
-            self.xlabel = "Voltage [V]"
+            self.xlabel = "Voltage"
+            self.xunit = "V"
             self.y = self.wfile.df[self.key].to_numpy()
         elif("i(i-sweep)" in keys):
             self.x = self.wfile.df["i(i-sweep)"].to_numpy()
-            self.xlabel = "Current [I]"
+            self.xlabel = "Current"
+            self.xunit = "A"
             self.y = self.wfile.df[self.key].to_numpy()
         elif("temp-sweep" in keys):
             self.x = self.wfile.df["temp-sweep"].to_numpy()
-            self.xlabel = "Temperature [C]"
+            self.xlabel = "Temperature"
+            self.xunit = "°C"
             self.y = self.wfile.df[self.key].to_numpy()
         elif(self.xaxis in keys):
             self.x = self.wfile.df[self.xaxis].to_numpy()
             self.xlabel = " "
+            self.xunit = ""
             self.y = self.wfile.df[self.key].to_numpy()
 
         if(self.line):
