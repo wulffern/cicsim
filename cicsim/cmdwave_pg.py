@@ -131,6 +131,7 @@ class PgWaveBrowser(QWidget):
         self.xaxis = xaxis
         self.files = WaveFiles()
         self._wave_cache = {}
+        self._tag_to_item = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
@@ -177,29 +178,17 @@ class PgWaveBrowser(QWidget):
 
     def setWaveColor(self, tag, color):
         """Color a wave tree item to match its plot line."""
-        f = self.files.getSelected()
-        if f is None:
-            return
-        for i in range(self.wave_tree.topLevelItemCount()):
-            item = self.wave_tree.topLevelItem(i)
-            yname = item.data(0, Qt.UserRole)
-            if yname and f.getTag(yname) == tag:
-                from PySide6.QtGui import QColor
-                item.setForeground(0, QColor(color))
-                return
+        item = self._tag_to_item.get(tag)
+        if item:
+            from PySide6.QtGui import QColor
+            item.setForeground(0, QColor(color))
 
     def clearWaveColor(self, tag):
         """Reset a wave tree item color back to default."""
-        f = self.files.getSelected()
-        if f is None:
-            return
-        for i in range(self.wave_tree.topLevelItemCount()):
-            item = self.wave_tree.topLevelItem(i)
-            yname = item.data(0, Qt.UserRole)
-            if yname and f.getTag(yname) == tag:
-                from PySide6.QtGui import QColor
-                item.setForeground(0, QColor('#e0e0e0'))
-                return
+        item = self._tag_to_item.get(tag)
+        if item:
+            from PySide6.QtGui import QColor
+            item.setForeground(0, QColor('#e0e0e0'))
 
     def _file_selected(self, current, previous):
         if current:
@@ -207,27 +196,81 @@ class PgWaveBrowser(QWidget):
             self.files.select(fname)
             self._fill_waves()
 
+    @staticmethod
+    def _parse_hierarchy(name):
+        """Split 'v(a.b.c)' → ['v', 'a', 'b', 'c'] for tree display."""
+        m = re.match(r'^([vi])\((.+)\)$', name)
+        if m:
+            return [m.group(1)] + m.group(2).split('.')
+        return [name]
+
     def _fill_waves(self):
         self.wave_tree.clear()
+        self._tag_to_item = {}
         f = self.files.getSelected()
         if f is None:
             return
         pattern = self.search.text()
-        for name in f.getWaveNames():
-            if not pattern or re.search(pattern, name):
-                item = QTreeWidgetItem([name])
-                item.setData(0, Qt.UserRole, name)
-                self.wave_tree.addTopLevelItem(item)
-                tag = f.getTag(name)
-                if tag in self._wave_cache:
-                    wave = self._wave_cache[tag]
-                    if wave.color:
-                        from PySide6.QtGui import QColor
-                        item.setForeground(0, QColor(wave.color))
+
+        names = [n for n in f.getWaveNames()
+                 if not pattern or re.search(pattern, n, re.IGNORECASE)]
+
+        root = {}
+        for name in names:
+            parts = self._parse_hierarchy(name)
+            node = root
+            for part in parts[:-1]:
+                if part not in node:
+                    node[part] = {}
+                elif isinstance(node[part], str):
+                    node[part] = {None: node[part]}
+                node = node[part]
+            leaf_key = parts[-1]
+            if leaf_key in node and isinstance(node[leaf_key], dict):
+                node[leaf_key][None] = name
+            else:
+                node[leaf_key] = name
+
+        self._build_tree(self.wave_tree, root, f)
+
+    def _build_tree(self, parent, node, wfile):
+        for key in sorted(node.keys()):
+            if key is None:
+                continue
+            value = node[key]
+            if isinstance(value, str):
+                item = QTreeWidgetItem([key])
+                item.setData(0, Qt.UserRole, value)
+                self._attach(parent, item)
+                self._color_if_plotted(item, wfile, value)
+            else:
+                item = QTreeWidgetItem([key])
+                if None in value:
+                    item.setData(0, Qt.UserRole, value[None])
+                    self._color_if_plotted(item, wfile, value[None])
+                self._attach(parent, item)
+                self._build_tree(item, value, wfile)
+
+    @staticmethod
+    def _attach(parent, item):
+        if isinstance(parent, QTreeWidget):
+            parent.addTopLevelItem(item)
+        else:
+            parent.addChild(item)
+
+    def _color_if_plotted(self, item, wfile, name):
+        tag = wfile.getTag(name)
+        self._tag_to_item[tag] = item
+        if tag in self._wave_cache:
+            wave = self._wave_cache[tag]
+            if wave.color:
+                from PySide6.QtGui import QColor
+                item.setForeground(0, QColor(wave.color))
 
     def _wave_clicked(self, item, column):
         yname = item.data(0, Qt.UserRole)
         if not yname:
+            item.setExpanded(not item.isExpanded())
             return
         f = self.files.getSelected()
         tag = f.getTag(yname)
