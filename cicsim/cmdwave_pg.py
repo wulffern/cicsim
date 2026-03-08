@@ -457,7 +457,14 @@ class PgWavePlot(QWidget):
 
         color = WAVE_COLORS[self._color_index % len(WAVE_COLORS)]
         self._color_index += 1
-        curve = wave.plot(vb, color=color)
+
+        if vb is self.plot.vb:
+            curve = wave.plot(self.plot, color=color)
+        else:
+            curve = wave.plot(vb, color=color)
+            if self._logx and curve:
+                curve.setLogMode(True, False)
+
         if curve is None:
             return None
 
