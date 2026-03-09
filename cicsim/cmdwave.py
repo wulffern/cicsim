@@ -215,7 +215,7 @@ class CmdWave(cs.Command):
     def reloadPlots(self):
         self.graph.reloadPlots()
 
-    def openFile(self, fname):
+    def openFile(self, fname, sheet_name=None):
         self.browser.openFile(fname)
 
     def run(self):

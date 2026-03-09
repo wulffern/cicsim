@@ -3,6 +3,7 @@
 import cicsim as cs
 import os
 import numpy as np
+import pandas as pd
 from matplotlib.ticker import EngFormatter
 
 #- Model for wavefiles
@@ -105,10 +106,13 @@ class Wave():
 
 class WaveFile():
 
-    def __init__(self,fname,xaxis):
+    def __init__(self,fname,xaxis,sheet_name=0):
         self.xaxis = xaxis
         self.fname = fname
+        self.sheet_name = sheet_name
         self.name = os.path.basename(fname)
+        if isinstance(sheet_name, str):
+            self.name += " [%s]" % sheet_name
         self.waves = dict()
         self.df = None
         self.reload()
@@ -116,14 +120,62 @@ class WaveFile():
 
     def reload(self):
         if(self.df is None):
-            self.df = cs.toDataFrame(self.fname)
+            self.df = self._read_file()
             self.modified = os.path.getmtime(self.fname)
         else:
             newmodified = os.path.getmtime(self.fname)
 
             if(newmodified > self.modified):
-                self.df = cs.toDataFrame(self.fname)
+                self.df = self._read_file()
                 self.modified = newmodified
+
+    PANDAS_READERS = {
+        '.csv':     lambda self: self._read_csv(','),
+        '.tsv':     lambda self: self._read_csv('\t'),
+        '.txt':     lambda self: self._read_csv('\t'),
+        '.xlsx':    lambda self: self._read_excel(),
+        '.xls':     lambda self: self._read_excel(),
+        '.ods':     lambda self: self._read_excel(),
+        '.pkl':     lambda self: pd.read_pickle(self.fname),
+        '.pickle':  lambda self: pd.read_pickle(self.fname),
+        '.json':    lambda self: pd.read_json(self.fname),
+        '.parquet': lambda self: pd.read_parquet(self.fname),
+        '.feather': lambda self: pd.read_feather(self.fname),
+        '.h5':      lambda self: pd.read_hdf(self.fname),
+        '.hdf5':    lambda self: pd.read_hdf(self.fname),
+        '.html':    lambda self: pd.read_html(self.fname)[0],
+        '.xml':     lambda self: pd.read_xml(self.fname),
+        '.fwf':     lambda self: pd.read_fwf(self.fname),
+        '.stata':   lambda self: pd.read_stata(self.fname),
+        '.dta':     lambda self: pd.read_stata(self.fname),
+        '.sas7bdat': lambda self: pd.read_sas(self.fname),
+        '.sav':     lambda self: pd.read_spss(self.fname),
+    }
+
+    def _read_file(self):
+        ext = os.path.splitext(self.fname)[1].lower()
+        reader = self.PANDAS_READERS.get(ext)
+        if reader:
+            return reader(self)
+        return cs.toDataFrame(self.fname)
+
+    def _read_csv(self, sep):
+        try:
+            df = pd.read_csv(self.fname, sep=sep)
+        except Exception:
+            df = pd.read_csv(self.fname, sep=None, engine='python')
+        df.columns = [c.strip() for c in df.columns]
+        return df
+
+    def _read_excel(self):
+        df = pd.read_excel(self.fname, sheet_name=self.sheet_name)
+        df.columns = [c.strip() for c in df.columns]
+        return df
+
+    @staticmethod
+    def excel_sheet_names(fname):
+        xl = pd.ExcelFile(fname)
+        return xl.sheet_names
 
     def getWaveNames(self):
         cols = self.df.columns
@@ -150,10 +202,11 @@ class WaveFiles(dict):
         self.current = None
         pass
 
-    def open(self,fname,xaxis):
-        self[fname] = WaveFile(fname,xaxis)
-        self.current = fname
-        return self[fname]
+    def open(self,fname,xaxis,sheet_name=0):
+        key = fname if sheet_name == 0 else "%s::%s" % (fname, sheet_name)
+        self[key] = WaveFile(fname,xaxis,sheet_name)
+        self.current = key
+        return self[key]
 
     def select(self,fname):
         if(fname in self):

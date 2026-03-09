@@ -35,8 +35,8 @@ This is a script package I use to control ngspice, it can
 | 0.1.17  | Updated docs and spec |
 | 0.1.18  | Code quality overhaul: replaced os.system with subprocess, replaced eval with ast.literal_eval, migrated to Python logging module, added documentation for all CLI commands, removed setup.py in favor of pyproject.toml |
 | 0.1.19  | Wave viewer overhaul: measurement cursors (A/B) with delta readout, scroll-wheel zoom, keyboard shortcuts, engineering notation on axes (EngFormatter), Export PDF, legend toggle, regex search tooltip, Help menu. Fixed pyproject.toml license for Python 3.8. Added unit tests |
-
-
+| 0.2.0   | New pyqtgraph backend (`--backend pg`): hierarchical wave browser, automatic dual Y-axes, GPU-accelerated rendering, closeable tabs, analysis functions (FFT/PSD, Histogram, Differentiate, X vs Y). Fixed AC analysis complex data plotting |
+| 0.2.1   | Multi-format file support: CSV, TSV, Excel, JSON, Parquet, Feather, HDF5, Pickle, and more. `--sheet` option for Excel files. String/categorical axis support with rotated labels. Gradient (dy/dx) and slope in cursor readout. Double-click to plot. Regex signal picker for X vs Y |
 
 
 # Install this module
@@ -58,16 +58,26 @@ Head over to [Sky130nm tutorial](https://analogicus.com/aic2026/sky130nm_tutoria
 
 # Get started with waveform viewer
 
-Make sure you install a python version with tk. On my mac it was
+A standalone `cicwave` command is available that defaults to the pyqtgraph
+backend. It is equivalent to `cicsim wave --backend pg`.
 
 ``` bash
-brew install python-tk
+# Standalone command (defaults to pg backend)
+cicwave output_tran/tran_SchGtTtKffVh_*
+
+# Or via cicsim subcommand
+cicsim wave output_tran/tran_SchGtTtKffVh_*              # tkinter backend
+cicsim wave --backend pg output_tran/tran_SchGtTtKffVh_*  # pyqtgraph backend
 ```
 
-Once installed, I do
+Supported file formats: `.raw` (ngspice), `.csv`, `.tsv`, `.txt`, `.xlsx`,
+`.xls`, `.ods`, `.json`, `.parquet`, `.feather`, `.h5`, `.hdf5`, `.pkl`,
+`.pickle`, `.html`, `.xml`, `.fwf`, `.dta`, `.sas7bdat`, `.sav`.
 
 ``` bash
-cicsim wave output_tran/tran_SchGtTtKffVh_*
+# Open CSV / Excel files
+cicwave data.csv
+cicwave data.xlsx --sheet "Sheet2"
 ```
 
 ![](wave.png)
@@ -76,25 +86,33 @@ cicsim wave output_tran/tran_SchGtTtKffVh_*
 
 | Key | Action |
 |:-------------|:-------------------------------|
-| `a` | Set cursor A at mouse position |
-| `b` | Set cursor B at mouse position |
+| `A` | Set cursor A at mouse position |
+| `B` | Set cursor B at mouse position |
 | `Escape` | Clear cursors |
-| `f` | Auto scale (fit) |
-| `r` | Reload all waves |
-| `l` | Toggle legend |
-| `Delete` | Remove selected wave |
-| `Ctrl+O` | Open raw file |
+| `F` | Auto scale (fit) |
+| `R` | Reload all waves |
+| `L` | Toggle legend |
+| `Ctrl+O` | Open file |
 | `Ctrl+P` | Export PDF |
-| `Ctrl+N` | New plot tab |
-| `Ctrl+A` | Add axis |
+| `Ctrl+N` | New plot tab (pg) |
+| `Ctrl+W` | Close current tab (pg) |
 | `Ctrl+Q` | Quit |
 | Scroll | Zoom x-axis |
 | Shift+Scroll | Zoom y-axis |
 
+## Analysis functions (pg backend, right-click menu)
+
+| Function | Description |
+|:---------|:-----------|
+| FFT / PSD | Power spectral density in dB with Hanning window |
+| Histogram | Distribution with Gaussian fit, mean and sigma |
+| Differentiate | Numerical dy/dx |
+| X vs Y | Parametric plot with regex signal picker |
+
 
 # Commands
 
-``` 
+```
 Usage: cicsim [OPTIONS] COMMAND [ARGS]...
 
   Custom Integrated Circuit Simulation
@@ -118,4 +136,18 @@ Commands:
   summary      Generate simulation summary for results
   template     Run an IP template with <options> YAML file
   wave         Open waveform viewer
+```
+
+A standalone command is also available:
+
+```
+Usage: cicwave [OPTIONS] [FILES]...
+
+  Waveform viewer (standalone). Defaults to the pyqtgraph backend.
+
+Options:
+  --x TEXT                Specify x-axis
+  --backend [tk|pg]       GUI backend (default: pg)
+  --sheet TEXT            Sheet name for Excel files
+  --help                  Show this message and exit.
 ```

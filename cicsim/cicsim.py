@@ -94,7 +94,8 @@ def archive(ctx,name,runfiles):
 @click.option("--x",default=None,help="Specify x-axis")
 @click.option("--backend",default="tk",type=click.Choice(["tk","pg"]),
               help="GUI backend: tk (tkinter+matplotlib) or pg (PySide6+pyqtgraph)")
-def wave(files,x,backend):
+@click.option("--sheet",default=None,help="Sheet name for Excel files (default: first sheet)")
+def wave(files,x,backend,sheet):
     """Open waveform viewer.
 
     Interactive waveform viewer for SPICE simulation results (.raw files).
@@ -134,6 +135,10 @@ def wave(files,x,backend):
            (left/right by unit), GPU-accelerated rendering.
     """
 
+    _run_wave(files, x, backend, sheet)
+
+
+def _run_wave(files, x, backend, sheet):
     if backend == "pg":
         try:
             from cicsim.cmdwave_pg import CmdWavePg
@@ -152,8 +157,26 @@ def wave(files,x,backend):
         c = cs.CmdWave(x)
 
     for f in files:
-        c.openFile(f)
+        c.openFile(f, sheet_name=sheet)
     c.run()
+
+
+@click.command()
+@click.argument("files", nargs=-1)
+@click.option("--x", default=None, help="Specify x-axis")
+@click.option("--backend", default="pg", type=click.Choice(["tk", "pg"]),
+              help="GUI backend (default: pg)")
+@click.option("--sheet", default=None, help="Sheet name for Excel files (default: first sheet)")
+def cicwave(files, x, backend, sheet):
+    """Waveform viewer (standalone).
+
+    Shortcut for 'cicsim wave --backend pg'. Opens the pyqtgraph-based
+    waveform viewer by default.
+
+    Supports: .raw, .csv, .tsv, .xlsx, .json, .parquet, .feather, .h5,
+    .pkl, and more.
+    """
+    _run_wave(files, x, backend, sheet)
 
 
 

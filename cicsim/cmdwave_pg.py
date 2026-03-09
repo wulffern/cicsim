@@ -14,7 +14,9 @@ import numpy as np
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTreeWidget, QTreeWidgetItem, QLineEdit, QTabWidget,
-    QPushButton, QLabel, QCheckBox, QTextEdit, QFileDialog, QDialog)
+    QPushButton, QLabel, QCheckBox, QTextEdit, QFileDialog, QDialog,
+    QInputDialog, QMenu)
+from PySide6 import QtCore
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QFont, QShortcut, QPainter
 
@@ -39,6 +41,96 @@ def _eng(value, unit=""):
     return EngFormatter(unit=unit)(value)
 
 
+def _to_numeric(arr):
+    """Convert array to float. For string data, return (indices, labels)."""
+    try:
+        return np.real(np.array(arr, dtype=float)), None
+    except (ValueError, TypeError):
+        labels = [str(v) for v in arr]
+        return np.arange(len(labels), dtype=float), labels
+
+
+class _RotatedAxisItem(pg.AxisItem):
+    """AxisItem that draws tick labels rotated 90 degrees."""
+
+    def drawPicture(self, p, axisSpec, tickSpecs, textSpecs):
+        super().drawPicture(p, axisSpec, tickSpecs, [])
+        for rect, flags, text in textSpecs:
+            p.save()
+            p.translate(rect.center())
+            p.rotate(-90)
+            p.drawText(
+                QtCore.QRectF(-rect.height() / 2, -rect.width() / 2,
+                              rect.height(), rect.width()),
+                Qt.AlignCenter, text)
+            p.restore()
+
+
+def _apply_rotated_ticks(plot_item, axis_name, ticks):
+    """Replace an axis on a PlotItem with a rotated-label version."""
+    old_ax = plot_item.getAxis(axis_name)
+    new_ax = _RotatedAxisItem(axis_name)
+    new_ax.setTicks([ticks])
+    max_len = max((len(t[1]) for t in ticks), default=5)
+    new_ax.setHeight(max(60, 7 * max_len))
+    new_ax.linkToView(plot_item.vb)
+    if old_ax.scene():
+        old_ax.scene().removeItem(old_ax)
+    plot_item.layout.removeItem(old_ax)
+    plot_item.axes[axis_name]['item'] = new_ax
+    plot_item.layout.addItem(new_ax, 3 if axis_name == 'bottom' else 1, 1)
+    new_ax.setZValue(-1000)
+
+
+class _SignalPickerDialog(QDialog):
+    """Modal dialog with regex-filtered signal list."""
+
+    def __init__(self, parent, title, names):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(400, 500)
+        self._names = names
+
+        layout = QVBoxLayout(self)
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Regex filter…")
+        self._search.textChanged.connect(self._filter)
+        layout.addWidget(self._search)
+
+        from PySide6.QtWidgets import QListWidget
+        self._list = QListWidget()
+        self._list.addItems(names)
+        self._list.itemDoubleClicked.connect(self.accept)
+        layout.addWidget(self._list)
+
+        row = QHBoxLayout()
+        ok = QPushButton("OK")
+        ok.clicked.connect(self.accept)
+        cancel = QPushButton("Cancel")
+        cancel.clicked.connect(self.reject)
+        row.addWidget(ok)
+        row.addWidget(cancel)
+        layout.addLayout(row)
+
+    def _filter(self, text):
+        self._list.clear()
+        try:
+            pat = re.compile(text, re.IGNORECASE)
+        except re.error:
+            pat = None
+        for n in self._names:
+            if not pat or pat.search(n):
+                self._list.addItem(n)
+
+    def selected(self):
+        items = self._list.selectedItems()
+        if items:
+            return items[0].text()
+        if self._list.count() > 0:
+            return self._list.item(0).text()
+        return None
+
+
 class PgWave:
     """Associates a WaveFile column with a pyqtgraph PlotDataItem."""
 
@@ -56,6 +148,8 @@ class PgWave:
         self.tag = wfile.getTag(key)
         self.curve = None
         self.color = None
+        self._xlabels = None
+        self._ylabels = None
         self.reload()
 
     @staticmethod
@@ -101,14 +195,16 @@ class PgWave:
             self.y = self.wfile.df[self.key].to_numpy()
 
         if self.curve and self.x is not None and self.y is not None:
-            self.curve.setData(np.real(self.x), np.real(self.y))
+            x, _ = _to_numeric(self.x)
+            y, _ = _to_numeric(self.y)
+            self.curve.setData(x, y)
 
     def plot(self, target, color='w'):
         """Plot on a PlotItem or ViewBox. Returns the curve or None."""
         if self.y is None:
             return None
-        y = np.real(self.y)
-        x = np.real(self.x) if self.x is not None else np.arange(len(y))
+        y, self._ylabels = _to_numeric(self.y)
+        x, self._xlabels = _to_numeric(self.x) if self.x is not None else (np.arange(len(y)), None)
         self.color = color
         self.curve = pg.PlotDataItem(x, y, pen=pg.mkPen(color, width=1),
                                      name=self.ylabel)
@@ -125,6 +221,7 @@ class PgWave:
 class PgWaveBrowser(QWidget):
     waveSelected = Signal(object)
     waveRemoveRequested = Signal(object)
+    analysisRequested = Signal(str, object)  # (analysis_type, wave)
 
     def __init__(self, xaxis, parent=None):
         super().__init__(parent)
@@ -167,7 +264,7 @@ class PgWaveBrowser(QWidget):
 
         self.wave_tree = QTreeWidget()
         self.wave_tree.setHeaderLabel("Waves")
-        self.wave_tree.itemClicked.connect(self._wave_clicked)
+        self.wave_tree.itemDoubleClicked.connect(self._wave_clicked)
         self.wave_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.wave_tree.customContextMenuRequested.connect(self._wave_context)
 
@@ -175,10 +272,11 @@ class PgWaveBrowser(QWidget):
         layout.addLayout(search_row)
         layout.addWidget(self.wave_tree, 3)
 
-    def openFile(self, fname):
-        f = self.files.open(fname, self.xaxis)
+    def openFile(self, fname, sheet_name=None):
+        sheet = sheet_name if sheet_name is not None else 0
+        f = self.files.open(fname, self.xaxis, sheet_name=sheet)
         item = QTreeWidgetItem([f.name])
-        item.setData(0, Qt.UserRole, fname)
+        item.setData(0, Qt.UserRole, f.name)
         self.file_tree.addTopLevelItem(item)
         self.file_tree.setCurrentItem(item)
         self._fill_waves()
@@ -317,12 +415,25 @@ class PgWaveBrowser(QWidget):
             return
         f = self.files.getSelected()
         tag = f.getTag(yname)
+
         if tag not in self._wave_cache:
-            return
-        from PySide6.QtWidgets import QMenu
+            self._wave_cache[tag] = PgWave(f, yname, self.xaxis)
+
+        wave = self._wave_cache[tag]
+        wave.reload()
+
         menu = QMenu(self)
-        menu.addAction("Remove from plot", lambda: self.waveRemoveRequested.emit(
-            self._wave_cache[tag]))
+        menu.addAction("Plot", lambda: self.waveSelected.emit(wave))
+        if wave.curve:
+            menu.addAction("Remove from plot",
+                           lambda: self.waveRemoveRequested.emit(wave))
+        menu.addSeparator()
+        for label, atype in [("FFT / PSD", "fft"),
+                             ("Histogram", "histogram"),
+                             ("Differentiate (dy/dx)", "differentiate"),
+                             ("X vs Y...", "xvy")]:
+            menu.addAction(label, lambda t=atype: self.analysisRequested.emit(
+                t, wave))
         menu.exec(self.wave_tree.viewport().mapToGlobal(pos))
 
 
@@ -361,6 +472,7 @@ class PgWavePlot(QWidget):
         self._unit_vb = {}
         self._right_vb = None
         self._logx = False
+        self._has_rotated_x = False
 
         self.wave_data = {}
         self._color_index = 0
@@ -469,6 +581,11 @@ class PgWavePlot(QWidget):
             return None
 
         self.wave_data[wave.tag] = (wave, yunit)
+
+        if wave._xlabels and not self._has_rotated_x:
+            ticks = list(zip(range(len(wave._xlabels)), wave._xlabels))
+            _apply_rotated_ticks(self.plot, 'bottom', ticks)
+            self._has_rotated_x = True
 
         if vb is self.plot.vb:
             self.plot.vb.enableAutoRange()
@@ -582,6 +699,7 @@ class PgWavePlot(QWidget):
         self.plot.setLabel('left', '')
         self.plot.setLabel('right', '')
         self._logx = False
+        self._has_rotated_x = False
 
     # --- Cursors ---
 
@@ -632,7 +750,7 @@ class PgWavePlot(QWidget):
 
     # --- Scroll zoom (matches tk implementation) ---
 
-    def _on_wheel(self, event):
+    def _on_wheel(self, event, axis=None):
         delta = event.delta()
         if delta == 0:
             return
@@ -738,6 +856,18 @@ class PgWavePlot(QWidget):
         else:
             self.status.setText("")
 
+    def _interp_gradient(self, wave, view_x):
+        if wave.x is None or wave.y is None or view_x is None:
+            return None
+        try:
+            xd = np.real(wave.x)
+            yd = np.real(wave.y)
+            data_x = self._view_to_data_x(view_x)
+            grad = np.gradient(yd, xd)
+            return float(np.interp(data_x, xd, grad))
+        except Exception:
+            return None
+
     def _get_xunit(self):
         for wave, _ in self.wave_data.values():
             if wave.xunit:
@@ -791,17 +921,231 @@ class PgWavePlot(QWidget):
 
         for tag, (wave, _) in self.wave_data.items():
             yu = wave.yunit
+            du = "%s/%s" % (yu, wave.xunit) if yu and wave.xunit else ""
             wparts = ["  %-22s" % wave.key]
             ya = self._interp_y(wave, self.cursor_a)
             yb = self._interp_y(wave, self.cursor_b)
+            ga = self._interp_gradient(wave, self.cursor_a)
+            gb = self._interp_gradient(wave, self.cursor_b)
             if ya is not None:
                 wparts.append("A: %-14s" % _eng(ya, yu))
             if yb is not None:
                 wparts.append("B: %-14s" % _eng(yb, yu))
             if ya is not None and yb is not None:
                 wparts.append("Δ: %-14s" % _eng(yb - ya, yu))
+                if xa is not None and xb is not None and (xb - xa) != 0:
+                    slope = (yb - ya) / (xb - xa)
+                    wparts.append("Δ/ΔX: %-14s" % _eng(slope, du))
+            if ga is not None:
+                wparts.append("dA: %-14s" % _eng(ga, du))
+            if gb is not None:
+                wparts.append("dB: %-14s" % _eng(gb, du))
             lines.append("".join(wparts))
 
+        self.readout.setPlainText("\n".join(lines))
+
+
+class PgAnalysisPlot(QWidget):
+    """Lightweight analysis tab with basic A/B cursors and readout."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(2, 2, 2, 2)
+
+        self.pw = pg.PlotWidget()
+        self.pw.showGrid(x=True, y=True, alpha=0.3)
+        vb = self.pw.plotItem.vb
+        vb.wheelEvent = self._on_wheel
+        self._orig_drag = vb.mouseDragEvent
+        vb.mouseDragEvent = self._on_mouse_drag
+        layout.addWidget(self.pw, 1)
+
+        font = QFont("Courier", 9)
+        self.readout = QTextEdit()
+        self.readout.setReadOnly(True)
+        self.readout.setMaximumHeight(80)
+        self.readout.setFont(font)
+        self.readout.setStyleSheet(
+            "background-color: #2b2b2b; color: #e0e0e0;")
+        layout.addWidget(self.readout)
+
+        self.status = QLabel("")
+        self.status.setFont(font)
+        self.status.setStyleSheet(
+            "background-color: #2b2b2b; color: #e0e0e0; padding: 2px;")
+        layout.addWidget(self.status)
+
+        self.cursor_a = None
+        self.cursor_b = None
+        self._cursor_a_line = None
+        self._cursor_b_line = None
+        self._last_x = None
+        self._curves = []
+        self._logx = False
+        self._xunit = ""
+        self._yunit = ""
+
+        self.pw.scene().sigMouseMoved.connect(self._on_mouse_moved)
+
+    def plot(self, x, y, **kwargs):
+        curve = self.pw.plot(x, y, **kwargs)
+        self._curves.append((x, y))
+        return curve
+
+    def addItem(self, item, **kwargs):
+        self.pw.addItem(item, **kwargs)
+
+    def setLabel(self, axis, text='', units=''):
+        self.pw.setLabel(axis, text, units=units)
+        if axis == 'bottom':
+            self._xunit = units or text
+        elif axis == 'left':
+            self._yunit = units or text
+
+    def setLogMode(self, x=False, y=False):
+        self.pw.setLogMode(x=x, y=y)
+        self._logx = x
+
+    @property
+    def sigRangeChanged(self):
+        return self.pw.sigRangeChanged
+
+    def viewRange(self):
+        return self.pw.viewRange()
+
+    def _view_to_data_x(self, x):
+        return 10 ** x if self._logx else x
+
+    def placeCursorA(self):
+        if self._last_x is not None:
+            self._set_cursor('a', self._last_x)
+
+    def placeCursorB(self):
+        if self._last_x is not None:
+            self._set_cursor('b', self._last_x)
+
+    def clearCursors(self):
+        for line in [self._cursor_a_line, self._cursor_b_line]:
+            if line:
+                self.pw.removeItem(line)
+        self._cursor_a_line = self._cursor_b_line = None
+        self.cursor_a = self.cursor_b = None
+        self.readout.clear()
+
+    def autoSize(self):
+        self.pw.enableAutoRange()
+
+    def _set_cursor(self, which, x):
+        pen = pg.mkPen('y' if which == 'a' else 'g',
+                        width=1, style=Qt.DashLine)
+        attr_line = '_cursor_%s_line' % which
+        old = getattr(self, attr_line)
+        if old:
+            self.pw.removeItem(old)
+        line = pg.InfiniteLine(pos=x, angle=90, pen=pen, movable=True)
+        self.pw.addItem(line)
+        setattr(self, attr_line, line)
+        setattr(self, 'cursor_%s' % which, x)
+        line.sigPositionChanged.connect(
+            lambda l, w=which: self._on_cursor_moved(w, l))
+        self._update_readout()
+
+    def _on_cursor_moved(self, which, line):
+        setattr(self, 'cursor_%s' % which, line.value())
+        self._update_readout()
+
+    def _on_wheel(self, event, axis=None):
+        delta = event.delta()
+        if delta == 0:
+            return
+        scale = 1.0 / ZOOM_FACTOR if delta > 0 else ZOOM_FACTOR
+        vb = self.pw.plotItem.vb
+        pos = event.pos()
+        mouse_point = vb.mapSceneToView(pos)
+        modifiers = event.modifiers()
+        if modifiers & Qt.ShiftModifier:
+            vr = vb.viewRange()
+            ylo, yhi = vr[1]
+            yd = mouse_point.y()
+            vb.setYRange(yd - (yd - ylo) * scale,
+                         yd + (yhi - yd) * scale, padding=0)
+        else:
+            vr = vb.viewRange()
+            xlo, xhi = vr[0]
+            xd = mouse_point.x()
+            vb.setXRange(xd - (xd - xlo) * scale,
+                         xd + (xhi - xd) * scale, padding=0)
+        event.accept()
+
+    def _on_mouse_drag(self, ev, axis=None):
+        mods = ev.modifiers()
+        if ev.button() == Qt.RightButton and (
+                mods & Qt.ShiftModifier or mods & Qt.ControlModifier):
+            ev.accept()
+            if ev.isFinish():
+                return
+            delta = ev.pos() - ev.lastPos()
+            vb = self.pw.plotItem.vb
+            vr = vb.viewRange()
+            w = vb.width()
+            h = vb.height()
+            if mods & Qt.ShiftModifier:
+                dx = delta.x() / w
+                xlo, xhi = vr[0]
+                xspan = xhi - xlo
+                vb.setXRange(xlo + dx * xspan, xhi - dx * xspan, padding=0)
+            elif mods & Qt.ControlModifier:
+                dy = delta.y() / h
+                ylo, yhi = vr[1]
+                yspan = yhi - ylo
+                vb.setYRange(ylo - dy * yspan, yhi + dy * yspan, padding=0)
+        else:
+            self._orig_drag(ev, axis)
+
+    def _on_mouse_moved(self, pos):
+        vb = self.pw.plotItem.vb
+        if not vb.sceneBoundingRect().contains(pos):
+            return
+        mp = vb.mapSceneToView(pos)
+        self._last_x = mp.x()
+        data_x = self._view_to_data_x(mp.x())
+        self.status.setText("x: %s" % _eng(data_x, self._xunit))
+
+    def _update_readout(self):
+        xa_raw = self.cursor_a
+        xb_raw = self.cursor_b
+        xa = self._view_to_data_x(xa_raw) if xa_raw is not None else None
+        xb = self._view_to_data_x(xb_raw) if xb_raw is not None else None
+        parts = []
+        if xa is not None:
+            parts.append("A: %s" % _eng(xa, self._xunit))
+        if xb is not None:
+            parts.append("B: %s" % _eng(xb, self._xunit))
+        if xa is not None and xb is not None:
+            dx = xb - xa
+            parts.append("ΔX: %s" % _eng(dx, self._xunit))
+
+        lines = ["  ".join(parts)]
+        for xd, yd in self._curves:
+            grad = np.gradient(yd, xd)
+            wparts = []
+            if xa is not None:
+                ya = np.interp(self._view_to_data_x(xa_raw), xd, yd)
+                ga = np.interp(self._view_to_data_x(xa_raw), xd, grad)
+                wparts.append("A: %-14s  dA: %-14s" % (
+                    _eng(ya, self._yunit), _eng(ga)))
+            if xb is not None:
+                yb = np.interp(self._view_to_data_x(xb_raw), xd, yd)
+                gb = np.interp(self._view_to_data_x(xb_raw), xd, grad)
+                wparts.append("B: %-14s  dB: %-14s" % (
+                    _eng(yb, self._yunit), _eng(gb)))
+            if xa is not None and xb is not None:
+                wparts.append("Δ: %s" % _eng(yb - ya, self._yunit))
+                if (xb - xa) != 0:
+                    slope = (yb - ya) / (xb - xa)
+                    wparts.append("Δ/ΔX: %s" % _eng(slope))
+            lines.append("  ".join(wparts))
         self.readout.setPlainText("\n".join(lines))
 
 
@@ -816,6 +1160,8 @@ class PgWaveWindow(QMainWindow):
 
         self.browser = PgWaveBrowser(xaxis)
         self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self._close_tab)
 
         splitter.addWidget(self.browser)
         splitter.addWidget(self.tab_widget)
@@ -826,6 +1172,7 @@ class PgWaveWindow(QMainWindow):
 
         self.browser.waveSelected.connect(self._on_wave_selected)
         self.browser.waveRemoveRequested.connect(self._on_wave_remove)
+        self.browser.analysisRequested.connect(self._on_analysis)
 
         self._setup_menus()
         self._setup_shortcuts()
@@ -834,13 +1181,14 @@ class PgWaveWindow(QMainWindow):
         mb = self.menuBar()
 
         m = mb.addMenu("File")
-        m.addAction("Open Raw          Ctrl+O", self._open_file)
+        m.addAction("Open File         Ctrl+O", self._open_file)
         m.addAction("Export PDF        Ctrl+P", self._export_pdf)
         m.addSeparator()
         m.addAction("Quit              Ctrl+Q", self.close)
 
         m = mb.addMenu("Edit")
         m.addAction("New Plot          Ctrl+N", self._add_plot_tab)
+        m.addAction("Close Tab         Ctrl+W", self._close_current_tab)
         m.addSeparator()
         m.addAction("Reload All        R", self._reload)
         m.addAction("Auto Scale        F", self._auto_size)
@@ -863,6 +1211,7 @@ class PgWaveWindow(QMainWindow):
             ("Ctrl+P", self._export_pdf),
             ("Ctrl+Q", self.close),
             ("Ctrl+N", self._add_plot_tab),
+            ("Ctrl+W", self._close_current_tab),
             ("Escape", self._clear_cursors),
         ]:
             QShortcut(QKeySequence(seq), self, func)
@@ -873,15 +1222,15 @@ class PgWaveWindow(QMainWindow):
             return
         p = self._current()
         key = event.text().lower()
-        if p and key == 'a':
+        if p and key == 'a' and hasattr(p, 'placeCursorA'):
             p.placeCursorA()
-        elif p and key == 'b':
+        elif p and key == 'b' and hasattr(p, 'placeCursorB'):
             p.placeCursorB()
-        elif p and key == 'f':
+        elif p and key == 'f' and hasattr(p, 'autoSize'):
             p.autoSize()
-        elif p and key == 'r':
+        elif p and key == 'r' and hasattr(p, 'reloadAll'):
             p.reloadAll()
-        elif p and key == 'l':
+        elif p and key == 'l' and hasattr(p, 'toggleLegend'):
             p.toggleLegend()
         else:
             super().keyPressEvent(event)
@@ -912,23 +1261,24 @@ class PgWaveWindow(QMainWindow):
 
     def _open_file(self):
         fname, _ = QFileDialog.getOpenFileName(
-            self, "Open Raw File", os.getcwd())
+            self, "Open File", os.getcwd(),
+            "All Supported (*.raw *.csv *.tsv *.txt *.xlsx *.xls *.ods *.pkl *.pickle *.json *.parquet *.feather *.h5 *.hdf5);;Raw Files (*.raw);;CSV/TSV (*.csv *.tsv *.txt);;Excel (*.xlsx *.xls *.ods);;Pickle (*.pkl *.pickle);;JSON (*.json);;Parquet (*.parquet);;Feather (*.feather);;HDF5 (*.h5 *.hdf5);;All Files (*)")
         if fname:
             self.browser.openFile(fname)
 
     def _export_pdf(self):
         p = self._current()
-        if p:
+        if p and hasattr(p, 'exportPdf'):
             p.exportPdf()
 
     def _reload(self):
         p = self._current()
-        if p:
+        if p and hasattr(p, 'reloadAll'):
             p.reloadAll()
 
     def _auto_size(self):
         p = self._current()
-        if p:
+        if p and hasattr(p, 'autoSize'):
             p.autoSize()
 
     def _remove_all(self):
@@ -940,22 +1290,22 @@ class PgWaveWindow(QMainWindow):
 
     def _cursor_a(self):
         p = self._current()
-        if p:
+        if p and hasattr(p, 'placeCursorA'):
             p.placeCursorA()
 
     def _cursor_b(self):
         p = self._current()
-        if p:
+        if p and hasattr(p, 'placeCursorB'):
             p.placeCursorB()
 
     def _clear_cursors(self):
         p = self._current()
-        if p:
+        if p and hasattr(p, 'clearCursors'):
             p.clearCursors()
 
     def _toggle_legend(self):
         p = self._current()
-        if p:
+        if p and hasattr(p, 'toggleLegend'):
             p.toggleLegend()
 
     def _show_help(self):
@@ -973,6 +1323,7 @@ class PgWaveWindow(QMainWindow):
             "\n"
             "Edit\n"
             "  Ctrl+N        New plot tab\n"
+            "  Ctrl+W        Close current tab\n"
             "  R             Reload all waves\n"
             "  F             Auto scale (fit)\n"
             "\n"
@@ -991,11 +1342,16 @@ class PgWaveWindow(QMainWindow):
             "  Shift+Scroll       Zoom y-axis\n"
             "  Shift+Right-drag   Zoom x-axis\n"
             "  Ctrl+Right-drag    Zoom y-axis\n"
-            "  Right-click        Context menu\n"
             "\n"
             "Browser\n"
-            "  Click wave    Add to plot\n"
-            "  Right-click   Remove from plot\n"
+            "  Double-click       Add to plot\n"
+            "  Right-click        Context menu\n"
+            "\n"
+            "Analysis (right-click menu)\n"
+            "  FFT / PSD          Spectral density\n"
+            "  Histogram          Distribution + fit\n"
+            "  Differentiate      Numerical dy/dx\n"
+            "  X vs Y             Parametric plot\n"
         )
         text.setFont(QFont("Courier", 11))
         text.setStyleSheet(
@@ -1006,8 +1362,158 @@ class PgWaveWindow(QMainWindow):
         layout.addWidget(btn)
         dlg.exec()
 
-    def openFile(self, fname):
-        self.browser.openFile(fname)
+    def _close_tab(self, index):
+        widget = self.tab_widget.widget(index)
+        if widget:
+            if isinstance(widget, PgWavePlot):
+                tags = widget.removeAll()
+                for tag in tags:
+                    self.browser.clearWaveColor(tag)
+            self.tab_widget.removeTab(index)
+            widget.deleteLater()
+        if self.tab_widget.count() == 0:
+            self._add_plot_tab()
+
+    def _close_current_tab(self):
+        idx = self.tab_widget.currentIndex()
+        if idx >= 0:
+            self._close_tab(idx)
+
+    def _on_analysis(self, atype, wave):
+        wave.reload()
+        x, _ = _to_numeric(wave.x)
+        y, _ = _to_numeric(wave.y)
+
+        if atype == "fft":
+            self._do_fft(wave.key, x, y, wave.xunit, wave.yunit)
+        elif atype == "histogram":
+            self._do_histogram(wave.key, y, wave.yunit)
+        elif atype == "differentiate":
+            self._do_differentiate(wave.key, x, y, wave.xunit, wave.yunit)
+        elif atype == "xvy":
+            self._do_xvy_dialog(wave)
+
+    def _add_analysis_tab(self, title):
+        w = PgAnalysisPlot()
+        self.tab_widget.addTab(w, title)
+        self.tab_widget.setCurrentWidget(w)
+        return w
+
+    def _do_fft(self, name, x, y, xunit, yunit):
+        n = len(y)
+        if n < 2:
+            return
+
+        dt = np.mean(np.diff(x))
+        if dt <= 0:
+            return
+
+        window = np.hanning(n)
+        yw = y * window
+        Y = np.fft.rfft(yw)
+        freqs = np.fft.rfftfreq(n, d=dt)
+
+        psd = np.abs(Y) ** 2
+        psd[psd < 1e-300] = 1e-300
+        psd_db = 10.0 * np.log10(psd / np.max(psd))
+
+        freqs = freqs[1:]
+        psd_db = psd_db[1:]
+
+        w = self._add_analysis_tab("FFT: %s" % name)
+        w.plot(freqs, psd_db, pen=pg.mkPen('c', width=1))
+        w.setLabel('bottom', 'Frequency', units='Hz')
+        w.setLabel('left', 'PSD', units='dB')
+        if len(freqs) > 1 and freqs[0] > 0:
+            w.setLogMode(x=True, y=False)
+
+    def _do_histogram(self, name, y, yunit):
+        n = len(y)
+        if n < 2:
+            return
+
+        nbins = max(10, n // 100)
+        counts, edges = np.histogram(y, bins=nbins)
+        centers = (edges[:-1] + edges[1:]) / 2.0
+
+        mu = np.mean(y)
+        sigma = np.std(y)
+
+        w = self._add_analysis_tab("Hist: %s" % name)
+        bar = pg.BarGraphItem(x=centers, height=counts,
+                              width=(edges[1] - edges[0]) * 0.85,
+                              brush='c', pen='w')
+        w.addItem(bar)
+
+        if sigma > 0:
+            xfit = np.linspace(edges[0], edges[-1], 200)
+            scale = np.max(counts)
+            gauss = scale * np.exp(-0.5 * ((xfit - mu) / sigma) ** 2)
+            w.plot(xfit, gauss, pen=pg.mkPen('r', width=2))
+
+        w.setLabel('bottom', yunit if yunit else name)
+        w.setLabel('left', 'Count')
+        txt = pg.TextItem("μ = %s\nσ = %s" % (_eng(mu, yunit), _eng(sigma, yunit)),
+                          color='w', anchor=(0, 1))
+        w.addItem(txt, ignoreBounds=True)
+
+        _busy = [False]
+
+        def _reposition():
+            if _busy[0]:
+                return
+            _busy[0] = True
+            vr = w.viewRange()
+            txt.setPos(vr[0][0] + 0.02 * (vr[0][1] - vr[0][0]),
+                       vr[1][1] - 0.02 * (vr[1][1] - vr[1][0]))
+            _busy[0] = False
+        w.sigRangeChanged.connect(_reposition)
+        _reposition()
+
+    def _do_differentiate(self, name, x, y, xunit, yunit):
+        if len(x) < 2:
+            return
+        dydx = np.gradient(y, x)
+        dy_unit = ""
+        if yunit and xunit:
+            dy_unit = "%s/%s" % (yunit, xunit)
+
+        w = self._add_analysis_tab("d/dx: %s" % name)
+        w.plot(x, dydx, pen=pg.mkPen('m', width=1))
+        w.setLabel('bottom', xunit if xunit else 'x')
+        w.setLabel('left', dy_unit if dy_unit else "d(%s)/dx" % name)
+
+    def _do_xvy_dialog(self, wave_y):
+        f = self.browser.files.getSelected()
+        if not f:
+            return
+        names = list(f.getWaveNames())
+        dlg = _SignalPickerDialog(self, "Select X-axis signal", names)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        chosen = dlg.selected()
+        if not chosen:
+            return
+        xwave = PgWave(f, chosen, self.browser.xaxis)
+        xwave.reload()
+        xx, xlabels = _to_numeric(xwave.y)
+        yy, ylabels = _to_numeric(wave_y.y)
+        min_len = min(len(xx), len(yy))
+        xx, yy = xx[:min_len], yy[:min_len]
+
+        w = self._add_analysis_tab("%s vs %s" % (wave_y.key, chosen))
+        w.plot(xx, yy, pen=pg.mkPen('y', width=1))
+        w.setLabel('bottom', chosen)
+        w.setLabel('left', wave_y.key)
+        if xlabels:
+            ticks = list(zip(xx[:min_len], xlabels[:min_len]))
+            _apply_rotated_ticks(w.pw.plotItem, 'bottom', ticks)
+        if ylabels:
+            ticks = list(zip(yy[:min_len], ylabels[:min_len]))
+            w.pw.getAxis('left').setTicks([ticks])
+
+    def openFile(self, fname, sheet_name=None):
+        self.browser.openFile(fname, sheet_name=sheet_name)
 
 
 class CmdWavePg:
@@ -1018,8 +1524,8 @@ class CmdWavePg:
                             background='k', foreground='w')
         self.win = PgWaveWindow(xaxis)
 
-    def openFile(self, fname):
-        self.win.openFile(fname)
+    def openFile(self, fname, sheet_name=None):
+        self.win.openFile(fname, sheet_name=sheet_name)
 
     def run(self):
         self.win.show()
