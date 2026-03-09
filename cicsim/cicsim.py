@@ -95,7 +95,9 @@ def archive(ctx,name,runfiles):
 @click.option("--backend",default="tk",type=click.Choice(["tk","pg"]),
               help="GUI backend: tk (tkinter+matplotlib) or pg (PySide6+pyqtgraph)")
 @click.option("--sheet",default=None,help="Sheet name for Excel files (default: first sheet)")
-def wave(files,x,backend,sheet):
+@click.option("--pivot",default=None,help="Pivot spec file (YAML/JSON)")
+@click.option("--pivot-info",is_flag=True,default=False,help="Print pivot dimensions and exit")
+def wave(files,x,backend,sheet,pivot,pivot_info):
     """Open waveform viewer.
 
     Interactive waveform viewer for SPICE simulation results (.raw files).
@@ -133,12 +135,33 @@ def wave(files,x,backend,sheet):
       pg   Uses PySide6 + pyqtgraph. Install: pip install cicsim[pg]
            Features: hierarchical wave browser, automatic dual Y-axes
            (left/right by unit), GPU-accelerated rendering.
+
+    \b
+    Pivot:
+      --pivot spec.yaml     Reshape data using pivot spec before viewing
+      --pivot-info          Print unique values per pivot dimension and exit
     """
 
-    _run_wave(files, x, backend, sheet)
+    _run_wave(files, x, backend, sheet, pivot, pivot_info)
 
 
-def _run_wave(files, x, backend, sheet):
+def _run_wave(files, x, backend, sheet, pivot_spec=None, pivot_info_flag=False):
+    if pivot_spec:
+        from cicsim.pivot import load_spec, pivot_info, apply_pivot
+        from cicsim.wavefiles import WaveFile
+        spec = load_spec(pivot_spec)
+
+        if pivot_info_flag:
+            for f in files:
+                wf = WaveFile(f, x or "")
+                print("--- %s ---" % f)
+                print(pivot_info(wf.df, spec))
+                print()
+            return
+
+        if not x and spec.get('columns'):
+            x = spec['columns']
+
     if backend == "pg":
         try:
             from cicsim.cmdwave_pg import CmdWavePg
@@ -156,8 +179,16 @@ def _run_wave(files, x, backend, sheet):
             sys.exit(1)
         c = cs.CmdWave(x)
 
-    for f in files:
-        c.openFile(f, sheet_name=sheet)
+    if pivot_spec:
+        for f in files:
+            wf = WaveFile(f, x or "")
+            pivoted = apply_pivot(wf.df, spec)
+            name = "pivot(%s)" % os.path.basename(f)
+            c.openDataFrame(pivoted, name)
+    else:
+        for f in files:
+            c.openFile(f, sheet_name=sheet)
+
     c.run()
 
 
@@ -167,7 +198,9 @@ def _run_wave(files, x, backend, sheet):
 @click.option("--backend", default="pg", type=click.Choice(["tk", "pg"]),
               help="GUI backend (default: pg)")
 @click.option("--sheet", default=None, help="Sheet name for Excel files (default: first sheet)")
-def cicwave(files, x, backend, sheet):
+@click.option("--pivot", default=None, help="Pivot spec file (YAML/JSON)")
+@click.option("--pivot-info", is_flag=True, default=False, help="Print pivot dimensions and exit")
+def cicwave(files, x, backend, sheet, pivot, pivot_info):
     """Waveform viewer (standalone).
 
     Shortcut for 'cicsim wave --backend pg'. Opens the pyqtgraph-based
@@ -175,8 +208,13 @@ def cicwave(files, x, backend, sheet):
 
     Supports: .raw, .csv, .tsv, .xlsx, .json, .parquet, .feather, .h5,
     .pkl, and more.
+
+    \b
+    Pivot:
+      --pivot spec.yaml     Reshape data using pivot spec before viewing
+      --pivot-info          Print unique values per pivot dimension and exit
     """
-    _run_wave(files, x, backend, sheet)
+    _run_wave(files, x, backend, sheet, pivot, pivot_info)
 
 
 

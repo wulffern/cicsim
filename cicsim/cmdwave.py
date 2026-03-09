@@ -218,6 +218,9 @@ class CmdWave(cs.Command):
     def openFile(self, fname, sheet_name=None):
         self.browser.openFile(fname)
 
+    def openDataFrame(self, df, name):
+        self.browser.openDataFrame(df, name)
+
     def run(self):
         tkinter.mainloop()
 

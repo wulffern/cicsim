@@ -10,6 +10,7 @@ import os
 import sys
 import re
 import numpy as np
+from importlib.metadata import version as _pkg_version
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -275,6 +276,14 @@ class PgWaveBrowser(QWidget):
     def openFile(self, fname, sheet_name=None):
         sheet = sheet_name if sheet_name is not None else 0
         f = self.files.open(fname, self.xaxis, sheet_name=sheet)
+        item = QTreeWidgetItem([f.name])
+        item.setData(0, Qt.UserRole, f.name)
+        self.file_tree.addTopLevelItem(item)
+        self.file_tree.setCurrentItem(item)
+        self._fill_waves()
+
+    def openDataFrame(self, df, name):
+        f = self.files.openDataFrame(df, name, self.xaxis)
         item = QTreeWidgetItem([f.name])
         item.setData(0, Qt.UserRole, f.name)
         self.file_tree.addTopLevelItem(item)
@@ -1152,7 +1161,11 @@ class PgAnalysisPlot(QWidget):
 class PgWaveWindow(QMainWindow):
     def __init__(self, xaxis):
         super().__init__()
-        self.setWindowTitle("cIcWave: %s" % os.getcwd())
+        try:
+            ver = _pkg_version("cicsim")
+        except Exception:
+            ver = "?"
+        self.setWindowTitle("cIcWave v%s: %s" % (ver, os.getcwd()))
         self.resize(1200, 700)
 
         splitter = QSplitter(Qt.Horizontal)
@@ -1515,6 +1528,9 @@ class PgWaveWindow(QMainWindow):
     def openFile(self, fname, sheet_name=None):
         self.browser.openFile(fname, sheet_name=sheet_name)
 
+    def openDataFrame(self, df, name):
+        self.browser.openDataFrame(df, name)
+
 
 class CmdWavePg:
     def __init__(self, xaxis):
@@ -1526,6 +1542,9 @@ class CmdWavePg:
 
     def openFile(self, fname, sheet_name=None):
         self.win.openFile(fname, sheet_name=sheet_name)
+
+    def openDataFrame(self, df, name):
+        self.win.openDataFrame(df, name)
 
     def run(self):
         self.win.show()

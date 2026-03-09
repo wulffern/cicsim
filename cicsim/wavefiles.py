@@ -106,7 +106,7 @@ class Wave():
 
 class WaveFile():
 
-    def __init__(self,fname,xaxis,sheet_name=0):
+    def __init__(self,fname,xaxis,sheet_name=0,df=None):
         self.xaxis = xaxis
         self.fname = fname
         self.sheet_name = sheet_name
@@ -114,11 +114,14 @@ class WaveFile():
         if isinstance(sheet_name, str):
             self.name += " [%s]" % sheet_name
         self.waves = dict()
-        self.df = None
+        self.df = df
+        self._virtual = df is not None
         self.reload()
         pass
 
     def reload(self):
+        if self._virtual:
+            return
         if(self.df is None):
             self.df = self._read_file()
             self.modified = os.path.getmtime(self.fname)
@@ -205,6 +208,12 @@ class WaveFiles(dict):
     def open(self,fname,xaxis,sheet_name=0):
         key = fname if sheet_name == 0 else "%s::%s" % (fname, sheet_name)
         self[key] = WaveFile(fname,xaxis,sheet_name)
+        self.current = key
+        return self[key]
+
+    def openDataFrame(self, df, name, xaxis):
+        key = "::virtual::" + name
+        self[key] = WaveFile(name, xaxis, df=df)
         self.current = key
         return self[key]
 
