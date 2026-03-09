@@ -7,3 +7,4 @@ wheel
 setuptools
 numpy
 tikzplotlib
+scipy
