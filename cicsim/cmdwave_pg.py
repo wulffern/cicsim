@@ -16,10 +16,10 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTreeWidget, QTreeWidgetItem, QLineEdit, QTabWidget,
     QPushButton, QLabel, QCheckBox, QTextEdit, QFileDialog, QDialog,
-    QInputDialog, QMenu)
+    QInputDialog, QMenu, QComboBox)
 from PySide6 import QtCore
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeySequence, QFont, QShortcut, QPainter
+from PySide6.QtGui import QKeySequence, QFont, QShortcut, QPainter, QColor, QPalette
 
 import pyqtgraph as pg
 
@@ -36,6 +36,28 @@ WAVE_COLORS = [
     '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
     '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
 ]
+
+EXPORT_COLORS = [
+    '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
+    '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
+    '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
+]
+
+PLOT_STYLES = ['Lines', 'Markers', 'Lines+Markers', 'Steps']
+
+
+def _style_kwargs(color, style, width=1):
+    """Return PlotDataItem keyword args for the given plot style."""
+    pen = pg.mkPen(color, width=width)
+    if style == 'Markers':
+        return dict(pen=None, symbol='o', symbolSize=6,
+                    symbolPen=pg.mkPen(color, width=width), symbolBrush=color)
+    if style == 'Lines+Markers':
+        return dict(pen=pen, symbol='o', symbolSize=5,
+                    symbolPen=pg.mkPen(color, width=width), symbolBrush=color)
+    if style == 'Steps':
+        return dict(pen=pen, stepMode='left')
+    return dict(pen=pen)
 
 
 def _eng(value, unit=""):
@@ -200,17 +222,30 @@ class PgWave:
             y, _ = _to_numeric(self.y)
             self.curve.setData(x, y)
 
-    def plot(self, target, color='w'):
+    def plot(self, target, color='w', style='Lines'):
         """Plot on a PlotItem or ViewBox. Returns the curve or None."""
         if self.y is None:
             return None
         y, self._ylabels = _to_numeric(self.y)
         x, self._xlabels = _to_numeric(self.x) if self.x is not None else (np.arange(len(y)), None)
         self.color = color
-        self.curve = pg.PlotDataItem(x, y, pen=pg.mkPen(color, width=1),
-                                     name=self.ylabel)
+        self.style = style
+        kw = _style_kwargs(color, style)
+        self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         target.addItem(self.curve)
         return self.curve
+
+    def setStyle(self, style):
+        if self.curve is None:
+            return
+        self.style = style
+        vb = self.curve.getViewBox()
+        vb.removeItem(self.curve)
+        y, _ = _to_numeric(self.y)
+        x, _ = _to_numeric(self.x) if self.x is not None else (np.arange(len(y)), None)
+        kw = _style_kwargs(self.color, style)
+        self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
+        vb.addItem(self.curve)
 
     def remove(self):
         if self.curve:
@@ -223,6 +258,7 @@ class PgWaveBrowser(QWidget):
     waveSelected = Signal(object)
     waveRemoveRequested = Signal(object)
     analysisRequested = Signal(str, object)  # (analysis_type, wave)
+    styleChanged = Signal(str)
 
     def __init__(self, xaxis, parent=None):
         super().__init__(parent)
@@ -237,6 +273,15 @@ class PgWaveBrowser(QWidget):
         self.file_tree = QTreeWidget()
         self.file_tree.setHeaderLabel("Files")
         self.file_tree.currentItemChanged.connect(self._file_selected)
+
+        style_row = QHBoxLayout()
+        style_row.addWidget(QLabel("Style:"))
+        self.style_cb = QComboBox()
+        self.style_cb.addItems(PLOT_STYLES)
+        self.style_cb.setToolTip("Plot style for all waves")
+        self.style_cb.currentTextChanged.connect(self.styleChanged.emit)
+        style_row.addWidget(self.style_cb)
+        style_row.addStretch()
 
         search_row = QHBoxLayout()
         self.search = QLineEdit()
@@ -270,8 +315,13 @@ class PgWaveBrowser(QWidget):
         self.wave_tree.customContextMenuRequested.connect(self._wave_context)
 
         layout.addWidget(self.file_tree, 1)
+        layout.addLayout(style_row)
         layout.addLayout(search_row)
         layout.addWidget(self.wave_tree, 3)
+
+    @property
+    def plotStyle(self):
+        return self.style_cb.currentText()
 
     def openFile(self, fname, sheet_name=None):
         sheet = sheet_name if sheet_name is not None else 0
@@ -436,6 +486,15 @@ class PgWaveBrowser(QWidget):
         if wave.curve:
             menu.addAction("Remove from plot",
                            lambda: self.waveRemoveRequested.emit(wave))
+        style_menu = menu.addMenu("Style")
+        for s in PLOT_STYLES:
+            def _set_style(st=s):
+                if wave.curve:
+                    wave.setStyle(st)
+                else:
+                    self.style_cb.setCurrentText(st)
+                    self.waveSelected.emit(wave)
+            style_menu.addAction(s, _set_style)
         menu.addSeparator()
         for label, atype in [("FFT / PSD", "fft"),
                              ("Histogram", "histogram"),
@@ -560,7 +619,7 @@ class PgWavePlot(QWidget):
     # Public API
     # ------------------------------------------------------------------
 
-    def show_wave(self, wave):
+    def show_wave(self, wave, style='Lines'):
         """Plot a wave. Returns (tag, color) on success, else None."""
         if wave.tag in self.wave_data:
             return None
@@ -580,9 +639,9 @@ class PgWavePlot(QWidget):
         self._color_index += 1
 
         if vb is self.plot.vb:
-            curve = wave.plot(self.plot, color=color)
+            curve = wave.plot(self.plot, color=color, style=style)
         else:
-            curve = wave.plot(vb, color=color)
+            curve = wave.plot(vb, color=color, style=style)
             if self._logx and curve:
                 curve.setLogMode(True, False)
 
@@ -630,6 +689,10 @@ class PgWavePlot(QWidget):
             wave.reload()
         self.autoSize()
 
+    def setAllStyles(self, style):
+        for tag, (wave, _) in self.wave_data.items():
+            wave.setStyle(style)
+
     def toggleLegend(self):
         self._legend_visible = not self._legend_visible
         if self._legend:
@@ -648,26 +711,96 @@ class PgWavePlot(QWidget):
             "PDF files (*.pdf);;PNG files (*.png);;SVG files (*.svg)")
         if not fname:
             return
-        if fname.lower().endswith('.svg'):
-            from pyqtgraph.exporters import SVGExporter
-            SVGExporter(self.gw.scene()).export(fname)
-        elif fname.lower().endswith('.png'):
-            from pyqtgraph.exporters import ImageExporter
-            ImageExporter(self.gw.scene()).export(fname)
-        else:
-            try:
-                from PySide6.QtPrintSupport import QPrinter
-                printer = QPrinter(QPrinter.HighResolution)
-                printer.setOutputFormat(QPrinter.PdfFormat)
-                printer.setOutputFileName(fname)
-                painter = QPainter(printer)
-                self.gw.render(painter)
-                painter.end()
-            except ImportError:
-                from pyqtgraph.exporters import ImageExporter
-                if not fname.lower().endswith('.png'):
-                    fname += '.png'
-                ImageExporter(self.gw.scene()).export(fname)
+        self._export_matplotlib(fname)
+
+    def _export_matplotlib(self, fname):
+        import matplotlib.pyplot as plt
+        from matplotlib.ticker import EngFormatter
+
+        if not self.wave_data:
+            return
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        units_left = set()
+        units_right = set()
+        ax_right = None
+        tags = list(self.wave_data.keys())
+
+        for i, tag in enumerate(tags):
+            wave, yunit = self.wave_data[tag]
+            if wave.x is None or wave.y is None:
+                continue
+            x, xlabels = _to_numeric(wave.x)
+            y, _ = _to_numeric(wave.y)
+            color = EXPORT_COLORS[i % len(EXPORT_COLORS)]
+            style = getattr(wave, 'style', 'Lines')
+
+            is_right = (self._right_vb is not None
+                        and yunit in self._unit_vb
+                        and self._unit_vb[yunit] is self._right_vb)
+
+            target = ax
+            if is_right:
+                if ax_right is None:
+                    ax_right = ax.twinx()
+                target = ax_right
+                units_right.add(yunit)
+            else:
+                units_left.add(yunit)
+
+            kw = dict(color=color, linewidth=1.5, label=wave.key)
+            if style == 'Markers':
+                kw.update(linestyle='none', marker='o', markersize=4)
+            elif style == 'Lines+Markers':
+                kw.update(marker='o', markersize=3)
+            elif style == 'Steps':
+                kw.update(drawstyle='steps-mid')
+
+            if self._logx:
+                target.semilogx(x, y, **kw)
+            else:
+                target.plot(x, y, **kw)
+
+            if xlabels:
+                ax.set_xticks(x)
+                ax.set_xticklabels(xlabels, rotation=45, ha='right')
+
+        xunit = self._get_xunit()
+        xlabel = ""
+        for wave, _ in self.wave_data.values():
+            if wave.xlabel:
+                xlabel = wave.xlabel
+                break
+        if xunit:
+            ax.set_xlabel("%s [%s]" % (xlabel, xunit) if xlabel else xunit)
+            ax.xaxis.set_major_formatter(EngFormatter(unit=xunit))
+        elif xlabel:
+            ax.set_xlabel(xlabel)
+
+        for yu in units_left:
+            if yu:
+                ax.set_ylabel("[%s]" % yu)
+                ax.yaxis.set_major_formatter(EngFormatter(unit=yu))
+        if ax_right:
+            for yu in units_right:
+                if yu:
+                    ax_right.set_ylabel("[%s]" % yu)
+                    ax_right.yaxis.set_major_formatter(EngFormatter(unit=yu))
+
+        lines, labels = ax.get_legend_handles_labels()
+        if ax_right:
+            r_lines, r_labels = ax_right.get_legend_handles_labels()
+            lines += r_lines
+            labels += r_labels
+        if labels:
+            ax.legend(lines, labels, fontsize=7, loc='best')
+
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+        dpi = 150 if fname.lower().endswith('.png') else None
+        fig.savefig(fname, dpi=dpi, facecolor='white')
+        plt.close(fig)
 
     def clearCursors(self):
         for line in self._cursor_a_lines:
@@ -1186,6 +1319,7 @@ class PgWaveWindow(QMainWindow):
         self.browser.waveSelected.connect(self._on_wave_selected)
         self.browser.waveRemoveRequested.connect(self._on_wave_remove)
         self.browser.analysisRequested.connect(self._on_analysis)
+        self.browser.styleChanged.connect(self._on_style_changed)
 
         self._setup_menus()
         self._setup_shortcuts()
@@ -1260,7 +1394,7 @@ class PgWaveWindow(QMainWindow):
     def _on_wave_selected(self, wave):
         p = self._current()
         if p:
-            result = p.show_wave(wave)
+            result = p.show_wave(wave, style=self.browser.plotStyle)
             if result:
                 tag, color = result
                 self.browser.setWaveColor(tag, color)
@@ -1271,6 +1405,11 @@ class PgWaveWindow(QMainWindow):
             tag = p.removeLine(wave)
             if tag:
                 self.browser.clearWaveColor(tag)
+
+    def _on_style_changed(self, style):
+        p = self._current()
+        if p and hasattr(p, 'setAllStyles'):
+            p.setAllStyles(style)
 
     def _open_file(self):
         fname, _ = QFileDialog.getOpenFileName(
@@ -1532,10 +1671,32 @@ class PgWaveWindow(QMainWindow):
         self.browser.openDataFrame(df, name)
 
 
+def _apply_dark_palette(app):
+    app.setStyle("Fusion")
+    p = QPalette()
+    p.setColor(QPalette.Window, QColor(43, 43, 43))
+    p.setColor(QPalette.WindowText, QColor(224, 224, 224))
+    p.setColor(QPalette.Base, QColor(30, 30, 30))
+    p.setColor(QPalette.AlternateBase, QColor(43, 43, 43))
+    p.setColor(QPalette.ToolTipBase, QColor(43, 43, 43))
+    p.setColor(QPalette.ToolTipText, QColor(224, 224, 224))
+    p.setColor(QPalette.Text, QColor(224, 224, 224))
+    p.setColor(QPalette.Button, QColor(53, 53, 53))
+    p.setColor(QPalette.ButtonText, QColor(224, 224, 224))
+    p.setColor(QPalette.BrightText, QColor(255, 50, 50))
+    p.setColor(QPalette.Link, QColor(42, 130, 218))
+    p.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    p.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+    p.setColor(QPalette.Disabled, QPalette.Text, QColor(128, 128, 128))
+    p.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(128, 128, 128))
+    app.setPalette(p)
+
+
 class CmdWavePg:
     def __init__(self, xaxis):
         self.xaxis = xaxis
         self.app = QApplication.instance() or QApplication(sys.argv)
+        _apply_dark_palette(self.app)
         pg.setConfigOptions(antialias=True, useOpenGL=False,
                             background='k', foreground='w')
         self.win = PgWaveWindow(xaxis)
