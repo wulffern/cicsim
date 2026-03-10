@@ -97,7 +97,9 @@ def archive(ctx,name,runfiles):
 @click.option("--sheet",default=None,help="Sheet name for Excel files (default: first sheet)")
 @click.option("--pivot",default=None,help="Pivot spec file (YAML/JSON)")
 @click.option("--pivot-info",is_flag=True,default=False,help="Print pivot dimensions and exit")
-def wave(files,x,backend,sheet,pivot,pivot_info):
+@click.option("--session",default=None,help="Load session file (.cicwave.yaml)")
+@click.option("--export",default=None,help="Export plot to file (PDF/PNG/SVG) and exit")
+def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
     """Open waveform viewer.
 
     Interactive waveform viewer for SPICE simulation results (.raw files).
@@ -111,8 +113,11 @@ def wave(files,x,backend,sheet,pivot,pivot_info):
       R              Reload all waveforms
       L              Toggle legend
       Ctrl+O         Open raw file
+      Ctrl+S         Save session
       Ctrl+P         Export to PDF
       Ctrl+N         New plot tab (pg backend)
+      Ctrl+L         Set axis labels
+      Ctrl+T         Add annotation
       Ctrl+Q         Quit
 
     \b
@@ -140,12 +145,20 @@ def wave(files,x,backend,sheet,pivot,pivot_info):
     Pivot:
       --pivot spec.yaml     Reshape data using pivot spec before viewing
       --pivot-info          Print unique values per pivot dimension and exit
+
+    \b
+    Session:
+      --session plot.cicwave.yaml         Load saved session
+      --export plot.pdf                   Export to file and exit (no GUI)
+      --session s.yaml --export out.pdf   Restore session and export
     """
 
-    _run_wave(files, x, backend, sheet, pivot, pivot_info)
+    _run_wave(files, x, backend, sheet, pivot, pivot_info,
+              session_path=session, export_path=export)
 
 
-def _run_wave(files, x, backend, sheet, pivot_spec=None, pivot_info_flag=False):
+def _run_wave(files, x, backend, sheet, pivot_spec=None,
+              pivot_info_flag=False, session_path=None, export_path=None):
     if pivot_spec:
         from cicsim.pivot import load_spec, pivot_info, apply_pivot
         from cicsim.wavefiles import WaveFile
@@ -161,6 +174,9 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None, pivot_info_flag=False):
 
         if not x and spec.get('columns'):
             x = spec['columns']
+
+    if session_path or export_path:
+        backend = "pg"
 
     if backend == "pg":
         try:
@@ -179,17 +195,25 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None, pivot_info_flag=False):
             sys.exit(1)
         c = cs.CmdWave(x)
 
+    if session_path:
+        c.win.applySession(session_path)
+
     if pivot_spec:
         for f in files:
             wf = WaveFile(f, x or "")
             pivoted = apply_pivot(wf.df, spec)
             name = "pivot(%s)" % os.path.basename(f)
-            c.openDataFrame(pivoted, name)
+            c.openDataFrame(pivoted, name,
+                            pivot_spec_path=os.path.abspath(pivot_spec),
+                            original_path=os.path.abspath(f))
     else:
         for f in files:
             c.openFile(f, sheet_name=sheet)
 
-    c.run()
+    if export_path:
+        c.exportAndExit(export_path)
+    else:
+        c.run()
 
 
 @click.command()
@@ -200,7 +224,9 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None, pivot_info_flag=False):
 @click.option("--sheet", default=None, help="Sheet name for Excel files (default: first sheet)")
 @click.option("--pivot", default=None, help="Pivot spec file (YAML/JSON)")
 @click.option("--pivot-info", is_flag=True, default=False, help="Print pivot dimensions and exit")
-def cicwave(files, x, backend, sheet, pivot, pivot_info):
+@click.option("--session", default=None, help="Load session file (.cicwave.yaml)")
+@click.option("--export", default=None, help="Export plot to file (PDF/PNG/SVG) and exit")
+def cicwave(files, x, backend, sheet, pivot, pivot_info, session, export):
     """Waveform viewer (standalone).
 
     Shortcut for 'cicsim wave --backend pg'. Opens the pyqtgraph-based
@@ -213,8 +239,15 @@ def cicwave(files, x, backend, sheet, pivot, pivot_info):
     Pivot:
       --pivot spec.yaml     Reshape data using pivot spec before viewing
       --pivot-info          Print unique values per pivot dimension and exit
+
+    \b
+    Session:
+      --session plot.cicwave.yaml         Load saved session
+      --export plot.pdf                   Export to file and exit (no GUI)
+      --session s.yaml --export out.pdf   Restore session and export
     """
-    _run_wave(files, x, backend, sheet, pivot, pivot_info)
+    _run_wave(files, x, backend, sheet, pivot, pivot_info,
+              session_path=session, export_path=export)
 
 
 

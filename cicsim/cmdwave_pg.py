@@ -332,8 +332,13 @@ class PgWaveBrowser(QWidget):
         self.file_tree.setCurrentItem(item)
         self._fill_waves()
 
-    def openDataFrame(self, df, name):
+    def openDataFrame(self, df, name, pivot_spec_path=None,
+                       original_path=None):
         f = self.files.openDataFrame(df, name, self.xaxis)
+        if pivot_spec_path:
+            f._pivot_spec_path = pivot_spec_path
+        if original_path:
+            f._original_path = original_path
         item = QTreeWidgetItem([f.name])
         item.setData(0, Qt.UserRole, f.name)
         self.file_tree.addTopLevelItem(item)
@@ -553,6 +558,11 @@ class PgWavePlot(QWidget):
         self._cursor_b_lines = []
         self._delta_texts = []
         self._last_x = None
+        self._annotations = []
+
+        self.custom_xlabel = None
+        self.custom_ylabel = None
+        self.custom_title = None
 
         self.gw.scene().sigMouseMoved.connect(self._on_mouse_moved)
 
@@ -662,6 +672,7 @@ class PgWavePlot(QWidget):
             vb.enableAutoRange()
             vb.autoRange()
 
+        self._update_readout()
         return (wave.tag, color)
 
     def removeLine(self, wave):
@@ -669,6 +680,7 @@ class PgWavePlot(QWidget):
         tag = wave.tag
         if tag in self.wave_data:
             self._remove_wave(tag)
+            self._update_readout()
             return tag
         return None
 
@@ -677,6 +689,7 @@ class PgWavePlot(QWidget):
         for tag in tags:
             self._remove_wave(tag)
         self._reset_axes()
+        self._update_readout()
         return tags
 
     def autoSize(self):
@@ -766,27 +779,54 @@ class PgWavePlot(QWidget):
                 ax.set_xticks(x)
                 ax.set_xticklabels(xlabels, rotation=45, ha='right')
 
-        xunit = self._get_xunit()
-        xlabel = ""
-        for wave, _ in self.wave_data.values():
-            if wave.xlabel:
-                xlabel = wave.xlabel
-                break
-        if xunit:
-            ax.set_xlabel("%s [%s]" % (xlabel, xunit) if xlabel else xunit)
-            ax.xaxis.set_major_formatter(EngFormatter(unit=xunit))
-        elif xlabel:
-            ax.set_xlabel(xlabel)
+        if self.custom_xlabel:
+            ax.set_xlabel(self.custom_xlabel)
+        else:
+            xunit = self._get_xunit()
+            xlabel = ""
+            for wave, _ in self.wave_data.values():
+                if wave.xlabel:
+                    xlabel = wave.xlabel
+                    break
+            if xunit:
+                ax.set_xlabel("%s [%s]" % (xlabel, xunit) if xlabel else xunit)
+                ax.xaxis.set_major_formatter(EngFormatter(unit=xunit))
+            elif xlabel:
+                ax.set_xlabel(xlabel)
 
-        for yu in units_left:
-            if yu:
-                ax.set_ylabel("[%s]" % yu)
-                ax.yaxis.set_major_formatter(EngFormatter(unit=yu))
+        if self.custom_ylabel:
+            ax.set_ylabel(self.custom_ylabel)
+        else:
+            for yu in units_left:
+                if yu:
+                    ax.set_ylabel("[%s]" % yu)
+                    ax.yaxis.set_major_formatter(EngFormatter(unit=yu))
         if ax_right:
             for yu in units_right:
                 if yu:
                     ax_right.set_ylabel("[%s]" % yu)
                     ax_right.yaxis.set_major_formatter(EngFormatter(unit=yu))
+
+        if self.custom_title:
+            ax.set_title(self.custom_title)
+
+        for ann in self._annotations:
+            ax.annotate(
+                ann['text'], xy=(ann['x'], ann['y']),
+                fontsize=8, color='#333333',
+                bbox=dict(boxstyle='round,pad=0.3', fc='#ffffcc',
+                          ec='#888888', alpha=0.9),
+                arrowprops=dict(arrowstyle='->', color='#555555'))
+
+        stats = self.getStats()
+        if stats:
+            stat_lines = []
+            for s in stats:
+                u = s['unit']
+                stat_lines.append("%s: μ=%s σ=%s" % (
+                    s['key'], _eng(s['mean'], u), _eng(s['std'], u)))
+            fig.text(0.01, 0.01, "  |  ".join(stat_lines),
+                     fontsize=6, color='#666666', va='bottom')
 
         lines, labels = ax.get_legend_handles_labels()
         if ax_right:
@@ -798,6 +838,7 @@ class PgWavePlot(QWidget):
 
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
+        fig.subplots_adjust(bottom=max(0.15, fig.subplotpars.bottom))
         dpi = 150 if fname.lower().endswith('.png') else None
         fig.savefig(fname, dpi=dpi, facecolor='white')
         plt.close(fig)
@@ -1037,9 +1078,54 @@ class PgWavePlot(QWidget):
         except Exception:
             return None
 
+    def getStats(self):
+        """Return per-wave statistics as a list of dicts."""
+        stats = []
+        for tag, (wave, _) in self.wave_data.items():
+            if wave.y is None:
+                continue
+            y = np.real(wave.y)
+            y = y[np.isfinite(y)]
+            if len(y) == 0:
+                continue
+            stats.append({
+                'key': wave.key, 'unit': wave.yunit,
+                'min': float(np.min(y)), 'max': float(np.max(y)),
+                'mean': float(np.mean(y)), 'std': float(np.std(y)),
+                'pp': float(np.max(y) - np.min(y)),
+            })
+        return stats
+
+    def _show_stats(self):
+        stats = self.getStats()
+        if not stats:
+            self.readout.clear()
+            return
+        lines = []
+        for s in stats:
+            u = s['unit']
+            lines.append("  %-22s  min: %-12s  max: %-12s  μ: %-12s  σ: %-12s  pp: %s" % (
+                s['key'], _eng(s['min'], u), _eng(s['max'], u),
+                _eng(s['mean'], u), _eng(s['std'], u), _eng(s['pp'], u)))
+        self.readout.setPlainText("\n".join(lines))
+
+    def addAnnotation(self, x, y, text):
+        item = pg.TextItem(text=text, color='#e0e0e0', anchor=(0, 1),
+                           fill=pg.mkBrush(51, 51, 51, 200), border='w')
+        item.setFont(QFont("Courier", 9))
+        item.setPos(x, y)
+        self.plot.addItem(item)
+        self._annotations.append({'text': text, 'x': x, 'y': y, 'item': item})
+
+    def removeAnnotations(self):
+        for ann in self._annotations:
+            if ann.get('item'):
+                self.plot.removeItem(ann['item'])
+        self._annotations.clear()
+
     def _update_readout(self):
         if self.cursor_a is None and self.cursor_b is None:
-            self.readout.clear()
+            self._show_stats()
             return
 
         xunit = self._get_xunit()
@@ -1329,6 +1415,9 @@ class PgWaveWindow(QMainWindow):
 
         m = mb.addMenu("File")
         m.addAction("Open File         Ctrl+O", self._open_file)
+        m.addAction("Save Session      Ctrl+S", self._save_session)
+        m.addAction("Load Session", self._load_session)
+        m.addSeparator()
         m.addAction("Export PDF        Ctrl+P", self._export_pdf)
         m.addSeparator()
         m.addAction("Quit              Ctrl+Q", self.close)
@@ -1336,6 +1425,10 @@ class PgWaveWindow(QMainWindow):
         m = mb.addMenu("Edit")
         m.addAction("New Plot          Ctrl+N", self._add_plot_tab)
         m.addAction("Close Tab         Ctrl+W", self._close_current_tab)
+        m.addSeparator()
+        m.addAction("Set Axis Labels   Ctrl+L", self._set_axis_labels)
+        m.addAction("Add Annotation    Ctrl+T", self._add_annotation)
+        m.addAction("Clear Annotations", self._clear_annotations)
         m.addSeparator()
         m.addAction("Reload All        R", self._reload)
         m.addAction("Auto Scale        F", self._auto_size)
@@ -1355,10 +1448,13 @@ class PgWaveWindow(QMainWindow):
     def _setup_shortcuts(self):
         for seq, func in [
             ("Ctrl+O", self._open_file),
+            ("Ctrl+S", self._save_session),
             ("Ctrl+P", self._export_pdf),
             ("Ctrl+Q", self.close),
             ("Ctrl+N", self._add_plot_tab),
             ("Ctrl+W", self._close_current_tab),
+            ("Ctrl+L", self._set_axis_labels),
+            ("Ctrl+T", self._add_annotation),
             ("Escape", self._clear_cursors),
         ]:
             QShortcut(QKeySequence(seq), self, func)
@@ -1469,13 +1565,16 @@ class PgWaveWindow(QMainWindow):
             "══════════════════════════════\n"
             "\n"
             "File\n"
-            "  Ctrl+O        Open raw file\n"
-            "  Ctrl+P        Export PDF\n"
+            "  Ctrl+O        Open file\n"
+            "  Ctrl+S        Save session\n"
+            "  Ctrl+P        Export PDF/PNG/SVG\n"
             "  Ctrl+Q        Quit\n"
             "\n"
             "Edit\n"
             "  Ctrl+N        New plot tab\n"
             "  Ctrl+W        Close current tab\n"
+            "  Ctrl+L        Set axis labels\n"
+            "  Ctrl+T        Add annotation\n"
             "  R             Reload all waves\n"
             "  F             Auto scale (fit)\n"
             "\n"
@@ -1513,6 +1612,220 @@ class PgWaveWindow(QMainWindow):
         btn.clicked.connect(dlg.accept)
         layout.addWidget(btn)
         dlg.exec()
+
+    # ------------------------------------------------------------------
+    # Axis labels dialog
+    # ------------------------------------------------------------------
+
+    def _set_axis_labels(self):
+        p = self._current()
+        if not isinstance(p, PgWavePlot):
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Set Axis Labels")
+        form = QVBoxLayout(dlg)
+
+        def _row(label_text, default):
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label_text))
+            le = QLineEdit(default or "")
+            row.addWidget(le)
+            form.addLayout(row)
+            return le
+
+        title_le = _row("Title:", p.custom_title)
+        xlabel_le = _row("X-axis:", p.custom_xlabel)
+        ylabel_le = _row("Y-axis:", p.custom_ylabel)
+
+        btn = QPushButton("Apply")
+        btn.clicked.connect(dlg.accept)
+        form.addWidget(btn)
+
+        if dlg.exec() != QDialog.Accepted:
+            return
+        p.custom_title = title_le.text().strip() or None
+        p.custom_xlabel = xlabel_le.text().strip() or None
+        p.custom_ylabel = ylabel_le.text().strip() or None
+        if p.custom_title:
+            p.plot.setTitle(p.custom_title, color='w', size='11pt')
+        else:
+            p.plot.setTitle(None)
+        if p.custom_xlabel:
+            p.plot.setLabel('bottom', p.custom_xlabel)
+        if p.custom_ylabel:
+            p.plot.setLabel('left', p.custom_ylabel)
+
+    # ------------------------------------------------------------------
+    # Annotations
+    # ------------------------------------------------------------------
+
+    def _add_annotation(self):
+        p = self._current()
+        if not isinstance(p, PgWavePlot):
+            return
+        if p._last_x is None:
+            return
+        text, ok = QInputDialog.getText(self, "Add Annotation",
+                                        "Text:")
+        if not ok or not text.strip():
+            return
+        vr = p.plot.viewRange()
+        y = (vr[1][0] + vr[1][1]) / 2.0
+        p.addAnnotation(p._last_x, y, text.strip())
+
+    def _clear_annotations(self):
+        p = self._current()
+        if isinstance(p, PgWavePlot):
+            p.removeAnnotations()
+
+    # ------------------------------------------------------------------
+    # Session save / load
+    # ------------------------------------------------------------------
+
+    def _build_session(self):
+        """Collect current GUI state into a serialisable dict."""
+        files = []
+        wf_to_idx = {}
+        for fkey, wf in self.browser.files.items():
+            idx = len(files)
+            orig = getattr(wf, '_original_path', None) or wf.fname
+            entry = {'path': os.path.abspath(orig)}
+            pivot_path = getattr(wf, '_pivot_spec_path', None)
+            if pivot_path:
+                entry['pivot'] = pivot_path
+            files.append(entry)
+            wf_to_idx[id(wf)] = idx
+
+        plots = []
+        for ti in range(self.tab_widget.count()):
+            widget = self.tab_widget.widget(ti)
+            if not isinstance(widget, PgWavePlot):
+                continue
+            tab_name = self.tab_widget.tabText(ti)
+            waves = []
+            for tag, (wave, yunit) in widget.wave_data.items():
+                fi = wf_to_idx.get(id(wave.wfile))
+                waves.append({
+                    'file': fi,
+                    'name': wave.key,
+                    'style': getattr(wave, 'style', 'Lines'),
+                })
+            plot_dict = {'name': tab_name, 'waves': waves}
+            if widget.custom_xlabel:
+                plot_dict['xlabel'] = widget.custom_xlabel
+            if widget.custom_ylabel:
+                plot_dict['ylabel'] = widget.custom_ylabel
+            if widget.custom_title:
+                plot_dict['title'] = widget.custom_title
+            if widget._annotations:
+                plot_dict['annotations'] = [
+                    {'text': a['text'], 'x': float(a['x']),
+                     'y': float(a['y'])}
+                    for a in widget._annotations
+                ]
+            plots.append(plot_dict)
+
+        return {'files': files, 'plots': plots}
+
+    def _save_session(self):
+        import yaml
+        fname, _ = QFileDialog.getSaveFileName(
+            self, "Save Session", os.getcwd(),
+            "Session files (*.cicwave.yaml);;YAML files (*.yaml);;All Files (*)")
+        if not fname:
+            return
+        session = self._build_session()
+        session_dir = os.path.dirname(os.path.abspath(fname))
+        for fe in session.get('files', []):
+            fe['path'] = os.path.relpath(fe['path'], session_dir)
+            if 'pivot' in fe:
+                fe['pivot'] = os.path.relpath(fe['pivot'], session_dir)
+
+        with open(fname, 'w') as fh:
+            yaml.dump(session, fh, default_flow_style=False, sort_keys=False)
+
+    def _load_session(self):
+        fname, _ = QFileDialog.getOpenFileName(
+            self, "Load Session", os.getcwd(),
+            "Session files (*.cicwave.yaml *.yaml);;All Files (*)")
+        if not fname:
+            return
+        self.applySession(fname)
+
+    def applySession(self, session_path):
+        """Load a session file and restore the GUI state."""
+        import yaml
+        with open(session_path) as fh:
+            session = yaml.safe_load(fh)
+
+        session_dir = os.path.dirname(os.path.abspath(session_path))
+
+        for fe in session.get('files', []):
+            fpath = fe['path']
+            if not os.path.isabs(fpath):
+                fpath = os.path.normpath(os.path.join(session_dir, fpath))
+            pivot_path = fe.get('pivot')
+            if pivot_path and not os.path.isabs(pivot_path):
+                pivot_path = os.path.normpath(
+                    os.path.join(session_dir, pivot_path))
+
+            if pivot_path:
+                from cicsim.pivot import load_spec, apply_pivot
+                from cicsim.wavefiles import WaveFile
+                spec = load_spec(pivot_path)
+                wf = WaveFile(fpath, self.browser.xaxis or spec.get('columns', ''))
+                pivoted = apply_pivot(wf.df, spec)
+                name = "pivot(%s)" % os.path.basename(fpath)
+                self.browser.openDataFrame(pivoted, name)
+            else:
+                self.browser.openFile(fpath)
+
+        for pd in session.get('plots', []):
+            tab_idx = self.tab_widget.count() - 1
+            p = self.tab_widget.widget(tab_idx)
+            if p is None or (isinstance(p, PgWavePlot) and p.wave_data):
+                self._add_plot_tab()
+                tab_idx = self.tab_widget.count() - 1
+                p = self.tab_widget.widget(tab_idx)
+
+            if pd.get('name'):
+                self.tab_widget.setTabText(tab_idx, pd['name'])
+
+            for wd in pd.get('waves', []):
+                wave_name = wd.get('name')
+                style = wd.get('style', 'Lines')
+                wave = self._find_wave(wave_name)
+                if wave:
+                    result = p.show_wave(wave, style=style)
+                    if result:
+                        tag, color = result
+                        self.browser.setWaveColor(tag, color)
+
+            if pd.get('xlabel'):
+                p.custom_xlabel = pd['xlabel']
+                p.plot.setLabel('bottom', pd['xlabel'])
+            if pd.get('ylabel'):
+                p.custom_ylabel = pd['ylabel']
+                p.plot.setLabel('left', pd['ylabel'])
+            if pd.get('title'):
+                p.custom_title = pd['title']
+                p.plot.setTitle(pd['title'], color='w', size='11pt')
+
+            for ann in pd.get('annotations', []):
+                p.addAnnotation(ann['x'], ann['y'], ann['text'])
+
+    def _find_wave(self, name):
+        """Look up a PgWave by column name across all loaded files."""
+        for fkey, wf in self.browser.files.items():
+            for wn in wf.getWaveNames():
+                if wn == name:
+                    tag = wf.getTag(wn)
+                    if tag in self.browser._wave_cache:
+                        return self.browser._wave_cache[tag]
+                    wave = PgWave(wf, wn, self.browser.xaxis)
+                    self.browser._wave_cache[tag] = wave
+                    return wave
+        return None
 
     def _close_tab(self, index):
         widget = self.tab_widget.widget(index)
@@ -1667,8 +1980,8 @@ class PgWaveWindow(QMainWindow):
     def openFile(self, fname, sheet_name=None):
         self.browser.openFile(fname, sheet_name=sheet_name)
 
-    def openDataFrame(self, df, name):
-        self.browser.openDataFrame(df, name)
+    def openDataFrame(self, df, name, **kwargs):
+        self.browser.openDataFrame(df, name, **kwargs)
 
 
 def _apply_dark_palette(app):
@@ -1704,9 +2017,24 @@ class CmdWavePg:
     def openFile(self, fname, sheet_name=None):
         self.win.openFile(fname, sheet_name=sheet_name)
 
-    def openDataFrame(self, df, name):
-        self.win.openDataFrame(df, name)
+    def openDataFrame(self, df, name, **kwargs):
+        self.win.openDataFrame(df, name, **kwargs)
 
     def run(self):
         self.win.show()
         self.app.exec()
+
+    def exportAndExit(self, fname):
+        """Export the current plot to a file without showing the GUI."""
+        for ti in range(self.win.tab_widget.count()):
+            widget = self.win.tab_widget.widget(ti)
+            if isinstance(widget, PgWavePlot) and widget.wave_data:
+                if self.win.tab_widget.count() > 1:
+                    base, ext = os.path.splitext(fname)
+                    out = "%s_%d%s" % (base, ti, ext) if ti > 0 else fname
+                else:
+                    out = fname
+                widget._export_matplotlib(out)
+                print("Exported: %s" % out)
+                break
+        self.app.quit()
