@@ -2,7 +2,7 @@
 layout: home
 ---
 
-<https://github.com/wulffern/cicsim>
+[https://github.com/wulffern/cicsim](https://github.com/wulffern/cicsim)
 
 cicsim is a collection of scripts that I use to simplify my life when it comes to
 analog simulation.
