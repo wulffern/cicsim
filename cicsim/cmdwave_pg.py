@@ -1920,7 +1920,10 @@ class PgWaveWindow(QMainWindow):
                 from cicsim.pivot import load_spec, apply_pivot
                 from cicsim.wavefiles import WaveFile
                 spec = load_spec(pivot_path)
-                wf = WaveFile(fpath, self.browser.xaxis or spec.get('columns', ''))
+                xaxis = self.browser.xaxis or spec.get('columns', '')
+                if not self.browser.xaxis and spec.get('columns'):
+                    self.browser.xaxis = spec['columns']
+                wf = WaveFile(fpath, xaxis)
                 pivoted = apply_pivot(wf.df, spec)
                 name = "pivot(%s)" % os.path.basename(fpath)
                 self.browser.openDataFrame(pivoted, name)
