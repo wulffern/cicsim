@@ -213,13 +213,13 @@ slope, and derivative values at both cursor positions.
 
 ## Sessions (pg backend)
 
-Save the current viewer state (loaded files, plotted waves, axis labels,
-annotations) to a YAML file and restore it later.
+A session file captures the full viewer state so you can save a view and
+restore it later, or generate plots from the command line without opening
+the GUI.
 
 Save via menu: **File → Save Session (Ctrl+S)**
 
 Load from the command line:
-
 
 ```bash
 cicwave --session mysession.cicwave.yaml
@@ -231,9 +231,91 @@ Export a session to PDF without opening the GUI:
 cicwave --session mysession.cicwave.yaml --export plot.pdf
 ```
 
+Combine session restore with export (useful for scripted plot generation):
+
+```bash
+cicwave --session mysession.cicwave.yaml --export plot.svg
+```
+
+### Session file format
+
+A session file is YAML with two top-level keys: `files` and `plots`.
+File paths are relative to the session file location.
+
+```yaml
+files:
+  - path: ../data/tran.raw           # path to data file (required)
+  - path: ../data/measurements.csv
+    pivot: ../specs/pivot_spec.yaml   # optional pivot spec for this file
+
+plots:
+  - name: "Transient"                # tab name
+    title: "Amplifier Output"        # plot title (optional)
+    xlabel: "Time"                    # custom x-axis label (optional)
+    ylabel: "Voltage"                # custom y-axis label (optional)
+    waves:
+      - file: 0                      # index into the files list
+        name: "v(out)"               # column / signal name
+        style: Lines                  # Lines, Markers, Lines+Markers, Steps
+      - file: 0
+        name: "v(in)"
+        style: Lines
+    annotations:                      # optional list of text annotations
+      - text: "settling"
+        x: 1.5e-6
+        y: 0.9
+
+  - name: "DC sweep"                 # second tab
+    waves:
+      - file: 1
+        name: "Gain_T27"
+        style: Lines
+```
+
+### Session file reference
+
+**`files`** — list of data files to load:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `path` | yes | Path to the data file (relative to session file or absolute) |
+| `pivot` | no | Path to a pivot spec YAML/JSON file to reshape this file before viewing |
+
+**`plots`** — list of plot tabs:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `name` | no | Tab name shown in the tab bar |
+| `title` | no | Plot title displayed above the graph |
+| `xlabel` | no | Custom x-axis label |
+| `ylabel` | no | Custom y-axis label |
+| `waves` | yes | List of waves to plot (see below) |
+| `annotations` | no | List of text annotations (see below) |
+
+**`waves`** — list of signals to plot in a tab:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `file` | yes | Zero-based index into the `files` list |
+| `name` | yes | Column name (signal name) in the data file |
+| `style` | no | Plot style: `Lines` (default), `Markers`, `Lines+Markers`, or `Steps` |
+
+**`annotations`** — list of text labels placed on the plot:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `text` | yes | Annotation text |
+| `x` | yes | X position in data coordinates |
+| `y` | yes | Y position in data coordinates |
+
+
 ## Pivot
 
-Reshape tabular data before viewing using a pivot spec file:
+Pivot reshapes a flat/long-format table into wide format suitable for
+waveform plotting. This is useful when simulation results are stored as
+one-row-per-measurement (e.g. parameter sweeps, Monte Carlo results).
+
+### Usage
 
 ```bash
 cicsim wave results.csv --pivot spec.yaml
@@ -244,3 +326,58 @@ Inspect the available pivot dimensions first:
 ```bash
 cicsim wave results.csv --pivot spec.yaml --pivot-info
 ```
+
+### Pivot spec format
+
+A pivot spec is a YAML (or JSON) file with the following keys:
+
+```yaml
+index: Parameter         # column whose unique values become separate waves
+columns: Frequency       # (optional) column used as x-axis
+values: Measurement      # column containing the y-axis values
+conditions:              # (optional) further split waves by these columns
+  - Temp
+  - Config
+aliases:                 # (optional) short names for condition values
+  Config:
+    c0: "LV"
+    c1: "HV"
+```
+
+### Pivot spec reference
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `index` | yes | Column to split on — each unique value becomes a wave (e.g. `Parameter`) |
+| `columns` | no | Column to use as the x-axis. Rows with NaN in this column are dropped. If omitted the result is a bar-style categorical plot |
+| `values` | yes | Column containing the measurement values (y-axis) |
+| `conditions` | no | List of additional columns to split by. Each unique combination of (`index` × conditions) becomes its own wave. Wave names are formed as `{index}_{C}{condition_value}` |
+| `aliases` | no | Dictionary of short names for condition values. Keyed by condition column name, then `c0`, `c1`, ... for each unique value in sorted order |
+
+### Example
+
+Given a CSV with amplifier gain and phase measured across frequency at
+three temperatures:
+
+<!--run_output:
+run: cat pivot_data.csv
+-->
+
+And a pivot spec:
+
+<!--run_output:
+run: cat pivot_spec.yaml
+-->
+
+The `--pivot-info` flag shows the dimensions:
+
+<!--run_output:
+run: cicwave pivot_data.csv --pivot pivot_spec.yaml --pivot-info
+-->
+
+Plotting the pivoted data with a session:
+
+<!--run_image:
+run: cicwave --session session_pivot.cicwave.yaml --export wave_pivot.svg
+output_image: wave_pivot.svg
+-->

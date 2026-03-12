@@ -1,0 +1,5 @@
+index: Parameter
+columns: Frequency
+values: Measurement
+conditions:
+  - Temp

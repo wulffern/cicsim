@@ -1,0 +1,15 @@
+files:
+  - path: pivot_data.csv
+    pivot: pivot_spec.yaml
+plots:
+  - name: Gain vs Frequency
+    waves:
+      - file: 0
+        name: "Gain_T-40"
+        style: Lines
+      - file: 0
+        name: "Gain_T27"
+        style: Lines
+      - file: 0
+        name: "Gain_T125"
+        style: Lines
