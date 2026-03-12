@@ -46,7 +46,7 @@ EXPORT_COLORS = [
 PLOT_STYLES = ['Lines', 'Markers', 'Lines+Markers', 'Steps']
 
 
-def _style_kwargs(color, style, width=1):
+def _style_kwargs(color, style, width=2):
     """Return PlotDataItem keyword args for the given plot style."""
     pen = pg.mkPen(color, width=width)
     if style == 'Markers':
@@ -222,7 +222,7 @@ class PgWave:
             y, _ = _to_numeric(self.y)
             self.curve.setData(x, y)
 
-    def plot(self, target, color='w', style='Lines'):
+    def plot(self, target, color='w', style='Lines', width=2):
         """Plot on a PlotItem or ViewBox. Returns the curve or None."""
         if self.y is None:
             return None
@@ -230,7 +230,8 @@ class PgWave:
         x, self._xlabels = _to_numeric(self.x) if self.x is not None else (np.arange(len(y)), None)
         self.color = color
         self.style = style
-        kw = _style_kwargs(color, style)
+        self._width = width
+        kw = _style_kwargs(color, style, width=width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         target.addItem(self.curve)
         return self.curve
@@ -243,7 +244,19 @@ class PgWave:
         vb.removeItem(self.curve)
         y, _ = _to_numeric(self.y)
         x, _ = _to_numeric(self.x) if self.x is not None else (np.arange(len(y)), None)
-        kw = _style_kwargs(self.color, style)
+        kw = _style_kwargs(self.color, style, width=self._width)
+        self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
+        vb.addItem(self.curve)
+
+    def setWidth(self, width):
+        if self.curve is None:
+            return
+        self._width = width
+        vb = self.curve.getViewBox()
+        vb.removeItem(self.curve)
+        y, _ = _to_numeric(self.y)
+        x, _ = _to_numeric(self.x) if self.x is not None else (np.arange(len(y)), None)
+        kw = _style_kwargs(self.color, self.style, width=width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         vb.addItem(self.curve)
 
@@ -326,8 +339,9 @@ class PgWaveBrowser(QWidget):
     def openFile(self, fname, sheet_name=None):
         sheet = sheet_name if sheet_name is not None else 0
         f = self.files.open(fname, self.xaxis, sheet_name=sheet)
+        key = self.files.current
         item = QTreeWidgetItem([f.name])
-        item.setData(0, Qt.UserRole, f.name)
+        item.setData(0, Qt.UserRole, key)
         self.file_tree.addTopLevelItem(item)
         self.file_tree.setCurrentItem(item)
         self._fill_waves()
@@ -339,8 +353,9 @@ class PgWaveBrowser(QWidget):
             f._pivot_spec_path = pivot_spec_path
         if original_path:
             f._original_path = original_path
+        key = self.files.current
         item = QTreeWidgetItem([f.name])
-        item.setData(0, Qt.UserRole, f.name)
+        item.setData(0, Qt.UserRole, key)
         self.file_tree.addTopLevelItem(item)
         self.file_tree.setCurrentItem(item)
         self._fill_waves()
@@ -549,6 +564,8 @@ class PgWavePlot(QWidget):
 
         self.wave_data = {}
         self._color_index = 0
+        self._line_width = 2
+        self._font_size = 9
         self._legend_visible = False
         self._legend = None
 
@@ -649,9 +666,11 @@ class PgWavePlot(QWidget):
         self._color_index += 1
 
         if vb is self.plot.vb:
-            curve = wave.plot(self.plot, color=color, style=style)
+            curve = wave.plot(self.plot, color=color, style=style,
+                              width=self._line_width)
         else:
-            curve = wave.plot(vb, color=color, style=style)
+            curve = wave.plot(vb, color=color, style=style,
+                              width=self._line_width)
             if self._logx and curve:
                 curve.setLogMode(True, False)
 
@@ -697,6 +716,27 @@ class PgWavePlot(QWidget):
             vb.enableAutoRange()
             vb.autoRange()
 
+    def zoomIn(self):
+        self._keyboard_zoom(1.0 / ZOOM_FACTOR)
+
+    def zoomOut(self):
+        self._keyboard_zoom(ZOOM_FACTOR)
+
+    def _keyboard_zoom(self, scale):
+        vr = self.plot.vb.viewRange()
+        xlo, xhi = vr[0]
+        xmid = (xlo + xhi) / 2.0
+        self.plot.vb.setXRange(
+            xmid - (xmid - xlo) * scale,
+            xmid + (xhi - xmid) * scale, padding=0)
+        for vb in self._all_viewboxes():
+            vr = vb.viewRange()
+            ylo, yhi = vr[1]
+            ymid = (ylo + yhi) / 2.0
+            vb.setYRange(
+                ymid - (ymid - ylo) * scale,
+                ymid + (yhi - ymid) * scale, padding=0)
+
     def reloadAll(self):
         for tag, (wave, _) in self.wave_data.items():
             wave.reload()
@@ -705,6 +745,21 @@ class PgWavePlot(QWidget):
     def setAllStyles(self, style):
         for tag, (wave, _) in self.wave_data.items():
             wave.setStyle(style)
+
+    def setLineWidth(self, width):
+        self._line_width = width
+        for tag, (wave, _) in self.wave_data.items():
+            wave.setWidth(width)
+
+    def setFontSize(self, size):
+        self._font_size = size
+        font = QFont("Courier", size)
+        self.readout.setFont(font)
+        self.status.setFont(font)
+        for axis_name in ['bottom', 'left', 'right']:
+            ax = self.plot.getAxis(axis_name)
+            ax.setTickFont(font)
+            ax.setStyle(tickFont=font)
 
     def toggleLegend(self):
         self._legend_visible = not self._legend_visible
@@ -1264,6 +1319,33 @@ class PgAnalysisPlot(QWidget):
     def autoSize(self):
         self.pw.enableAutoRange()
 
+    def zoomIn(self):
+        self._keyboard_zoom(1.0 / ZOOM_FACTOR)
+
+    def zoomOut(self):
+        self._keyboard_zoom(ZOOM_FACTOR)
+
+    def _keyboard_zoom(self, scale):
+        vb = self.pw.plotItem.vb
+        vr = vb.viewRange()
+        xlo, xhi = vr[0]
+        xmid = (xlo + xhi) / 2.0
+        vb.setXRange(xmid - (xmid - xlo) * scale,
+                     xmid + (xhi - xmid) * scale, padding=0)
+        ylo, yhi = vr[1]
+        ymid = (ylo + yhi) / 2.0
+        vb.setYRange(ymid - (ymid - ylo) * scale,
+                     ymid + (yhi - ymid) * scale, padding=0)
+
+    def setFontSize(self, size):
+        font = QFont("Courier", size)
+        self.readout.setFont(font)
+        self.status.setFont(font)
+        for axis_name in ['bottom', 'left']:
+            ax = self.pw.plotItem.getAxis(axis_name)
+            ax.setTickFont(font)
+            ax.setStyle(tickFont=font)
+
     def _set_cursor(self, which, x):
         pen = pg.mkPen('y' if which == 'a' else 'g',
                         width=1, style=Qt.DashLine)
@@ -1399,6 +1481,8 @@ class PgWaveWindow(QMainWindow):
         splitter.addWidget(self.tab_widget)
         splitter.setSizes([250, 950])
 
+        self._line_width = 2
+        self._font_size = 9
         self.plot_index = 0
         self._add_plot_tab()
 
@@ -1432,6 +1516,8 @@ class PgWaveWindow(QMainWindow):
         m.addSeparator()
         m.addAction("Reload All        R", self._reload)
         m.addAction("Auto Scale        F", self._auto_size)
+        m.addAction("Zoom In           Shift+Z", self._zoom_in)
+        m.addAction("Zoom Out          Ctrl+Z", self._zoom_out)
         m.addSeparator()
         m.addAction("Remove All", self._remove_all)
 
@@ -1441,6 +1527,12 @@ class PgWaveWindow(QMainWindow):
         m.addAction("Clear Cursors     Escape", self._clear_cursors)
         m.addSeparator()
         m.addAction("Toggle Legend      L", self._toggle_legend)
+        m.addSeparator()
+        m.addAction("Increase Line Width   Ctrl+Up", self._inc_line_width)
+        m.addAction("Decrease Line Width   Ctrl+Down", self._dec_line_width)
+        m.addSeparator()
+        m.addAction("Increase Font Size    Ctrl+=", self._inc_font_size)
+        m.addAction("Decrease Font Size    Ctrl+-", self._dec_font_size)
 
         m = mb.addMenu("Help")
         m.addAction("Keyboard Shortcuts", self._show_help)
@@ -1455,6 +1547,10 @@ class PgWaveWindow(QMainWindow):
             ("Ctrl+W", self._close_current_tab),
             ("Ctrl+L", self._set_axis_labels),
             ("Ctrl+T", self._add_annotation),
+            ("Ctrl+Up", self._inc_line_width),
+            ("Ctrl+Down", self._dec_line_width),
+            ("Ctrl+=", self._inc_font_size),
+            ("Ctrl+-", self._dec_font_size),
             ("Escape", self._clear_cursors),
         ]:
             QShortcut(QKeySequence(seq), self, func)
@@ -1464,16 +1560,21 @@ class PgWaveWindow(QMainWindow):
             super().keyPressEvent(event)
             return
         p = self._current()
-        key = event.text().lower()
-        if p and key == 'a' and hasattr(p, 'placeCursorA'):
+        key = event.text()
+        mods = event.modifiers()
+        if p and key == 'Z' and hasattr(p, 'zoomIn'):
+            p.zoomIn()
+        elif p and key.lower() == 'z' and mods & Qt.ControlModifier and hasattr(p, 'zoomOut'):
+            p.zoomOut()
+        elif p and key.lower() == 'a' and hasattr(p, 'placeCursorA'):
             p.placeCursorA()
-        elif p and key == 'b' and hasattr(p, 'placeCursorB'):
+        elif p and key.lower() == 'b' and hasattr(p, 'placeCursorB'):
             p.placeCursorB()
-        elif p and key == 'f' and hasattr(p, 'autoSize'):
+        elif p and key.lower() == 'f' and hasattr(p, 'autoSize'):
             p.autoSize()
-        elif p and key == 'r' and hasattr(p, 'reloadAll'):
+        elif p and key.lower() == 'r' and hasattr(p, 'reloadAll'):
             p.reloadAll()
-        elif p and key == 'l' and hasattr(p, 'toggleLegend'):
+        elif p and key.lower() == 'l' and hasattr(p, 'toggleLegend'):
             p.toggleLegend()
         else:
             super().keyPressEvent(event)
@@ -1483,6 +1584,8 @@ class PgWaveWindow(QMainWindow):
 
     def _add_plot_tab(self):
         plot = PgWavePlot()
+        plot.setLineWidth(self._line_width)
+        plot.setFontSize(self._font_size)
         self.tab_widget.addTab(plot, "Plot %d" % self.plot_index)
         self.plot_index += 1
         self.tab_widget.setCurrentWidget(plot)
@@ -1528,6 +1631,44 @@ class PgWaveWindow(QMainWindow):
         p = self._current()
         if p and hasattr(p, 'autoSize'):
             p.autoSize()
+
+    def _zoom_in(self):
+        p = self._current()
+        if p and hasattr(p, 'zoomIn'):
+            p.zoomIn()
+
+    def _zoom_out(self):
+        p = self._current()
+        if p and hasattr(p, 'zoomOut'):
+            p.zoomOut()
+
+    def _inc_line_width(self):
+        self._line_width = min(self._line_width + 1, 10)
+        self._apply_line_width()
+
+    def _dec_line_width(self):
+        self._line_width = max(self._line_width - 1, 1)
+        self._apply_line_width()
+
+    def _apply_line_width(self):
+        for ti in range(self.tab_widget.count()):
+            w = self.tab_widget.widget(ti)
+            if hasattr(w, 'setLineWidth'):
+                w.setLineWidth(self._line_width)
+
+    def _inc_font_size(self):
+        self._font_size = min(self._font_size + 1, 24)
+        self._apply_font_size()
+
+    def _dec_font_size(self):
+        self._font_size = max(self._font_size - 1, 6)
+        self._apply_font_size()
+
+    def _apply_font_size(self):
+        for ti in range(self.tab_widget.count()):
+            w = self.tab_widget.widget(ti)
+            if hasattr(w, 'setFontSize'):
+                w.setFontSize(self._font_size)
 
     def _remove_all(self):
         p = self._current()
@@ -1577,6 +1718,8 @@ class PgWaveWindow(QMainWindow):
             "  Ctrl+T        Add annotation\n"
             "  R             Reload all waves\n"
             "  F             Auto scale (fit)\n"
+            "  Shift+Z       Zoom in\n"
+            "  Ctrl+Z        Zoom out\n"
             "\n"
             "Cursors\n"
             "  A             Set cursor A at mouse\n"
@@ -1586,6 +1729,10 @@ class PgWaveWindow(QMainWindow):
             "\n"
             "View\n"
             "  L             Toggle legend\n"
+            "  Ctrl+Up       Increase line width\n"
+            "  Ctrl+Down     Decrease line width\n"
+            "  Ctrl+=        Increase font size\n"
+            "  Ctrl+-        Decrease font size\n"
             "\n"
             "Mouse\n"
             "  Left-drag          Pan\n"
@@ -1860,6 +2007,7 @@ class PgWaveWindow(QMainWindow):
 
     def _add_analysis_tab(self, title):
         w = PgAnalysisPlot()
+        w.setFontSize(self._font_size)
         self.tab_widget.addTab(w, title)
         self.tab_widget.setCurrentWidget(w)
         return w
@@ -1886,7 +2034,7 @@ class PgWaveWindow(QMainWindow):
         psd_db = psd_db[1:]
 
         w = self._add_analysis_tab("FFT: %s" % name)
-        w.plot(freqs, psd_db, pen=pg.mkPen('c', width=1))
+        w.plot(freqs, psd_db, pen=pg.mkPen('c', width=2))
         w.setLabel('bottom', 'Frequency', units='Hz')
         w.setLabel('left', 'PSD', units='dB')
         if len(freqs) > 1 and freqs[0] > 0:
@@ -1944,7 +2092,7 @@ class PgWaveWindow(QMainWindow):
             dy_unit = "%s/%s" % (yunit, xunit)
 
         w = self._add_analysis_tab("d/dx: %s" % name)
-        w.plot(x, dydx, pen=pg.mkPen('m', width=1))
+        w.plot(x, dydx, pen=pg.mkPen('m', width=2))
         w.setLabel('bottom', xunit if xunit else 'x')
         w.setLabel('left', dy_unit if dy_unit else "d(%s)/dx" % name)
 
@@ -1967,7 +2115,7 @@ class PgWaveWindow(QMainWindow):
         xx, yy = xx[:min_len], yy[:min_len]
 
         w = self._add_analysis_tab("%s vs %s" % (wave_y.key, chosen))
-        w.plot(xx, yy, pen=pg.mkPen('y', width=1))
+        w.plot(xx, yy, pen=pg.mkPen('y', width=2))
         w.setLabel('bottom', chosen)
         w.setLabel('left', wave_y.key)
         if xlabels:

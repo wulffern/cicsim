@@ -124,5 +124,6 @@ Click on a wave will ask the WaveGraph to show the plot
 
     def openDataFrame(self, df, name):
         f = self.files.openDataFrame(df, name, self.xaxis)
-        self.tr_files.insert('', 'end', f.name, text=f.name)
+        key = self.files.current
+        self.tr_files.insert('', 'end', key, text=f.name)
         self.fillColumns()

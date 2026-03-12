@@ -160,6 +160,37 @@ class WavePlot(ttk.PanedWindow):
             ax.autoscale_view(True, True, True)
         self.canvas.draw_idle()
 
+    def zoomIn(self):
+        self._keyboard_zoom(1.0 / ZOOM_FACTOR)
+
+    def zoomOut(self):
+        self._keyboard_zoom(ZOOM_FACTOR)
+
+    def _keyboard_zoom(self, scale):
+        for ax in self.axes:
+            xlo, xhi = ax.get_xlim()
+            xmid = (xlo + xhi) / 2.0
+            ax.set_xlim(xmid - (xmid - xlo) * scale,
+                        xmid + (xhi - xmid) * scale)
+            ylo, yhi = ax.get_ylim()
+            ymid = (ylo + yhi) / 2.0
+            ax.set_ylim(ymid - (ymid - ylo) * scale,
+                        ymid + (yhi - ymid) * scale)
+        self.canvas.draw_idle()
+
+    def setLineWidth(self, width):
+        for tag, (wave, _) in self.wave_data.items():
+            if wave.line:
+                wave.line.set_linewidth(width)
+        self.canvas.draw_idle()
+
+    def setFontSize(self, size):
+        for ax in self.axes:
+            ax.tick_params(axis='both', labelsize=size)
+        self.readout.configure(font=("Courier", size))
+        self.status.configure(font=("Courier", size))
+        self.canvas.draw_idle()
+
     def reloadAll(self):
         for tag, (wave, _) in self.wave_data.items():
             wave.reload()

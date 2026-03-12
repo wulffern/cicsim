@@ -112,6 +112,8 @@ def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
       F              Auto scale (fit all)
       R              Reload all waveforms
       L              Toggle legend
+      Shift+Z        Zoom in
+      Ctrl+Z         Zoom out
       Ctrl+O         Open raw file
       Ctrl+S         Save session
       Ctrl+P         Export to PDF
@@ -119,6 +121,10 @@ def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
       Ctrl+L         Set axis labels
       Ctrl+T         Add annotation
       Ctrl+Q         Quit
+      Ctrl+Up        Increase line width
+      Ctrl+Down      Decrease line width
+      Ctrl+=         Increase font size
+      Ctrl+-         Decrease font size
 
     \b
     Mouse (pg backend):
@@ -130,8 +136,8 @@ def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
 
     \b
     Browser (pg backend):
-      Click wave     Add to plot
-      Right-click    Remove from plot
+      Double-click   Add to plot
+      Right-click    Context menu (plot, remove, style, analysis)
       Flat checkbox  Toggle hierarchy / flat list
 
     \b

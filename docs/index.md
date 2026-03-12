@@ -2,11 +2,14 @@
 layout: home
 ---
 
+<https://github.com/wulffern/cicsim>
+
 cicsim is a collection of scripts that I use to simplify my life when it comes to
 analog simulation.
 
 cicsim is short for Custom Integrated Circuit Simulation (or Carsten's
-Integrated Circuit Simulation). 
+Integrated Circuit Simulation).
+
 
 I pronounce `cicsim` as C I C SIM, while my students sometimes call it 'sick-sim'.
 
@@ -43,6 +46,13 @@ Commands:
 
 ```
 
+There is also a standalone command for the waveform viewer:
+
+```bash
+cicwave [FILES]...
+
+```
+
 
 
 ## Install stable version 
@@ -51,6 +61,12 @@ I sometimes release a version to pypi, so you can do
 
 ```
 python3 -m pip install cicsim
+```
+
+For the pyqtgraph waveform viewer backend (recommended):
+
+```
+python3 -m pip install cicsim[pg]
 ```
 
 ## Install latest and greatest 

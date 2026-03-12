@@ -41,6 +41,9 @@ class CmdWave(cs.Command):
         menubar.add_cascade(menu=menu_edit, label="Edit")
         menubar.add_cascade(menu=menu_view, label="View")
 
+        self._line_width = 2
+        self._font_size = 9
+
         menu_file.add_command(label="Open Raw          Ctrl+O",
                               command=self.openFileDialog)
         menu_file.add_command(label="Export PDF        Ctrl+P",
@@ -58,6 +61,10 @@ class CmdWave(cs.Command):
                               command=self.reloadPlots)
         menu_edit.add_command(label="Auto Scale        F",
                               command=self._autoSize)
+        menu_edit.add_command(label="Zoom In           Shift+Z",
+                              command=self._zoomIn)
+        menu_edit.add_command(label="Zoom Out          Ctrl+Z",
+                              command=self._zoomOut)
         menu_edit.add_separator()
         menu_edit.add_command(label="Remove Selected   Delete",
                               command=self._removeLine)
@@ -73,6 +80,16 @@ class CmdWave(cs.Command):
         menu_view.add_separator()
         menu_view.add_command(label="Toggle Legend      L",
                               command=self._toggleLegend)
+        menu_view.add_separator()
+        menu_view.add_command(label="Increase Line Width   Ctrl+Up",
+                              command=self._incLineWidth)
+        menu_view.add_command(label="Decrease Line Width   Ctrl+Down",
+                              command=self._decLineWidth)
+        menu_view.add_separator()
+        menu_view.add_command(label="Increase Font Size    Ctrl+=",
+                              command=self._incFontSize)
+        menu_view.add_command(label="Decrease Font Size    Ctrl+-",
+                              command=self._decFontSize)
 
         menu_help = Menu(menubar)
         menubar.add_cascade(menu=menu_help, label="Help")
@@ -99,12 +116,19 @@ class CmdWave(cs.Command):
         self.root.bind('<Delete>', lambda e: self._removeLine())
         self.root.bind('<Escape>', lambda e: self._clearCursors())
 
+        self.root.bind('<Control-z>', lambda e: self._zoomOut())
+        self.root.bind('<Control-Up>', lambda e: self._incLineWidth())
+        self.root.bind('<Control-Down>', lambda e: self._decLineWidth())
+        self.root.bind('<Control-equal>', lambda e: self._incFontSize())
+        self.root.bind('<Control-minus>', lambda e: self._decFontSize())
+
         # Single-key shortcuts — skip when focus is in an Entry widget
         for key, func in [('r', self.reloadPlots),
                           ('f', self._autoSize),
                           ('a', self._setCursorA),
                           ('b', self._setCursorB),
-                          ('l', self._toggleLegend)]:
+                          ('l', self._toggleLegend),
+                          ('Z', self._zoomIn)]:
             self.root.bind(key, self._make_key_handler(func))
 
     def _make_key_handler(self, func):
@@ -125,6 +149,40 @@ class CmdWave(cs.Command):
         p = self.graph.getCurrentPlot()
         if p:
             p.autoSize()
+
+    def _zoomIn(self):
+        p = self.graph.getCurrentPlot()
+        if p:
+            p.zoomIn()
+
+    def _zoomOut(self):
+        p = self.graph.getCurrentPlot()
+        if p:
+            p.zoomOut()
+
+    def _incLineWidth(self):
+        self._line_width = min(self._line_width + 1, 10)
+        self._applyLineWidth()
+
+    def _decLineWidth(self):
+        self._line_width = max(self._line_width - 1, 1)
+        self._applyLineWidth()
+
+    def _applyLineWidth(self):
+        for t in self.graph.nb.tabs():
+            self.graph.nb.nametowidget(t).setLineWidth(self._line_width)
+
+    def _incFontSize(self):
+        self._font_size = min(self._font_size + 1, 24)
+        self._applyFontSize()
+
+    def _decFontSize(self):
+        self._font_size = max(self._font_size - 1, 6)
+        self._applyFontSize()
+
+    def _applyFontSize(self):
+        for t in self.graph.nb.tabs():
+            self.graph.nb.nametowidget(t).setFontSize(self._font_size)
 
     def _removeLine(self):
         p = self.graph.getCurrentPlot()
@@ -176,6 +234,8 @@ class CmdWave(cs.Command):
             "  Ctrl+A        Add axis\n"
             "  R             Reload all waves\n"
             "  F             Auto scale (fit)\n"
+            "  Shift+Z       Zoom in\n"
+            "  Ctrl+Z        Zoom out\n"
             "  Delete        Remove selected wave\n"
             "\n"
             "Cursors\n"
@@ -189,6 +249,10 @@ class CmdWave(cs.Command):
             "\n"
             "View\n"
             "  L             Toggle legend\n"
+            "  Ctrl+Up       Increase line width\n"
+            "  Ctrl+Down     Decrease line width\n"
+            "  Ctrl+=        Increase font size\n"
+            "  Ctrl+-        Decrease font size\n"
             "\n"
             "Zoom\n"
             "  Scroll        Zoom x-axis\n"

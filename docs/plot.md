@@ -16,7 +16,11 @@ or save a plot to a file.
 I made `plot` before I made `wave`, so there is some overlap in features. 
 
 I would recommend `plot` for when you want to plot via a script, or indeed, see
-how you could write your own python code around the plot functions
+how you could write your own python code around the plot functions.
+
+For interactive waveform viewing, see the [wave](/cicsim/wave) command which
+supports cursors, dual Y-axes, analysis functions, sessions, and many file
+formats
 
 
 ## Command
