@@ -200,6 +200,28 @@ cicwave --session session_dual.cicwave.yaml --export wave_dual.svg
 ```
 
 ![](/cicsim/assets/wave_dual.svg)
+
+```bash
+cat session_dual.cicwave.yaml
+```
+
+```bash
+files:
+  - path: test.csv
+plots:
+  - name: Dual Y-axes
+    waves:
+      - file: 0
+        name: "v(vp)"
+        style: Lines
+      - file: 0
+        name: "i(ibias)"
+        style: Lines
+
+```
+
+
+
 ## Keyboard shortcuts
 
 ### File
@@ -282,6 +304,7 @@ annotations) to a YAML file and restore it later.
 Save via menu: **File → Save Session (Ctrl+S)**
 
 Load from the command line:
+
 
 ```bash
 cicwave --session mysession.cicwave.yaml

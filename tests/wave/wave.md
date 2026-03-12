@@ -131,6 +131,12 @@ run: cicwave --session session_dual.cicwave.yaml --export wave_dual.svg
 output_image: wave_dual.svg
 -->
 
+
+<!--run_output:
+run: cat session_dual.cicwave.yaml
+-->
+
+
 ## Keyboard shortcuts
 
 ### File
@@ -213,6 +219,7 @@ annotations) to a YAML file and restore it later.
 Save via menu: **File → Save Session (Ctrl+S)**
 
 Load from the command line:
+
 
 ```bash
 cicwave --session mysession.cicwave.yaml
