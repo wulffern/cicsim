@@ -1,0 +1,8 @@
+files:
+  - path: test.csv
+plots:
+  - name: Single wave
+    waves:
+      - file: 0
+        name: "v(vp)"
+        style: Lines

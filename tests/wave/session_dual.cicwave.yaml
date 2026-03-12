@@ -1,0 +1,11 @@
+files:
+  - path: test.csv
+plots:
+  - name: Dual Y-axes
+    waves:
+      - file: 0
+        name: "v(vp)"
+        style: Lines
+      - file: 0
+        name: "i(ibias)"
+        style: Lines

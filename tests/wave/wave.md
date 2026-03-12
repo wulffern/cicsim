@@ -99,21 +99,84 @@ Open an Excel file with a specific sheet:
 cicwave data.xlsx --sheet "Sheet2"
 ```
 
+## Examples
+
+There is example test data in `tests/wave`. Navigate to that directory.
+
+### Single wave
+
+Plot a single voltage signal:
+
+<!--run_image:
+run: cicwave --session session_single.cicwave.yaml --export wave_single.svg
+output_image: wave_single.svg
+-->
+
+### Multiple waves
+
+Plot multiple signals on the same axes:
+
+<!--run_image:
+run: cicwave --session session_multi.cicwave.yaml --export wave_multi.svg
+output_image: wave_multi.svg
+-->
+
+### Dual Y-axes
+
+When voltage and current signals are plotted together, the pg backend
+automatically assigns them to separate Y-axes based on their unit:
+
+<!--run_image:
+run: cicwave --session session_dual.cicwave.yaml --export wave_dual.svg
+output_image: wave_dual.svg
+-->
+
 ## Keyboard shortcuts
+
+### File
+
+| Key | Action |
+|-----|--------|
+| Ctrl+O | Open file |
+| Ctrl+S | Save session (pg) |
+| Ctrl+P | Export to PDF/PNG/SVG |
+| Ctrl+Q | Quit |
+
+### Edit
+
+| Key | Action |
+|-----|--------|
+| Ctrl+N | New plot tab (pg) |
+| Ctrl+W | Close current tab (pg) |
+| Ctrl+A | Add axis (tk) |
+| Ctrl+L | Set axis labels (pg) |
+| Ctrl+T | Add annotation (pg) |
+| R | Reload all waveforms |
+| F | Auto scale (fit all) |
+| Shift+Z | Zoom in |
+| Ctrl+Z | Zoom out |
+| Delete | Remove selected wave (tk) |
+
+### Cursors
 
 | Key | Action |
 |-----|--------|
 | A | Set cursor A at mouse position |
 | B | Set cursor B at mouse position |
 | Escape | Clear cursors |
-| F | Auto scale (fit all) |
-| R | Reload all waveforms |
+
+When two cursors are placed the readout panel shows ΔX, per-signal ΔY,
+slope, and derivative values at both cursor positions.
+
+### View
+
+| Key | Action |
+|-----|--------|
 | L | Toggle legend |
-| Ctrl+O | Open file |
-| Ctrl+P | Export to PDF |
-| Ctrl+N | New plot tab (pg) |
-| Ctrl+W | Close current tab (pg) |
-| Ctrl+Q | Quit |
+| Ctrl+Up | Increase line width |
+| Ctrl+Down | Decrease line width |
+| Ctrl+= | Increase font size |
+| Ctrl+- | Decrease font size |
 
 ## Mouse controls (pg backend)
 
@@ -124,12 +187,14 @@ cicwave data.xlsx --sheet "Sheet2"
 | Shift+Right-drag | Zoom x-axis |
 | Ctrl+Right-drag | Zoom y-axis |
 | Left-drag | Pan |
+| Click cursor line | Drag to reposition |
 
 ## Wave browser (pg backend)
 
 - **Double-click** a wave to add it to the plot
 - **Right-click** a wave to open the context menu:
   - Plot / Remove from plot
+  - Change plot style (Lines, Markers, Lines+Markers, Steps)
   - FFT / PSD (spectral density in dB)
   - Histogram (distribution with Gaussian fit, mean/sigma)
   - Differentiate (numerical dy/dx)
@@ -137,20 +202,38 @@ cicwave data.xlsx --sheet "Sheet2"
 - Signal names with dotted hierarchy (e.g. `v(xdut.x1.out)`) are shown as a
   collapsible tree organized by instance path
 - Use the **Flat** checkbox to switch to a flat list view
+- Use the **regex filter** to search for signals
 - Plotted waves are colored in the browser to match their plot line
 
-## Cursor readout (pg backend)
+## Sessions (pg backend)
 
-When cursors A and/or B are placed, the readout panel shows:
+Save the current viewer state (loaded files, plotted waves, axis labels,
+annotations) to a YAML file and restore it later.
 
-- X position of each cursor
-- Delta X and 1/Delta X (frequency)
-- Y value at each cursor per wave
-- Delta Y between cursors per wave
-- Slope between cursors (Delta Y / Delta X) per wave
-- Gradient (dy/dx) at each cursor per wave
+Save via menu: **File → Save Session (Ctrl+S)**
 
-## Closeable tabs (pg backend)
+Load from the command line:
 
-Each plot or analysis tab has a close button. Use Ctrl+W to close the current
-tab. If all tabs are closed, a fresh plot tab is created automatically.
+```bash
+cicwave --session mysession.cicwave.yaml
+```
+
+Export a session to PDF without opening the GUI:
+
+```bash
+cicwave --session mysession.cicwave.yaml --export plot.pdf
+```
+
+## Pivot
+
+Reshape tabular data before viewing using a pivot spec file:
+
+```bash
+cicsim wave results.csv --pivot spec.yaml
+```
+
+Inspect the available pivot dimensions first:
+
+```bash
+cicsim wave results.csv --pivot spec.yaml --pivot-info
+```

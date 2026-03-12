@@ -1,0 +1,14 @@
+files:
+  - path: test.csv
+plots:
+  - name: Multiple waves
+    waves:
+      - file: 0
+        name: "v(vp)"
+        style: Lines
+      - file: 0
+        name: "v(vn)"
+        style: Lines
+      - file: 0
+        name: "v(out)"
+        style: Lines
