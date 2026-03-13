@@ -11,7 +11,7 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
 from matplotlib.figure import Figure
 from matplotlib.ticker import EngFormatter
 
-from .cmdwave_pg import _get_theme
+from .theme import _get_theme
 
 CURSOR_KWARGS = {'linestyle': '--', 'linewidth': 1.0, 'alpha': 0.8}
 DRAG_TOLERANCE_PX = 10

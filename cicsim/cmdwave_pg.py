@@ -19,112 +19,39 @@ from PySide6.QtWidgets import (
     QInputDialog, QMenu, QComboBox)
 from PySide6 import QtCore
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeySequence, QFont, QShortcut, QPainter, QColor, QPalette
+from PySide6.QtGui import (QKeySequence, QFont, QFontDatabase, QShortcut,
+                           QPainter, QColor, QPalette)
 
 import pyqtgraph as pg
 
 from .wavefiles import WaveFile, WaveFiles
+from .theme import THEMES, _get_theme, _set_active_theme
 from matplotlib.ticker import EngFormatter
+
+
+def _mono_font(size):
+    """Return the system fixed-width font at the given point size."""
+    f = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+    f.setPointSize(size)
+    return f
 
 
 ZOOM_FACTOR = 1.3
 
-THEMES = {
-    'dark': {
-        'pg_background': 'k',
-        'pg_foreground': 'w',
-        'panel_bg': '#2b2b2b',
-        'panel_fg': '#e0e0e0',
-        'text_color': '#e0e0e0',
-        'overlay_fill': (51, 51, 51, 220),
-        'annotation_fill': (51, 51, 51, 200),
-        'annotation_border': 'w',
-        'title_color': 'w',
-        'tree_default_fg': '#e0e0e0',
-        'cursor_a': '#2196F3',
-        'cursor_b': '#FF9800',
-        'wave_colors': [
-            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-            '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
-        ],
-        'export_colors': [
-            '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
-            '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
-            '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
-        ],
-        'export_annotation_color': '#333333',
-        'export_annotation_bg': '#ffffcc',
-        'export_annotation_ec': '#888888',
-        'export_stats_color': '#666666',
-        'palette': {
-            'Window': (43, 43, 43),
-            'WindowText': (224, 224, 224),
-            'Base': (30, 30, 30),
-            'AlternateBase': (43, 43, 43),
-            'ToolTipBase': (43, 43, 43),
-            'ToolTipText': (224, 224, 224),
-            'Text': (224, 224, 224),
-            'Button': (53, 53, 53),
-            'ButtonText': (224, 224, 224),
-            'BrightText': (255, 50, 50),
-            'Link': (42, 130, 218),
-            'Highlight': (42, 130, 218),
-            'HighlightedText': (0, 0, 0),
-        },
-    },
-    'light': {
-        'pg_background': 'w',
-        'pg_foreground': 'k',
-        'panel_bg': '#f0f0f0',
-        'panel_fg': '#1a1a1a',
-        'text_color': '#1a1a1a',
-        'overlay_fill': (240, 240, 240, 230),
-        'annotation_fill': (255, 255, 240, 220),
-        'annotation_border': '#888888',
-        'title_color': 'k',
-        'tree_default_fg': '#1a1a1a',
-        'cursor_a': '#1565C0',
-        'cursor_b': '#E65100',
-        'wave_colors': [
-            '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
-            '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
-            '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
-        ],
-        'export_colors': [
-            '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
-            '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
-            '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
-        ],
-        'export_annotation_color': '#333333',
-        'export_annotation_bg': '#ffffcc',
-        'export_annotation_ec': '#888888',
-        'export_stats_color': '#666666',
-        'palette': {
-            'Window': (240, 240, 240),
-            'WindowText': (26, 26, 26),
-            'Base': (255, 255, 255),
-            'AlternateBase': (245, 245, 245),
-            'ToolTipBase': (255, 255, 220),
-            'ToolTipText': (26, 26, 26),
-            'Text': (26, 26, 26),
-            'Button': (225, 225, 225),
-            'ButtonText': (26, 26, 26),
-            'BrightText': (200, 30, 30),
-            'Link': (42, 130, 218),
-            'Highlight': (42, 130, 218),
-            'HighlightedText': (255, 255, 255),
-        },
-    },
-}
-
-_active_theme = THEMES['dark']
-
-
-def _get_theme():
-    return _active_theme
-
 PLOT_STYLES = ['Lines', 'Markers', 'Lines+Markers', 'Steps']
+
+
+def _apply_grid(plot_item):
+    """Apply theme-aware grid to a PlotItem."""
+    theme = _get_theme()
+    r, g, b, a = theme['grid_pen']
+    pen = pg.mkPen(QColor(r, g, b, a), width=1)
+    for axis_name in ('bottom', 'left'):
+        ax = plot_item.getAxis(axis_name)
+        ax.setGrid(a)
+        ax.setPen(pen)
+        ax.setTextPen(pg.mkPen(theme['pg_foreground']))
+    plot_item.update()
 
 
 def _style_kwargs(color, style, width=2):
@@ -141,8 +68,15 @@ def _style_kwargs(color, style, width=2):
     return dict(pen=pen)
 
 
+_eng_cache = {}
+
+
 def _eng(value, unit=""):
-    return EngFormatter(unit=unit)(value)
+    fmt = _eng_cache.get(unit)
+    if fmt is None:
+        fmt = EngFormatter(unit=unit)
+        _eng_cache[unit] = fmt
+    return fmt(value)
 
 
 def _to_numeric(arr):
@@ -315,6 +249,7 @@ class PgWave:
         kw = _style_kwargs(color, style, width=width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         target.addItem(self.curve)
+        self.curve.opts['clipToView'] = True
         return self.curve
 
     def setStyle(self, style):
@@ -328,6 +263,7 @@ class PgWave:
         kw = _style_kwargs(self.color, style, width=self._width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         vb.addItem(self.curve)
+        self.curve.opts['clipToView'] = True
 
     def setWidth(self, width):
         if self.curve is None:
@@ -340,6 +276,7 @@ class PgWave:
         kw = _style_kwargs(self.color, self.style, width=width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         vb.addItem(self.curve)
+        self.curve.opts['clipToView'] = True
 
     def remove(self):
         if self.curve:
@@ -620,7 +557,7 @@ class PgWavePlot(QWidget):
         self.gw = pg.GraphicsLayoutWidget()
         layout.addWidget(self.gw, 1)
 
-        font = QFont("Courier", 9)
+        font = _mono_font(9)
         self.readout = QTextEdit()
         self.readout.setReadOnly(True)
         self.readout.setMaximumHeight(120)
@@ -634,7 +571,8 @@ class PgWavePlot(QWidget):
         self._apply_panel_style()
 
         self.plot = self.gw.addPlot(row=0, col=0)
-        self.plot.showGrid(x=True, y=True, alpha=0.3)
+        self.plot.showGrid(x=True, y=True)
+        _apply_grid(self.plot)
         self.plot.vb.wheelEvent = lambda ev: self._on_wheel(ev)
         self._orig_mouseDragEvent = self.plot.vb.mouseDragEvent
         self.plot.vb.mouseDragEvent = self._on_mouse_drag
@@ -845,7 +783,7 @@ class PgWavePlot(QWidget):
 
     def setFontSize(self, size):
         self._font_size = size
-        font = QFont("Courier", size)
+        font = _mono_font(size)
         self.readout.setFont(font)
         self.status.setFont(font)
         for axis_name in ['bottom', 'left', 'right']:
@@ -1174,7 +1112,7 @@ class PgWavePlot(QWidget):
         text_item = pg.TextItem(
             text="\n".join(parts), color=theme['text_color'], anchor=(0.5, 0),
             fill=pg.mkBrush(*theme['overlay_fill']))
-        text_item.setFont(QFont("Courier", 8))
+        text_item.setFont(_mono_font(8))
         self.plot.addItem(text_item)
         vr = self.plot.viewRange()
         text_item.setPos(mid_x, vr[1][1])
@@ -1268,7 +1206,7 @@ class PgWavePlot(QWidget):
         item = pg.TextItem(text=text, color=theme['text_color'], anchor=(0, 1),
                            fill=pg.mkBrush(*theme['annotation_fill']),
                            border=theme['annotation_border'])
-        item.setFont(QFont("Courier", 9))
+        item.setFont(_mono_font(9))
         item.setPos(x, y)
         self.plot.addItem(item)
         self._annotations.append({'text': text, 'x': x, 'y': y, 'item': item})
@@ -1338,14 +1276,15 @@ class PgAnalysisPlot(QWidget):
         layout.setContentsMargins(2, 2, 2, 2)
 
         self.pw = pg.PlotWidget()
-        self.pw.showGrid(x=True, y=True, alpha=0.3)
+        self.pw.showGrid(x=True, y=True)
+        _apply_grid(self.pw.plotItem)
         vb = self.pw.plotItem.vb
         vb.wheelEvent = self._on_wheel
         self._orig_drag = vb.mouseDragEvent
         vb.mouseDragEvent = self._on_mouse_drag
         layout.addWidget(self.pw, 1)
 
-        font = QFont("Courier", 9)
+        font = _mono_font(9)
         self.readout = QTextEdit()
         self.readout.setReadOnly(True)
         self.readout.setMaximumHeight(80)
@@ -1444,7 +1383,7 @@ class PgAnalysisPlot(QWidget):
                      ymid + (yhi - ymid) * scale, padding=0)
 
     def setFontSize(self, size):
-        font = QFont("Courier", size)
+        font = _mono_font(size)
         self.readout.setFont(font)
         self.status.setFont(font)
         for axis_name in ['bottom', 'left']:
@@ -1816,8 +1755,10 @@ class PgWaveWindow(QMainWindow):
                 w._apply_panel_style()
             if hasattr(w, 'gw'):
                 w.gw.setBackground(theme['pg_background'])
+                _apply_grid(w.plot)
             if hasattr(w, 'pw'):
                 w.pw.setBackground(theme['pg_background'])
+                _apply_grid(w.pw.plotItem)
 
     def _show_help(self):
         dlg = QDialog(self)
@@ -1873,7 +1814,7 @@ class PgWaveWindow(QMainWindow):
             "  Differentiate      Numerical dy/dx\n"
             "  X vs Y             Parametric plot\n"
         )
-        text.setFont(QFont("Courier", 11))
+        text.setFont(_mono_font(11))
         theme = _get_theme()
         text.setStyleSheet(
             "background-color: %s; color: %s; padding: 16px;" % (
@@ -2263,9 +2204,8 @@ class PgWaveWindow(QMainWindow):
 
 
 def _apply_theme(app, theme_name='dark'):
-    global _active_theme
-    _active_theme = THEMES[theme_name]
-    theme = _active_theme
+    _set_active_theme(theme_name)
+    theme = _get_theme()
     app.setStyle("Fusion")
     p = QPalette()
     for role_name, rgb in theme['palette'].items():
@@ -2281,7 +2221,7 @@ class CmdWavePg:
     def __init__(self, xaxis, theme='dark'):
         self.xaxis = xaxis
         self.app = QApplication.instance() or QApplication(sys.argv)
-        pg.setConfigOptions(antialias=True, useOpenGL=False)
+        pg.setConfigOptions(antialias=False, useOpenGL=False)
         _apply_theme(self.app, theme)
         self.win = PgWaveWindow(xaxis)
 

@@ -8,7 +8,7 @@ import os
 
 from .wavebrowser import *
 from .wavegraph import *
-from .cmdwave_pg import _get_theme
+from .theme import _get_theme
 
 
 #- I try to follow a Model, View, Controller type of design pattern

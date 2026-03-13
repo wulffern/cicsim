@@ -8,7 +8,7 @@ import cicsim as cs
 import re
 import os
 
-from .cmdwave_pg import _get_theme
+from .theme import _get_theme
 
 #- Data Model
 from .wavefiles import *
