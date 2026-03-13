@@ -8,6 +8,7 @@ import os
 
 from .wavebrowser import *
 from .wavegraph import *
+from .cmdwave_pg import _get_theme
 
 
 #- I try to follow a Model, View, Controller type of design pattern
@@ -261,9 +262,10 @@ class CmdWave(cs.Command):
         win = Toplevel(self.root)
         win.title("Keyboard Shortcuts")
         win.resizable(False, False)
+        theme = _get_theme()
         label = Label(win, text=text, justify=LEFT,
                       font=("Courier", 11),
-                      bg="#2b2b2b", fg="#e0e0e0",
+                      bg=theme['panel_bg'], fg=theme['panel_fg'],
                       padx=16, pady=12)
         label.pack(fill=BOTH, expand=True)
         btn = ttk.Button(win, text="Close", command=win.destroy)

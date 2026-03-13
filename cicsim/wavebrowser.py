@@ -8,6 +8,8 @@ import cicsim as cs
 import re
 import os
 
+from .cmdwave_pg import _get_theme
+
 #- Data Model
 from .wavefiles import *
 
@@ -86,9 +88,10 @@ Click on a wave will ask the WaveGraph to show the plot
         self._tooltip = Toplevel(self.tr_search)
         self._tooltip.wm_overrideredirect(True)
         self._tooltip.wm_geometry("+%d+%d" % (x, y))
+        theme = _get_theme()
         label = Label(self._tooltip, text=self._REGEX_HELP,
                       justify=LEFT, font=("Courier", 10),
-                      bg="#2b2b2b", fg="#e0e0e0",
+                      bg=theme['panel_bg'], fg=theme['panel_fg'],
                       borderwidth=1, relief="solid", padx=6, pady=4)
         label.pack()
 

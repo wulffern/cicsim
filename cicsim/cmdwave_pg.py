@@ -27,21 +27,102 @@ from .wavefiles import WaveFile, WaveFiles
 from matplotlib.ticker import EngFormatter
 
 
-CURSOR_A_COLOR = '#2196F3'
-CURSOR_B_COLOR = '#FF9800'
 ZOOM_FACTOR = 1.3
 
-WAVE_COLORS = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
-]
+THEMES = {
+    'dark': {
+        'pg_background': 'k',
+        'pg_foreground': 'w',
+        'panel_bg': '#2b2b2b',
+        'panel_fg': '#e0e0e0',
+        'text_color': '#e0e0e0',
+        'overlay_fill': (51, 51, 51, 220),
+        'annotation_fill': (51, 51, 51, 200),
+        'annotation_border': 'w',
+        'title_color': 'w',
+        'tree_default_fg': '#e0e0e0',
+        'cursor_a': '#2196F3',
+        'cursor_b': '#FF9800',
+        'wave_colors': [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+            '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
+        ],
+        'export_colors': [
+            '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
+            '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
+            '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
+        ],
+        'export_annotation_color': '#333333',
+        'export_annotation_bg': '#ffffcc',
+        'export_annotation_ec': '#888888',
+        'export_stats_color': '#666666',
+        'palette': {
+            'Window': (43, 43, 43),
+            'WindowText': (224, 224, 224),
+            'Base': (30, 30, 30),
+            'AlternateBase': (43, 43, 43),
+            'ToolTipBase': (43, 43, 43),
+            'ToolTipText': (224, 224, 224),
+            'Text': (224, 224, 224),
+            'Button': (53, 53, 53),
+            'ButtonText': (224, 224, 224),
+            'BrightText': (255, 50, 50),
+            'Link': (42, 130, 218),
+            'Highlight': (42, 130, 218),
+            'HighlightedText': (0, 0, 0),
+        },
+    },
+    'light': {
+        'pg_background': 'w',
+        'pg_foreground': 'k',
+        'panel_bg': '#f0f0f0',
+        'panel_fg': '#1a1a1a',
+        'text_color': '#1a1a1a',
+        'overlay_fill': (240, 240, 240, 230),
+        'annotation_fill': (255, 255, 240, 220),
+        'annotation_border': '#888888',
+        'title_color': 'k',
+        'tree_default_fg': '#1a1a1a',
+        'cursor_a': '#1565C0',
+        'cursor_b': '#E65100',
+        'wave_colors': [
+            '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
+            '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
+            '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
+        ],
+        'export_colors': [
+            '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
+            '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
+            '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
+        ],
+        'export_annotation_color': '#333333',
+        'export_annotation_bg': '#ffffcc',
+        'export_annotation_ec': '#888888',
+        'export_stats_color': '#666666',
+        'palette': {
+            'Window': (240, 240, 240),
+            'WindowText': (26, 26, 26),
+            'Base': (255, 255, 255),
+            'AlternateBase': (245, 245, 245),
+            'ToolTipBase': (255, 255, 220),
+            'ToolTipText': (26, 26, 26),
+            'Text': (26, 26, 26),
+            'Button': (225, 225, 225),
+            'ButtonText': (26, 26, 26),
+            'BrightText': (200, 30, 30),
+            'Link': (42, 130, 218),
+            'Highlight': (42, 130, 218),
+            'HighlightedText': (255, 255, 255),
+        },
+    },
+}
 
-EXPORT_COLORS = [
-    '#0060a8', '#d45800', '#1a8a1a', '#c02020', '#7040a0',
-    '#6b4226', '#b8439e', '#505050', '#8a8c00', '#008fa8',
-    '#2980b9', '#e67e22', '#27ae60', '#e74c3c', '#8e44ad',
-]
+_active_theme = THEMES['dark']
+
+
+def _get_theme():
+    return _active_theme
 
 PLOT_STYLES = ['Lines', 'Markers', 'Lines+Markers', 'Steps']
 
@@ -372,7 +453,7 @@ class PgWaveBrowser(QWidget):
         item = self._tag_to_item.get(tag)
         if item:
             from PySide6.QtGui import QColor
-            item.setForeground(0, QColor('#e0e0e0'))
+            item.setForeground(0, QColor(_get_theme()['tree_default_fg']))
 
     def _file_selected(self, current, previous):
         if current:
@@ -541,15 +622,13 @@ class PgWavePlot(QWidget):
         self.readout.setReadOnly(True)
         self.readout.setMaximumHeight(120)
         self.readout.setFont(font)
-        self.readout.setStyleSheet(
-            "background-color: #2b2b2b; color: #e0e0e0;")
         layout.addWidget(self.readout)
 
         self.status = QLabel("")
         self.status.setFont(font)
-        self.status.setStyleSheet(
-            "background-color: #2b2b2b; color: #e0e0e0; padding: 2px;")
         layout.addWidget(self.status)
+
+        self._apply_panel_style()
 
         self.plot = self.gw.addPlot(row=0, col=0)
         self.plot.showGrid(x=True, y=True, alpha=0.3)
@@ -582,6 +661,13 @@ class PgWavePlot(QWidget):
         self.custom_title = None
 
         self.gw.scene().sigMouseMoved.connect(self._on_mouse_moved)
+
+    def _apply_panel_style(self):
+        theme = _get_theme()
+        ss = "background-color: %s; color: %s;" % (
+            theme['panel_bg'], theme['panel_fg'])
+        self.readout.setStyleSheet(ss)
+        self.status.setStyleSheet(ss + " padding: 2px;")
 
     # ------------------------------------------------------------------
     # Dual Y-axis management
@@ -629,16 +715,17 @@ class PgWavePlot(QWidget):
     def _ensure_cursors_on_right_vb(self):
         if self._right_vb is None:
             return
+        theme = _get_theme()
         vbs = self._all_viewboxes()
         for i, vb in enumerate(vbs):
             if self.cursor_a is not None and i >= len(self._cursor_a_lines):
                 line = self._make_cursor_line(
-                    self.cursor_a, CURSOR_A_COLOR, 'a')
+                    self.cursor_a, theme['cursor_a'], 'a')
                 vb.addItem(line)
                 self._cursor_a_lines.append(line)
             if self.cursor_b is not None and i >= len(self._cursor_b_lines):
                 line = self._make_cursor_line(
-                    self.cursor_b, CURSOR_B_COLOR, 'b')
+                    self.cursor_b, theme['cursor_b'], 'b')
                 vb.addItem(line)
                 self._cursor_b_lines.append(line)
 
@@ -662,7 +749,9 @@ class PgWavePlot(QWidget):
 
         vb = self._get_or_create_vb(yunit)
 
-        color = WAVE_COLORS[self._color_index % len(WAVE_COLORS)]
+        theme = _get_theme()
+        wcolors = theme['wave_colors']
+        color = wcolors[self._color_index % len(wcolors)]
         self._color_index += 1
 
         if vb is self.plot.vb:
@@ -795,13 +884,16 @@ class PgWavePlot(QWidget):
         ax_right = None
         tags = list(self.wave_data.keys())
 
+        theme = _get_theme()
+        ecolors = theme['export_colors']
+
         for i, tag in enumerate(tags):
             wave, yunit = self.wave_data[tag]
             if wave.x is None or wave.y is None:
                 continue
             x, xlabels = _to_numeric(wave.x)
             y, _ = _to_numeric(wave.y)
-            color = EXPORT_COLORS[i % len(EXPORT_COLORS)]
+            color = ecolors[i % len(ecolors)]
             style = getattr(wave, 'style', 'Lines')
 
             is_right = (self._right_vb is not None
@@ -868,9 +960,10 @@ class PgWavePlot(QWidget):
         for ann in self._annotations:
             ax.annotate(
                 ann['text'], xy=(ann['x'], ann['y']),
-                fontsize=8, color='#333333',
-                bbox=dict(boxstyle='round,pad=0.3', fc='#ffffcc',
-                          ec='#888888', alpha=0.9),
+                fontsize=8, color=theme['export_annotation_color'],
+                bbox=dict(boxstyle='round,pad=0.3',
+                          fc=theme['export_annotation_bg'],
+                          ec=theme['export_annotation_ec'], alpha=0.9),
                 arrowprops=dict(arrowstyle='->', color='#555555'))
 
         stats = self.getStats()
@@ -881,7 +974,8 @@ class PgWavePlot(QWidget):
                 stat_lines.append("%s: μ=%s σ=%s" % (
                     s['key'], _eng(s['mean'], u), _eng(s['std'], u)))
             fig.text(0.01, 0.01, "  |  ".join(stat_lines),
-                     fontsize=6, color='#666666', va='bottom')
+                     fontsize=6, color=theme['export_stats_color'],
+                     va='bottom')
 
         lines, labels = ax.get_legend_handles_labels()
         if ax_right:
@@ -950,7 +1044,8 @@ class PgWavePlot(QWidget):
         return line
 
     def _set_cursor(self, which, x):
-        color = CURSOR_A_COLOR if which == 'a' else CURSOR_B_COLOR
+        theme = _get_theme()
+        color = theme['cursor_a'] if which == 'a' else theme['cursor_b']
         lines = self._cursor_a_lines if which == 'a' else self._cursor_b_lines
 
         if not lines:
@@ -1072,9 +1167,10 @@ class PgWavePlot(QWidget):
             if ya is not None and yb is not None:
                 parts.append("Δ%s: %s" % (wave.key, _eng(yb - ya, wave.yunit)))
 
+        theme = _get_theme()
         text_item = pg.TextItem(
-            text="\n".join(parts), color='#e0e0e0', anchor=(0.5, 0),
-            fill=pg.mkBrush(51, 51, 51, 220))
+            text="\n".join(parts), color=theme['text_color'], anchor=(0.5, 0),
+            fill=pg.mkBrush(*theme['overlay_fill']))
         text_item.setFont(QFont("Courier", 8))
         self.plot.addItem(text_item)
         vr = self.plot.viewRange()
@@ -1165,8 +1261,10 @@ class PgWavePlot(QWidget):
         self.readout.setPlainText("\n".join(lines))
 
     def addAnnotation(self, x, y, text):
-        item = pg.TextItem(text=text, color='#e0e0e0', anchor=(0, 1),
-                           fill=pg.mkBrush(51, 51, 51, 200), border='w')
+        theme = _get_theme()
+        item = pg.TextItem(text=text, color=theme['text_color'], anchor=(0, 1),
+                           fill=pg.mkBrush(*theme['annotation_fill']),
+                           border=theme['annotation_border'])
         item.setFont(QFont("Courier", 9))
         item.setPos(x, y)
         self.plot.addItem(item)
@@ -1249,15 +1347,13 @@ class PgAnalysisPlot(QWidget):
         self.readout.setReadOnly(True)
         self.readout.setMaximumHeight(80)
         self.readout.setFont(font)
-        self.readout.setStyleSheet(
-            "background-color: #2b2b2b; color: #e0e0e0;")
         layout.addWidget(self.readout)
 
         self.status = QLabel("")
         self.status.setFont(font)
-        self.status.setStyleSheet(
-            "background-color: #2b2b2b; color: #e0e0e0; padding: 2px;")
         layout.addWidget(self.status)
+
+        self._apply_panel_style()
 
         self.cursor_a = None
         self.cursor_b = None
@@ -1270,6 +1366,13 @@ class PgAnalysisPlot(QWidget):
         self._yunit = ""
 
         self.pw.scene().sigMouseMoved.connect(self._on_mouse_moved)
+
+    def _apply_panel_style(self):
+        theme = _get_theme()
+        ss = "background-color: %s; color: %s;" % (
+            theme['panel_bg'], theme['panel_fg'])
+        self.readout.setStyleSheet(ss)
+        self.status.setStyleSheet(ss + " padding: 2px;")
 
     def plot(self, x, y, **kwargs):
         curve = self.pw.plot(x, y, **kwargs)
@@ -1533,6 +1636,9 @@ class PgWaveWindow(QMainWindow):
         m.addSeparator()
         m.addAction("Increase Font Size    Ctrl+=", self._inc_font_size)
         m.addAction("Decrease Font Size    Ctrl+-", self._dec_font_size)
+        m.addSeparator()
+        m.addAction("Dark Theme", lambda: self._set_theme('dark'))
+        m.addAction("Light Theme", lambda: self._set_theme('light'))
 
         m = mb.addMenu("Help")
         m.addAction("Keyboard Shortcuts", self._show_help)
@@ -1697,6 +1803,19 @@ class PgWaveWindow(QMainWindow):
         if p and hasattr(p, 'toggleLegend'):
             p.toggleLegend()
 
+    def _set_theme(self, theme_name):
+        app = QApplication.instance()
+        _apply_theme(app, theme_name)
+        theme = _get_theme()
+        for ti in range(self.tab_widget.count()):
+            w = self.tab_widget.widget(ti)
+            if hasattr(w, '_apply_panel_style'):
+                w._apply_panel_style()
+            if hasattr(w, 'gw'):
+                w.gw.setBackground(theme['pg_background'])
+            if hasattr(w, 'pw'):
+                w.pw.setBackground(theme['pg_background'])
+
     def _show_help(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("Keyboard Shortcuts")
@@ -1752,8 +1871,10 @@ class PgWaveWindow(QMainWindow):
             "  X vs Y             Parametric plot\n"
         )
         text.setFont(QFont("Courier", 11))
+        theme = _get_theme()
         text.setStyleSheet(
-            "background-color: #2b2b2b; color: #e0e0e0; padding: 16px;")
+            "background-color: %s; color: %s; padding: 16px;" % (
+                theme['panel_bg'], theme['panel_fg']))
         layout.addWidget(text)
         btn = QPushButton("Close")
         btn.clicked.connect(dlg.accept)
@@ -1794,7 +1915,8 @@ class PgWaveWindow(QMainWindow):
         p.custom_xlabel = xlabel_le.text().strip() or None
         p.custom_ylabel = ylabel_le.text().strip() or None
         if p.custom_title:
-            p.plot.setTitle(p.custom_title, color='w', size='11pt')
+            p.plot.setTitle(p.custom_title,
+                            color=_get_theme()['title_color'], size='11pt')
         else:
             p.plot.setTitle(None)
         if p.custom_xlabel:
@@ -1959,7 +2081,9 @@ class PgWaveWindow(QMainWindow):
                 p.plot.setLabel('left', pd['ylabel'])
             if pd.get('title'):
                 p.custom_title = pd['title']
-                p.plot.setTitle(pd['title'], color='w', size='11pt')
+                p.plot.setTitle(pd['title'],
+                                color=_get_theme()['title_color'],
+                                size='11pt')
 
             for ann in pd.get('annotations', []):
                 p.addAnnotation(ann['x'], ann['y'], ann['text'])
@@ -2070,7 +2194,7 @@ class PgWaveWindow(QMainWindow):
         w.setLabel('bottom', yunit if yunit else name)
         w.setLabel('left', 'Count')
         txt = pg.TextItem("μ = %s\nσ = %s" % (_eng(mu, yunit), _eng(sigma, yunit)),
-                          color='w', anchor=(0, 1))
+                          color=_get_theme()['text_color'], anchor=(0, 1))
         w.addItem(txt, ignoreBounds=True)
 
         _busy = [False]
@@ -2135,34 +2259,27 @@ class PgWaveWindow(QMainWindow):
         self.browser.openDataFrame(df, name, **kwargs)
 
 
-def _apply_dark_palette(app):
+def _apply_theme(app, theme_name='dark'):
+    global _active_theme
+    _active_theme = THEMES[theme_name]
+    theme = _active_theme
     app.setStyle("Fusion")
     p = QPalette()
-    p.setColor(QPalette.Window, QColor(43, 43, 43))
-    p.setColor(QPalette.WindowText, QColor(224, 224, 224))
-    p.setColor(QPalette.Base, QColor(30, 30, 30))
-    p.setColor(QPalette.AlternateBase, QColor(43, 43, 43))
-    p.setColor(QPalette.ToolTipBase, QColor(43, 43, 43))
-    p.setColor(QPalette.ToolTipText, QColor(224, 224, 224))
-    p.setColor(QPalette.Text, QColor(224, 224, 224))
-    p.setColor(QPalette.Button, QColor(53, 53, 53))
-    p.setColor(QPalette.ButtonText, QColor(224, 224, 224))
-    p.setColor(QPalette.BrightText, QColor(255, 50, 50))
-    p.setColor(QPalette.Link, QColor(42, 130, 218))
-    p.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    p.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+    for role_name, rgb in theme['palette'].items():
+        p.setColor(getattr(QPalette, role_name), QColor(*rgb))
     p.setColor(QPalette.Disabled, QPalette.Text, QColor(128, 128, 128))
     p.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(128, 128, 128))
     app.setPalette(p)
+    pg.setConfigOptions(background=theme['pg_background'],
+                        foreground=theme['pg_foreground'])
 
 
 class CmdWavePg:
-    def __init__(self, xaxis):
+    def __init__(self, xaxis, theme='dark'):
         self.xaxis = xaxis
         self.app = QApplication.instance() or QApplication(sys.argv)
-        _apply_dark_palette(self.app)
-        pg.setConfigOptions(antialias=True, useOpenGL=False,
-                            background='k', foreground='w')
+        pg.setConfigOptions(antialias=True, useOpenGL=False)
+        _apply_theme(self.app, theme)
         self.win = PgWaveWindow(xaxis)
 
     def openFile(self, fname, sheet_name=None):

@@ -11,8 +11,8 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
 from matplotlib.figure import Figure
 from matplotlib.ticker import EngFormatter
 
-CURSOR_A_COLOR = '#2196F3'
-CURSOR_B_COLOR = '#FF9800'
+from .cmdwave_pg import _get_theme
+
 CURSOR_KWARGS = {'linestyle': '--', 'linewidth': 1.0, 'alpha': 0.8}
 DRAG_TOLERANCE_PX = 10
 ZOOM_FACTOR = 1.3
@@ -65,14 +65,17 @@ class WavePlot(ttk.PanedWindow):
         self.toolbar = NavigationToolbar2Tk(self.canvas, right, pack_toolbar=False)
         self.toolbar.update()
 
+        theme = _get_theme()
         self.readout = Text(right, height=1, font=("Courier", 9),
-                            state=DISABLED, bg='#2b2b2b', fg='#e0e0e0',
+                            state=DISABLED, bg=theme['panel_bg'],
+                            fg=theme['panel_fg'],
                             wrap=NONE, borderwidth=1, relief="sunken",
                             insertbackground='white')
         self.status_var = StringVar(value="")
         self.status = tkinter.Label(right, textvariable=self.status_var,
                                     font=("Courier", 9), anchor=W,
-                                    bg='#2b2b2b', fg='#e0e0e0')
+                                    bg=theme['panel_bg'],
+                                    fg=theme['panel_fg'])
 
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=True)
         self.toolbar.pack(side=TOP, fill=X)
@@ -299,20 +302,24 @@ class WavePlot(ttk.PanedWindow):
         existing_b = len(self._cursor_b_lines)
         for i, ax in enumerate(self.axes):
             if self.cursor_a_x is not None and i >= existing_a:
-                line = ax.axvline(self.cursor_a_x, color=CURSOR_A_COLOR,
+                line = ax.axvline(self.cursor_a_x,
+                                  color=_get_theme()['cursor_a'],
                                   **CURSOR_KWARGS)
                 self._cursor_a_lines.append(line)
             if self.cursor_b_x is not None and i >= existing_b:
-                line = ax.axvline(self.cursor_b_x, color=CURSOR_B_COLOR,
+                line = ax.axvline(self.cursor_b_x,
+                                  color=_get_theme()['cursor_b'],
                                   **CURSOR_KWARGS)
                 self._cursor_b_lines.append(line)
 
     def _set_cursor(self, which, x):
+        theme = _get_theme()
         if which == 'a':
             self.cursor_a_x = x
             if not self._cursor_a_lines:
                 for ax in self.axes:
-                    line = ax.axvline(x, color=CURSOR_A_COLOR, **CURSOR_KWARGS)
+                    line = ax.axvline(x, color=theme['cursor_a'],
+                                     **CURSOR_KWARGS)
                     self._cursor_a_lines.append(line)
             else:
                 for line in self._cursor_a_lines:
@@ -321,7 +328,8 @@ class WavePlot(ttk.PanedWindow):
             self.cursor_b_x = x
             if not self._cursor_b_lines:
                 for ax in self.axes:
-                    line = ax.axvline(x, color=CURSOR_B_COLOR, **CURSOR_KWARGS)
+                    line = ax.axvline(x, color=theme['cursor_b'],
+                                     **CURSOR_KWARGS)
                     self._cursor_b_lines.append(line)
             else:
                 for line in self._cursor_b_lines:
@@ -382,12 +390,14 @@ class WavePlot(ttk.PanedWindow):
                 if ya is not None and yb is not None:
                     text_parts.append("Δ%s: %s" % (wave.key, self._eng(yb - ya, wave.yunit)))
 
+            theme = _get_theme()
             ann = ax.annotate(
                 "\n".join(text_parts),
                 xy=(mid_x, 0.97), xycoords=('data', 'axes fraction'),
                 fontsize=7, fontfamily='monospace',
-                color='#e0e0e0',
-                bbox=dict(boxstyle='round,pad=0.3', fc='#333333', ec='#666666', alpha=0.85),
+                color=theme['panel_fg'],
+                bbox=dict(boxstyle='round,pad=0.3',
+                          fc=theme['panel_bg'], ec='#666666', alpha=0.85),
                 ha='center', va='top')
             self._delta_annotations.append(ann)
 
