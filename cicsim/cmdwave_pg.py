@@ -563,6 +563,9 @@ class PgWaveBrowser(QWidget):
         if tag not in self._wave_cache:
             self._wave_cache[tag] = PgWave(f, yname, self.xaxis)
         wave = self._wave_cache[tag]
+        if wave.curve is not None:
+            self.waveRemoveRequested.emit(wave)
+            return
         wave.reload()
         self.waveSelected.emit(wave)
 
