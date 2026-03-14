@@ -32,6 +32,7 @@ import logging
 import math
 import operator
 import subprocess
+from contextlib import contextmanager
 
 logger = logging.getLogger("cicsim")
 
@@ -77,6 +78,18 @@ class Command:
 
     def doCmd(self,cmd):
         subprocess.run(cmd, shell=True)
+
+
+
+    @contextmanager
+    def pushd(self,path):
+        prev = os.getcwd()
+        os.chdir(path)
+        try:
+            yield
+        finally:
+            os.chdir(prev)
+
 
     def doCmdWithReturn(self,cmd):
         result = subprocess.run(cmd, shell=True, text=True,

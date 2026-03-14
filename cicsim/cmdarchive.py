@@ -2,6 +2,7 @@
 #
 import logging
 import cicsim as cs
+from cicsim.utils import parse_runfile
 import glob
 import os
 import shutil
@@ -25,20 +26,15 @@ class CmdArchive(cs.Command):
 
     def archive(self,runfile):
 
-        files = list()
-        with open(runfile) as fi:
-            for line in fi:
-                files.append(line)
+        files = parse_runfile(runfile)
 
         os.makedirs(self.fullname,exist_ok=True)
-
 
         baserun = os.path.basename(runfile)
         newrun = self.fullname + "_" + baserun
 
         newrunfiles = list()
         for f in files:
-            f = f.strip()
             fb = self.fullname + os.path.sep + os.path.basename(f)
             newrunfiles.append(fb)
 

@@ -36,6 +36,7 @@ from cicsim.command import setup_logging
 import importlib
 import pandas as pd
 import matplotlib.pyplot as plt
+from cicsim.utils import parse_runfile
 
 
 #- Few words on the coding in this file:
@@ -364,6 +365,16 @@ def portreplace(testbench,source,cell):
     stb = stb.replace("${VPORTS}"," ".join(map(lambda x: "v(%s)"%x,ports)))
     with open(testbench,"w") as fo:
         fo.write(stb)
+
+
+@cli.command()
+@click.argument("runfile",required=True)
+def oppoint(runfile):
+
+    co = cs.CmdOpPoint()
+    co.calcOpPoints(runfile)
+
+
 
 
 if __name__ == "__main__":

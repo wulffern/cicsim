@@ -15,10 +15,12 @@ from .cmdrun import *
 from .cmdrunng import *
 from .cmdsummary import *
 from .cmdarchive import *
+from .cmdoppoint import *
 #from cicsim import *
 from .ngraw import *
 from .plot import *
 from .spec import *
+
 
 import importlib.util
 if importlib.util.find_spec("tkinter"):

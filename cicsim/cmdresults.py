@@ -28,6 +28,7 @@
 
 import logging
 import cicsim as cs
+from cicsim.utils import parse_runfile
 import re
 import os
 import yaml
@@ -131,11 +132,7 @@ class CmdResults(cs.Command):
         return df_all
 
     def readYaml(self):
-        files = list()
-        with open(self.runfile) as fi:
-            for l in fi:
-                l = re.sub("\n","",l)
-                files.append(l + ".yaml")
+        files = [f + ".yaml" for f in parse_runfile(self.runfile)]
 
         df_all = pd.DataFrame()
         for f in files:
