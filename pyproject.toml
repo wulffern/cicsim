@@ -15,6 +15,7 @@ dependencies = [
   "matplotlib",
   "click",
   "pyyaml",
+  "cicspi",
   "tabulate",
 ]
 description = "Custom IC Creator Simulation Tools"

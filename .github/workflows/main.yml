@@ -27,7 +27,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: wulffern/aicex:latest
+      image: wulffern/aicex:26.04_latest
       options: --user root
     steps:
       - name: Checkout
