@@ -91,7 +91,8 @@ def archive(ctx,name,runfiles):
 
 @cli.command()
 @click.argument("files",nargs=-1)
-@click.option("--x",default=None,help="Specify x-axis")
+@click.option("--x", default=None,
+              help="X-axis column; else CICWAVE_X / CICSIM_X_AXIS; else saved default (pg); else auto")
 @click.option("--backend",default="tk",type=click.Choice(["tk","pg"]),
               help="GUI backend: tk (tkinter+matplotlib) or pg (PySide6+pyqtgraph)")
 @click.option("--sheet",default=None,help="Sheet name for Excel files (default: first sheet)")
@@ -163,8 +164,19 @@ def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
               session_path=session, export_path=export)
 
 
+def _resolve_wave_x_from_cli_env(cli_x):
+    """Apply --x, else CICWAVE_X / CICSIM_X_AXIS environment variables."""
+    if cli_x:
+        return cli_x
+    v = os.environ.get("CICWAVE_X") or os.environ.get("CICSIM_X_AXIS")
+    if v and str(v).strip():
+        return str(v).strip()
+    return None
+
+
 def _run_wave(files, x, backend, sheet, pivot_spec=None,
               pivot_info_flag=False, session_path=None, export_path=None):
+    x = _resolve_wave_x_from_cli_env(x)
     if pivot_spec:
         from cicsim.pivot import load_spec, pivot_info, apply_pivot
         from cicsim.wavefiles import WaveFile
@@ -224,7 +236,8 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None,
 
 @click.command()
 @click.argument("files", nargs=-1)
-@click.option("--x", default=None, help="Specify x-axis")
+@click.option("--x", default=None,
+              help="X-axis column; else CICWAVE_X / CICSIM_X_AXIS; else saved default; else auto")
 @click.option("--backend", default="pg", type=click.Choice(["tk", "pg"]),
               help="GUI backend (default: pg)")
 @click.option("--sheet", default=None, help="Sheet name for Excel files (default: first sheet)")

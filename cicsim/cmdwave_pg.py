@@ -16,9 +16,10 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTreeWidget, QTreeWidgetItem, QLineEdit, QTabWidget,
     QPushButton, QLabel, QCheckBox, QTextEdit, QFileDialog, QDialog,
-    QInputDialog, QMenu, QComboBox)
+    QInputDialog, QMenu, QComboBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QAbstractItemView)
 from PySide6 import QtCore
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent, QSettings
 from PySide6.QtGui import (QKeySequence, QFont, QFontDatabase, QShortcut,
                            QPainter, QColor, QPalette)
 
@@ -39,6 +40,21 @@ def _mono_font(size):
 ZOOM_FACTOR = 1.3
 
 PLOT_STYLES = ['Lines', 'Markers', 'Lines+Markers', 'Steps']
+
+
+def _read_saved_default_xaxis():
+    """Column name persisted via Edit → Default X Axis (empty = auto)."""
+    s = QSettings("cicsim", "cicwave")
+    v = s.value("default_x_axis", "")
+    if not v:
+        return None
+    t = str(v).strip()
+    return t or None
+
+
+def _write_saved_default_xaxis(name):
+    s = QSettings("cicsim", "cicwave")
+    s.setValue("default_x_axis", name or "")
 
 
 def _apply_grid(plot_item):
@@ -121,13 +137,22 @@ def _apply_rotated_ticks(plot_item, axis_name, ticks):
 
 
 class _SignalPickerDialog(QDialog):
-    """Modal dialog with regex-filtered signal list."""
+    """Modal dialog with regex-filtered signal list (Signal + File columns)."""
 
-    def __init__(self, parent, title, names):
+    def __init__(self, parent, title, names, file_label=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.resize(400, 500)
-        self._names = names
+        self.resize(640, 500)
+        self._names = list(names)
+        if file_label is None:
+            self._file_labels = [''] * len(self._names)
+        elif isinstance(file_label, (list, tuple)):
+            self._file_labels = list(file_label)
+            if len(self._file_labels) < len(self._names):
+                self._file_labels.extend(
+                    [''] * (len(self._names) - len(self._file_labels)))
+        else:
+            self._file_labels = [str(file_label)] * len(self._names)
 
         layout = QVBoxLayout(self)
         self._search = QLineEdit()
@@ -135,11 +160,19 @@ class _SignalPickerDialog(QDialog):
         self._search.textChanged.connect(self._filter)
         layout.addWidget(self._search)
 
-        from PySide6.QtWidgets import QListWidget
-        self._list = QListWidget()
-        self._list.addItems(names)
-        self._list.itemDoubleClicked.connect(self.accept)
-        layout.addWidget(self._list)
+        self._table = QTableWidget(len(self._names), 2)
+        self._table.setHorizontalHeaderLabels(["Signal", "File"])
+        hdr = self._table.horizontalHeader()
+        hdr.setStretchLastSection(True)
+        hdr.setSectionResizeMode(0, QHeaderView.Stretch)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._table.setAlternatingRowColors(True)
+        for i, n in enumerate(self._names):
+            self._table.setItem(i, 0, QTableWidgetItem(n))
+            self._table.setItem(i, 1, QTableWidgetItem(self._file_labels[i]))
+        self._table.itemDoubleClicked.connect(lambda _: self.accept())
+        layout.addWidget(self._table)
 
         row = QHBoxLayout()
         ok = QPushButton("OK")
@@ -151,21 +184,29 @@ class _SignalPickerDialog(QDialog):
         layout.addLayout(row)
 
     def _filter(self, text):
-        self._list.clear()
         try:
             pat = re.compile(text, re.IGNORECASE)
         except re.error:
             pat = None
-        for n in self._names:
-            if not pat or pat.search(n):
-                self._list.addItem(n)
+        for i in range(self._table.rowCount()):
+            sig = self._table.item(i, 0)
+            fil = self._table.item(i, 1)
+            s1 = sig.text() if sig else ""
+            s2 = fil.text() if fil else ""
+            ok = not pat or pat.search(s1) or pat.search(s2)
+            self._table.setRowHidden(i, not ok)
 
     def selected(self):
-        items = self._list.selectedItems()
-        if items:
-            return items[0].text()
-        if self._list.count() > 0:
-            return self._list.item(0).text()
+        cr = self._table.currentRow()
+        if cr >= 0 and not self._table.isRowHidden(cr):
+            it = self._table.item(cr, 0)
+            if it:
+                return it.text()
+        for i in range(self._table.rowCount()):
+            if not self._table.isRowHidden(i):
+                it = self._table.item(i, 0)
+                if it:
+                    return it.text()
         return None
 
 
@@ -285,11 +326,47 @@ class PgWave:
         self.color = None
 
 
+class _DropUrlTree(QTreeWidget):
+    """File / wave lists: accept external file drops (viewport-safe)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.viewport().setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                p = url.toLocalFile()
+                if p and os.path.isfile(p):
+                    event.acceptProposedAction()
+                    return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                p = url.toLocalFile()
+                if p and os.path.isfile(p):
+                    event.acceptProposedAction()
+                    return
+        super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        win = self.window()
+        if hasattr(win, '_handle_file_drop'):
+            win._handle_file_drop(event)
+        else:
+            event.ignore()
+
+
 class PgWaveBrowser(QWidget):
     waveSelected = Signal(object)
     waveRemoveRequested = Signal(object)
     analysisRequested = Signal(str, object)  # (analysis_type, wave)
     styleChanged = Signal(str)
+    fileRemoveRequested = Signal(str)
+    wavePlotAllRequested = Signal(str)
 
     def __init__(self, xaxis, parent=None):
         super().__init__(parent)
@@ -301,9 +378,12 @@ class PgWaveBrowser(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
 
-        self.file_tree = QTreeWidget()
+        self.file_tree = _DropUrlTree()
         self.file_tree.setHeaderLabel("Files")
         self.file_tree.currentItemChanged.connect(self._file_selected)
+        self.file_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.file_tree.customContextMenuRequested.connect(
+            self._file_context_menu)
 
         style_row = QHBoxLayout()
         style_row.addWidget(QLabel("Style:"))
@@ -339,7 +419,7 @@ class PgWaveBrowser(QWidget):
         search_row.addWidget(self.search)
         search_row.addWidget(self.flat_cb)
 
-        self.wave_tree = QTreeWidget()
+        self.wave_tree = _DropUrlTree()
         self.wave_tree.setHeaderLabel("Waves")
         self.wave_tree.itemDoubleClicked.connect(self._wave_clicked)
         self.wave_tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -397,6 +477,46 @@ class PgWaveBrowser(QWidget):
             fname = current.data(0, Qt.UserRole)
             self.files.select(fname)
             self._fill_waves()
+
+    def _file_context_menu(self, pos):
+        item = self.file_tree.itemAt(pos)
+        if not item:
+            return
+        key = item.data(0, Qt.UserRole)
+        if not key:
+            return
+        menu = QMenu(self)
+        menu.addAction(
+            "Remove from list",
+            lambda k=key: self.fileRemoveRequested.emit(k))
+        menu.exec(self.file_tree.viewport().mapToGlobal(pos))
+
+    def _purge_wave_cache_for_wfile(self, wf):
+        for yname in wf.getWaveNames():
+            self._wave_cache.pop(wf.getTag(yname), None)
+
+    def remove_file_entry(self, key):
+        """Remove a file from the model and file tree (plots/cache cleared elsewhere)."""
+        self.files.remove(key)
+        for i in range(self.file_tree.topLevelItemCount()):
+            it = self.file_tree.topLevelItem(i)
+            if it.data(0, Qt.UserRole) == key:
+                self.file_tree.takeTopLevelItem(i)
+                break
+        self._sync_file_selection_after_remove()
+
+    def _sync_file_selection_after_remove(self):
+        cur = self.files.current
+        if cur is None:
+            self.wave_tree.clear()
+            self._tag_to_item = {}
+            return
+        for i in range(self.file_tree.topLevelItemCount()):
+            it = self.file_tree.topLevelItem(i)
+            if it.data(0, Qt.UserRole) == cur:
+                self.file_tree.setCurrentItem(it)
+                break
+        self._fill_waves()
 
     def _toggle_flat(self, checked):
         self._flat_mode = checked
@@ -524,6 +644,9 @@ class PgWaveBrowser(QWidget):
 
         menu = QMenu(self)
         menu.addAction("Plot", lambda: self.waveSelected.emit(wave))
+        menu.addAction(
+            "Plot for all files",
+            lambda n=yname: self.wavePlotAllRequested.emit(n))
         if wave.curve:
             menu.addAction("Remove from plot",
                            lambda: self.waveRemoveRequested.emit(wave))
@@ -738,6 +861,17 @@ class PgWavePlot(QWidget):
         for tag in tags:
             self._remove_wave(tag)
         self._reset_axes()
+        self._update_readout()
+        return tags
+
+    def remove_waves_for_wfile(self, wf):
+        """Remove all traces that belong to WaveFile *wf* (same object identity)."""
+        tags = [tag for tag, (wave, _) in self.wave_data.items()
+                if wave.wfile is wf]
+        for tag in tags:
+            self._remove_wave(tag)
+        if not self.wave_data:
+            self._reset_axes()
         self._update_readout()
         return tags
 
@@ -1182,6 +1316,7 @@ class PgWavePlot(QWidget):
                 continue
             stats.append({
                 'key': wave.key, 'unit': wave.yunit,
+                'file': wave.wfile.name,
                 'min': float(np.min(y)), 'max': float(np.max(y)),
                 'mean': float(np.mean(y)), 'std': float(np.std(y)),
                 'pp': float(np.max(y) - np.min(y)),
@@ -1196,9 +1331,11 @@ class PgWavePlot(QWidget):
         lines = []
         for s in stats:
             u = s['unit']
-            lines.append("  %-22s  min: %-12s  max: %-12s  μ: %-12s  σ: %-12s  pp: %s" % (
-                s['key'], _eng(s['min'], u), _eng(s['max'], u),
-                _eng(s['mean'], u), _eng(s['std'], u), _eng(s['pp'], u)))
+            lines.append(
+                "  %-22s  min: %-12s  max: %-12s  μ: %-12s  σ: %-12s  pp: %-12s  %s"
+                % (s['key'], _eng(s['min'], u), _eng(s['max'], u),
+                   _eng(s['mean'], u), _eng(s['std'], u), _eng(s['pp'], u),
+                   s.get('file', '')))
         self.readout.setPlainText("\n".join(lines))
 
     def addAnnotation(self, x, y, text):
@@ -1262,7 +1399,7 @@ class PgWavePlot(QWidget):
                 wparts.append("dA: %-14s" % _eng(ga, du))
             if gb is not None:
                 wparts.append("dB: %-14s" % _eng(gb, du))
-            lines.append("".join(wparts))
+            lines.append("%s  %s" % ("".join(wparts), wave.wfile.name))
 
         self.readout.setPlainText("\n".join(lines))
 
@@ -1535,15 +1672,77 @@ class PgWaveWindow(QMainWindow):
         self.browser.waveRemoveRequested.connect(self._on_wave_remove)
         self.browser.analysisRequested.connect(self._on_analysis)
         self.browser.styleChanged.connect(self._on_style_changed)
+        self.browser.fileRemoveRequested.connect(self._on_file_remove)
+        self.browser.wavePlotAllRequested.connect(self._plot_wave_all_files)
+
+        self._drops_delegate_trees = (
+            self.browser.file_tree,
+            self.browser.wave_tree,
+            self.browser.file_tree.viewport(),
+            self.browser.wave_tree.viewport(),
+        )
 
         self._setup_menus()
         self._setup_shortcuts()
+        self._install_drop_filters()
+
+    def _install_drop_filters(self):
+        """Accept file drops on any child (plots, browser, etc.)."""
+        self._attach_drop_filter_subtree(self.centralWidget())
+
+    def _attach_drop_filter_subtree(self, root):
+        if root is None:
+            return
+        root.installEventFilter(self)
+        for w in root.findChildren(QWidget):
+            w.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        et = event.type()
+        if et in (QEvent.DragEnter, QEvent.DragMove, QEvent.Drop):
+            if obj in self._drops_delegate_trees:
+                return False
+        if et == QEvent.DragEnter or et == QEvent.DragMove:
+            if self._drop_mime_has_files(event.mimeData()):
+                event.acceptProposedAction()
+                return True
+        elif et == QEvent.Drop:
+            self._handle_file_drop(event)
+            return True
+        return super().eventFilter(obj, event)
+
+    @staticmethod
+    def _drop_mime_has_files(mime_data):
+        if not mime_data.hasUrls():
+            return False
+        for url in mime_data.urls():
+            p = url.toLocalFile()
+            if p and os.path.isfile(p):
+                return True
+        return False
+
+    def _handle_file_drop(self, event):
+        paths = []
+        for url in event.mimeData().urls():
+            p = url.toLocalFile()
+            if p and os.path.isfile(p):
+                paths.append(os.path.normpath(p))
+        if not paths:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        for path in paths:
+            if path.lower().endswith('.cicwave.yaml'):
+                self.applySession(path)
+            else:
+                self.browser.openFile(path)
 
     def _setup_menus(self):
         mb = self.menuBar()
 
         m = mb.addMenu("File")
         m.addAction("Open File         Ctrl+O", self._open_file)
+        m.addAction("Remove All Files", self._remove_all_files)
         m.addAction("Save Session      Ctrl+S", self._save_session)
         m.addAction("Load Session", self._load_session)
         m.addSeparator()
@@ -1556,6 +1755,7 @@ class PgWaveWindow(QMainWindow):
         m.addAction("Close Tab         Ctrl+W", self._close_current_tab)
         m.addSeparator()
         m.addAction("Set Axis Labels   Ctrl+L", self._set_axis_labels)
+        m.addAction("Default X Axis...", self._edit_default_xaxis)
         m.addAction("Add Annotation    Ctrl+T", self._add_annotation)
         m.addAction("Clear Annotations", self._clear_annotations)
         m.addSeparator()
@@ -1637,6 +1837,7 @@ class PgWaveWindow(QMainWindow):
         self.tab_widget.addTab(plot, "Plot %d" % self.plot_index)
         self.plot_index += 1
         self.tab_widget.setCurrentWidget(plot)
+        self._attach_drop_filter_subtree(plot)
 
     def _on_wave_selected(self, wave):
         p = self._current()
@@ -1652,6 +1853,52 @@ class PgWaveWindow(QMainWindow):
             tag = p.removeLine(wave)
             if tag:
                 self.browser.clearWaveColor(tag)
+
+    def _on_file_remove(self, key):
+        if key not in self.browser.files:
+            return
+        wf = self.browser.files[key]
+        for ti in range(self.tab_widget.count()):
+            w = self.tab_widget.widget(ti)
+            if isinstance(w, PgWavePlot):
+                tags = w.remove_waves_for_wfile(wf)
+                for tag in tags:
+                    self.browser.clearWaveColor(tag)
+        self.browser._purge_wave_cache_for_wfile(wf)
+        self.browser.remove_file_entry(key)
+
+    def _remove_all_files(self):
+        if not self.browser.files:
+            return
+        for ti in range(self.tab_widget.count()):
+            w = self.tab_widget.widget(ti)
+            if isinstance(w, PgWavePlot):
+                tags = w.removeAll()
+                for tag in tags:
+                    self.browser.clearWaveColor(tag)
+        self.browser._wave_cache.clear()
+        self.browser.file_tree.clear()
+        self.browser.wave_tree.clear()
+        self.browser._tag_to_item = {}
+        self.browser.files.clear_all()
+
+    def _plot_wave_all_files(self, yname):
+        p = self._current()
+        if not isinstance(p, PgWavePlot):
+            return
+        style = self.browser.plotStyle
+        for wf in self.browser.files.values():
+            if yname not in wf.getWaveNames():
+                continue
+            tag = wf.getTag(yname)
+            if tag not in self.browser._wave_cache:
+                self.browser._wave_cache[tag] = PgWave(wf, yname, self.browser.xaxis)
+            wave = self.browser._wave_cache[tag]
+            wave.reload()
+            result = p.show_wave(wave, style=style)
+            if result:
+                tag2, color = result
+                self.browser.setWaveColor(tag2, color)
 
     def _on_style_changed(self, style):
         p = self._current()
@@ -1824,6 +2071,25 @@ class PgWaveWindow(QMainWindow):
         btn.clicked.connect(dlg.accept)
         layout.addWidget(btn)
         dlg.exec()
+
+    # ------------------------------------------------------------------
+    # Default X axis (new loads + persistence)
+    # ------------------------------------------------------------------
+
+    def _edit_default_xaxis(self):
+        text, ok = QInputDialog.getText(
+            self, "Default X Axis",
+            "Column name used as X when the file has no standard axis "
+            "(time, frequency, sweeps, …).\n"
+            "Leave empty for automatic detection.\n"
+            "Applies to newly opened files; saved for later sessions.",
+            QLineEdit.Normal,
+            self.browser.xaxis or "")
+        if not ok:
+            return
+        col = text.strip() or None
+        self.browser.xaxis = col
+        _write_saved_default_xaxis(col)
 
     # ------------------------------------------------------------------
     # Axis labels dialog
@@ -2172,7 +2438,8 @@ class PgWaveWindow(QMainWindow):
         if not f:
             return
         names = list(f.getWaveNames())
-        dlg = _SignalPickerDialog(self, "Select X-axis signal", names)
+        dlg = _SignalPickerDialog(self, "Select X-axis signal", names,
+                                  file_label=f.name)
         if dlg.exec() != QDialog.Accepted:
             return
         chosen = dlg.selected()
@@ -2219,11 +2486,14 @@ def _apply_theme(app, theme_name='dark'):
 
 class CmdWavePg:
     def __init__(self, xaxis, theme='dark'):
-        self.xaxis = xaxis
         self.app = QApplication.instance() or QApplication(sys.argv)
         pg.setConfigOptions(antialias=False, useOpenGL=False)
         _apply_theme(self.app, theme)
-        self.win = PgWaveWindow(xaxis)
+        effective = xaxis
+        if not effective:
+            effective = _read_saved_default_xaxis()
+        self.xaxis = effective if effective else None
+        self.win = PgWaveWindow(self.xaxis)
 
     def openFile(self, fname, sheet_name=None):
         self.win.openFile(fname, sheet_name=sheet_name)

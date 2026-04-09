@@ -221,6 +221,19 @@ class WaveFiles(dict):
         if(fname in self):
             self.current = fname
 
+    def remove(self, key):
+        """Remove a loaded file by dict key. Updates current if needed."""
+        if key not in self:
+            return
+        del self[key]
+        if self.current == key:
+            self.current = next(iter(self.keys()), None)
+
+    def clear_all(self):
+        """Remove every loaded file."""
+        dict.clear(self)
+        self.current = None
+
     def getSelected(self):
         if(self.current is not None):
             return self[self.current]
