@@ -111,30 +111,6 @@ class CmdResults(cs.Command):
             text_file.write(self.footer)
 
 
-    def readCsv(self):
-        print("Not updated")
-        pass
-        files = glob.glob(f"output_{self.testbench}/{self.testbench}_*.csv")
-        df_all = pd.DataFrame()
-        for f in files:
-            df = pd.read_csv(f)
-            name = os.path.basename(f).replace(".*_","").replace(".csv","")
-            df["name"] = name
-            (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(f)
-            df["time"] = time.ctime(mtime)
-            m = re.search("([A-Z]+[a-z]+)[A-Z]",name)
-            if(m):
-                df["type"] = m.group(1)
-            df_all = pd.concat([df,df_all])
-
-        if(df_all.empty):
-            return None
-
-
-        #- Print each corner
-        df_all.drop(columns=["Unnamed: 0"],inplace=True)
-        return df_all
-
     def readYaml(self):
         files = list()
         with open(self.runfile) as fi:
@@ -142,25 +118,27 @@ class CmdResults(cs.Command):
                 l = re.sub("\n","",l)
                 files.append(l + ".yaml")
 
-        df_all = pd.DataFrame()
+        frames = []
         for f in files:
             with open(f) as yaml_file:
                 yaml_contents = yaml.safe_load(yaml_file)
             df = pd.json_normalize(yaml_contents)
-            name = os.path.basename(f).replace(".*_","").replace(".yaml","")
+            name = re.sub(r".*_", "", os.path.basename(f)).replace(".yaml","")
             df["name"] = name
             (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(f)
             df["time"] = time.ctime(mtime)
             m = re.search("([A-Z]+[a-z]+)[A-Z]",name)
             if(m):
                 df["type"] = m.group(1)
-            df_all = pd.concat([df,df_all])
+            frames.append(df)
 
-
-        if(df_all.empty):
-
+        if not frames:
             return None
 
+        df_all = pd.concat(frames, ignore_index=True)
+
+        if df_all.empty:
+            return None
 
         return df_all
 

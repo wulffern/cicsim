@@ -69,12 +69,13 @@ def cli(ctx,color):
 @click.option("--replace",default=None, help="YAML file with replacements for netlist")
 @click.option("--threads", default=1, help="Number of parallel simulation threads")
 @click.option("--progress/--no-progress", default=False, help="Show progress bar instead of interleaved logs")
+@click.option("--timeout", default=None, type=int, help="Timeout in seconds per simulation (default: no limit)")
 @click.pass_context
-def run(ctx,testbench,run,corner,count,name,ignore,sha,replace,threads,progress):
+def run(ctx,testbench,run,corner,count,name,ignore,sha,replace,threads,progress,timeout):
     """Run a ngspice simulation of TESTBENCH
     """
 
-    r = cs.CmdRunNg(testbench,run,corner,name,count,sha,threads=threads,progress=progress)
+    r = cs.CmdRunNg(testbench,run,corner,name,count,sha,threads=threads,progress=progress,timeout=timeout)
     r.loadReplacements(replace)
 
     r.run(ignore)

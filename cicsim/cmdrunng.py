@@ -36,14 +36,15 @@ import datetime
 import hashlib
 import inspect
 import subprocess
+import signal
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger("cicsim")
 
 class Simulation(cs.CdsConfig):
 
-    def __init__(self,testbench,corner,runsim,config,index,sha=None,progress=False):
+    def __init__(self,testbench,corner,runsim,config,index,sha=None,progress=False,timeout=None):
          #- Permutation variables
         self.runsim = runsim
         self.runmeas = True
@@ -54,6 +55,7 @@ class Simulation(cs.CdsConfig):
         self.rundir = f"output_{self.testbench}"
         self.sha = sha
         self.progress = progress
+        self.timeout = timeout
 
         #- Store sha128 checksums for files
         self.shas = dict()
@@ -187,6 +189,7 @@ class Simulation(cs.CdsConfig):
 
     def ngspice(self,ignore=True):
         simOk = True
+        self.err = 0
 
         if(self.runsim):
             tickTime = datetime.datetime.now()
@@ -214,12 +217,16 @@ class Simulation(cs.CdsConfig):
                 cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
             logger.debug("Cmd: " + cmd)
             try:
-                result = subprocess.run(cmd, shell=True)
+                result = subprocess.run(cmd, shell=True, timeout=self.timeout)
                 self.err = result.returncode
+            except subprocess.TimeoutExpired:
+                logger.error(f"Simulation {self.name} timed out after {self.timeout}s")
+                self.err = 1
             except KeyboardInterrupt:
                 sys.exit(2)
             except Exception as e:
                 logger.error(str(e))
+                self.err = 1
 
             if(self.err > 0):
                 simOk = False
@@ -270,6 +277,8 @@ class Simulation(cs.CdsConfig):
         for l in fi:
             if(l.startswith("#ifdef")):
                 d = re.split(r"\s+",l)
+                if len(d) < 2:
+                    continue
                 dkey = d[1]
                 state = 1
                 continue
@@ -384,7 +393,9 @@ class Simulation(cs.CdsConfig):
             else:
                 cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
             logger.debug("Cmd: " + cmd)
-            subprocess.run(cmd, shell=True)
+            result = subprocess.run(cmd, shell=True)
+            if result.returncode != 0:
+                logger.warning(f"ngspice measurement run returned {result.returncode} for {self.name}")
         else:
             if not self.progress:
                 logger.warning(f"Skipping measurement run of {self.name}.meas")
@@ -413,21 +424,34 @@ class Simulation(cs.CdsConfig):
     def parseLog(self):
         analysis = False
 
+        re_eq     = re.compile(r"=")
+        re_kv     = re.compile(r"^([^\s]+)\s*=\s*([^\s]+)\s")
+        re_binary = re.compile(r"binary raw file")
+        re_meas   = re.compile(r"Measurements for (.*)$")
+        re_sep    = re.compile(r"^---------------------------------")
+        re_index  = re.compile(r"^Index")
+        re_digit  = re.compile(r"^\d")
+        re_start  = re.compile(r"^\s*MEAS_START")
+        re_end    = re.compile(r"^\s*MEAS_END")
+
         #- Parse main log file for measurements
         data = dict()
         with open(self.oname + ".log") as fi:
             for l in fi:
-                if(analysis and re.search("=",l)):
-                    m = re.search(r"^([^\s]+)\s*=\s*([^\s]+)\s",l)
+                if(analysis and re_eq.search(l)):
+                    m = re_kv.search(l)
                     if(m):
                         key = m.groups()[0].strip()
                         val = m.groups()[1].strip()
-                        data[key] = float(val)
+                        try:
+                            data[key] = float(val)
+                        except ValueError:
+                            logger.warning(f"Could not parse measurement value: {key}={val}")
 
-                if(re.search("binary raw file",l)):
+                if(re_binary.search(l)):
                     analysis = False
 
-                m = re.search("Measurements for (.*)$",l)
+                m = re_meas.search(l)
                 if(m):
                     analysis = True
 
@@ -442,19 +466,16 @@ class Simulation(cs.CdsConfig):
             with open(measlog) as fi:
                 for l in fi:
 
-
                     if(analysis):
-                        #print(table,prepareTable,l)
-                            # Parse tables
-                        if(not prepareTable and re.search("^---------------------------------",l)):
+                        # Parse tables
+                        if(not prepareTable and re_sep.search(l)):
                             prepareTable = True
                             continue
-                        #print(l,end="")
-                        #print(re.search(r"^\d",l))
-                        if(table and not prepareTable and (not re.search(r"^\d",l) )):
+
+                        if(table and not prepareTable and (not re_digit.search(l))):
                             table = False
 
-                        if(prepareTable and re.search("^Index",l)):
+                        if(prepareTable and re_index.search(l)):
                             arr = re.split(r"\s+",l)
                             table_header = arr[1:]
                             table = True
@@ -462,28 +483,32 @@ class Simulation(cs.CdsConfig):
 
                         if(table and not prepareTable):
                             arr = re.split(r"\s+",l)
-
                             for k,v in zip(table_header,arr[1:]):
                                 if(v== ""):
                                     continue
                                 if(k not in data):
                                     data[k] = list()
-                                data[k].append(float(v))
-
+                                try:
+                                    data[k].append(float(v))
+                                except ValueError:
+                                    logger.warning(f"Could not parse table value: {k}={v}")
 
                         if(prepareTable):
                             prepareTable = False
 
                     #- Find key=val pairs
-                    if(analysis and re.search("=",l)):
-                        m = re.search(r"^([^\s]+)\s*=\s*([^\s]+)\s",l)
+                    if(analysis and re_eq.search(l)):
+                        m = re_kv.search(l)
                         if(m):
                             key = m.groups()[0].strip()
                             val = m.groups()[1].strip()
-                            data[key] = float(val)
-                    if(re.search(r"^\s*MEAS_START",l)):
+                            try:
+                                data[key] = float(val)
+                            except ValueError:
+                                logger.warning(f"Could not parse measurement value: {key}={val}")
+                    if(re_start.search(l)):
                         analysis = True
-                    if(re.search(r"^\s*MEAS_END",l)):
+                    if(re_end.search(l)):
                         analysis = False
 
         yamlfile = self.oname + ".yaml"
@@ -529,7 +554,7 @@ class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,runsim,corners,cornername,count,sha,threads=1,progress=False):
+    def __init__(self,testbench,runsim,corners,cornername,count,sha,threads=1,progress=False,timeout=None):
         self.testbench = testbench
         self.count = count
         self.runsim = runsim
@@ -538,6 +563,7 @@ class CmdRunNg(cs.CdsConfig):
         self.sha = sha
         self.threads = max(1, threads)
         self.progress = progress
+        self.timeout = timeout
         self.replace = None
 
         super().__init__()
@@ -576,28 +602,38 @@ class CmdRunNg(cs.CdsConfig):
         def run_one(job):
             corner, index = job
             c = Simulation(self.testbench, corner, self.runsim, self.config, index, self.sha,
-                           progress=self.progress)
+                           progress=self.progress, timeout=self.timeout)
             c.loadReplace(self.replace)
             ok = c.run(ignore)
             return c, bool(ok)
 
-        if self.progress:
-            from tqdm import tqdm
-            from cicsim.command import suppress_console_logging
-            with suppress_console_logging():
-                if self.threads > 1:
-                    with ThreadPoolExecutor(max_workers=self.threads) as executor:
+        executor = None
+        try:
+            if self.progress:
+                from tqdm import tqdm
+                from cicsim.command import suppress_console_logging
+                with suppress_console_logging():
+                    if self.threads > 1:
+                        executor = ThreadPoolExecutor(max_workers=self.threads)
                         results = list(tqdm(executor.map(run_one, jobs),
                                            total=len(jobs), desc=self.testbench, unit="sim"))
-                else:
-                    results = list(tqdm((run_one(job) for job in jobs),
-                                       total=len(jobs), desc=self.testbench, unit="sim"))
-        elif self.threads > 1:
-            logger.info(f"Running {len(jobs)} simulation(s) with {self.threads} threads")
-            with ThreadPoolExecutor(max_workers=self.threads) as executor:
+                    else:
+                        results = list(tqdm((run_one(job) for job in jobs),
+                                           total=len(jobs), desc=self.testbench, unit="sim"))
+            elif self.threads > 1:
+                logger.info(f"Running {len(jobs)} simulation(s) with {self.threads} threads")
+                executor = ThreadPoolExecutor(max_workers=self.threads)
                 results = list(executor.map(run_one, jobs))
-        else:
-            results = [run_one(job) for job in jobs]
+            else:
+                results = [run_one(job) for job in jobs]
+        except KeyboardInterrupt:
+            logger.warning("Interrupted — cancelling pending simulations")
+            if executor is not None:
+                executor.shutdown(wait=False, cancel_futures=True)
+            sys.exit(2)
+        finally:
+            if executor is not None:
+                executor.shutdown(wait=False)
 
         pyRunLater = list()
         files = list()

@@ -39,10 +39,7 @@ def ngRawRead(fname: str):
         names = dict()
         ind = 0
         while (True):
-            try:
-                mdata = fp.readline(BSIZE_SP).split(b':', maxsplit=1)
-            except:
-                raise
+            mdata = fp.readline(BSIZE_SP).split(b':', maxsplit=1)
             if len(mdata) == 2:
                 if mdata[0].lower() in MDATA_LIST:
                     plot[mdata[0].lower()] = mdata[1].strip()
@@ -55,7 +52,8 @@ def ngRawRead(fname: str):
 
                         varspec = (fp.readline(BSIZE_SP).strip()
                                    .decode('ascii').split())
-                        assert(varn == int(varspec[0]))
+                        if varn != int(varspec[0]):
+                            raise ValueError(f"Variable index mismatch in {fname}: expected {varn}, got {varspec[0]}")
 
                         #- Skip duplicated variables
                         if(varspec[1] not in names):

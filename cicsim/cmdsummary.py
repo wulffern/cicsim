@@ -146,8 +146,7 @@ class Summary(cs.Command):
         super().__init__()
 
         if(not os.path.exists(self.filename)):
-            logger.error(f"Could not find {self.filename}")
-            exit()
+            raise FileNotFoundError(f"Could not find {self.filename}")
 
         with open(self.filename) as fi:
             obj =yaml.safe_load(fi)
