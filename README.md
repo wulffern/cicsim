@@ -37,6 +37,12 @@ This is a script package I use to control ngspice, it can
 | 0.1.19  | Wave viewer overhaul: measurement cursors (A/B) with delta readout, scroll-wheel zoom, keyboard shortcuts, engineering notation on axes (EngFormatter), Export PDF, legend toggle, regex search tooltip, Help menu. Fixed pyproject.toml license for Python 3.8. Added unit tests |
 | 0.2.0   | New pyqtgraph backend (`--backend pg`): hierarchical wave browser, automatic dual Y-axes, GPU-accelerated rendering, closeable tabs, analysis functions (FFT/PSD, Histogram, Differentiate, X vs Y). Fixed AC analysis complex data plotting |
 | 0.2.1   | Multi-format file support: CSV, TSV, Excel, JSON, Parquet, Feather, HDF5, Pickle, and more. `--sheet` option for Excel files. String/categorical axis support with rotated labels. Gradient (dy/dx) and slope in cursor readout. Double-click to plot. Regex signal picker for X vs Y |
+| 0.2.2   | cicwave: fixed file selection, added zoom/line-width/font-size controls, statistics readout, session save/load, pivot support, dark theme, plot style selector, matplotlib export |
+| 0.2.3   | cicwave: light/dark theme toggle, session and pivot documentation |
+| 0.2.4   | cicwave: toggle wave visibility on double-click in browser |
+| 0.2.5   | cicwave: fixed grid in light mode, improved zoom performance, fixed font warning |
+| 0.2.6   | cicwave: drag-and-drop files, file menu, improved A/B cursor readout and X vs Y picker. Added GitHub release workflow |
+| 0.2.7   | `cicsim run`: added `--threads` for parallel simulations, `--progress` for tqdm progress bar, `--timeout` to kill hung sims, rich terminal results table. Bug fixes: uninitialized error state, float parse errors in log, silent measurement failures, dead code removed. CI: dependabot, ruff lint on PRs, pinned action versions, automated PyPI publish |
 
 
 # Install this module
@@ -136,6 +142,13 @@ Commands:
   summary      Generate simulation summary for results
   template     Run an IP template with <options> YAML file
   wave         Open waveform viewer
+
+Key options for run:
+  --threads N            Run N simulations in parallel
+  --progress             Show tqdm progress bar instead of interleaved logs
+  --timeout N            Kill any simulation that runs longer than N seconds
+  --sha / --no-sha       Skip re-running simulations whose input files haven't changed
+  --count N              Run each corner N times (Monte Carlo)
 ```
 
 A standalone command is also available:
