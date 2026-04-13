@@ -16,6 +16,8 @@ dependencies = [
   "click",
   "pyyaml",
   "tabulate",
+  "rich",
+  "tqdm",
 ]
 description = "Custom IC Creator Simulation Tools"
 readme = "README.md"
