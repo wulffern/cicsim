@@ -31,7 +31,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: install cicsim
@@ -45,14 +45,14 @@ jobs:
           make test
           make docs
       - name: Setup Pages
-        uses: actions/configure-pages@main
+        uses: actions/configure-pages@v5
       - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@main
+        uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs/
           destination: ./_site
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@main
+        uses: actions/upload-pages-artifact@v3
 
   # Deployment job
   deploy:
@@ -64,4 +64,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@main
+        uses: actions/deploy-pages@v4
