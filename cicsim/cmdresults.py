@@ -147,7 +147,7 @@ class CmdResults(cs.Command):
 
     def printRich(self, df, specs=None):
         console = Console()
-        str_cols = {"name", "time", "type"}
+        str_cols = {"name", "time", "type"} | {c for c in df.columns if df[c].dtype == object}
         key_cols = [c for c in ["name", "type"] if c in df.columns]
         data_cols = [c for c in df.columns if c not in key_cols]
 
