@@ -32,6 +32,7 @@ import logging
 import math
 import operator
 import subprocess
+from contextlib import contextmanager
 
 @contextmanager
 def suppress_console_logging(name="cicsim"):
