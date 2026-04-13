@@ -33,6 +33,22 @@ import math
 import operator
 import subprocess
 
+@contextmanager
+def suppress_console_logging(name="cicsim"):
+    """Temporarily remove StreamHandlers and disable propagation so tqdm owns the terminal."""
+    log = logging.getLogger(name)
+    stream_handlers = [h for h in log.handlers if isinstance(h, logging.StreamHandler)]
+    old_propagate = log.propagate
+    for h in stream_handlers:
+        log.removeHandler(h)
+    log.propagate = False
+    try:
+        yield
+    finally:
+        for h in stream_handlers:
+            log.addHandler(h)
+        log.propagate = old_propagate
+
 logger = logging.getLogger("cicsim")
 
 

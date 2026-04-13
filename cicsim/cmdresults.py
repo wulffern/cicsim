@@ -35,6 +35,10 @@ import glob
 import pandas as pd
 import numpy as np
 import time
+from rich.console import Console
+from rich.table import Table
+from rich import box
+from rich.markup import escape
 
 logger = logging.getLogger("cicsim")
 
@@ -43,7 +47,7 @@ logger = logging.getLogger("cicsim")
 class CmdResults(cs.Command):
     """ Summarize results of TESTBENCH """
 
-    def __init__(self,runfile,runname=None):
+    def __init__(self,runfile,runname=None,progress=False):
         if(runname is None):
             self.runname = runfile.replace(".run","")
         else:
@@ -51,6 +55,7 @@ class CmdResults(cs.Command):
         self.runfile = runfile
         self.ofile = runfile.replace(".run","")
         self.testbench = re.sub("_.*","",runfile)
+        self.progress = progress
         super().__init__()
 
     def summaryToMarkdown(self,specs,df_all):
@@ -162,6 +167,85 @@ class CmdResults(cs.Command):
 
 
 
+    def printRich(self, df, specs=None):
+        console = Console()
+        str_cols = {"name", "time", "type"}
+        key_cols = [c for c in ["name", "type"] if c in df.columns]
+        data_cols = [c for c in df.columns if c not in key_cols]
+
+        def spec_for(col):
+            return specs[col] if specs and col in specs else None
+
+        def display_val(col, raw):
+            """Return (scaled_float, formatted_string) for a data cell."""
+            sp = spec_for(col)
+            v = raw * sp.scale if sp and sp.scale != 1 else raw
+            return v, f"{v:.4g}"
+
+        def col_header(col):
+            sp = spec_for(col)
+            if sp and sp.unit:
+                return f"{col} {escape(f'[{sp.unit}]')}"
+            return col
+
+        def col_width(col):
+            """Estimate rendered column width including cell padding."""
+            sp = spec_for(col)
+            scale = sp.scale if sp else 1
+            header_w = len(col_header(col))
+            if col in str_cols:
+                val_w = df[col].astype(str).str.len().max() if len(df) else 0
+            else:
+                scaled = df[col].dropna() * scale
+                val_w = int(scaled.apply(lambda v: len(f"{v:.4g}")).max()) if len(scaled) else 0
+            return max(header_w, val_w) + 2  # +2 for cell padding
+
+        key_width = sum(col_width(c) + 1 for c in key_cols)
+        available = console.width - key_width
+
+        # Group data columns into chunks that fit the terminal width
+        chunks, chunk, chunk_w = [], [], 0
+        for col in data_cols:
+            w = col_width(col) + 1
+            if chunk and chunk_w + w > available:
+                chunks.append(chunk)
+                chunk, chunk_w = [col], w
+            else:
+                chunk.append(col)
+                chunk_w += w
+        if chunk:
+            chunks.append(chunk)
+
+        def make_table(cols):
+            t = Table(box=box.SIMPLE_HEAD, show_footer=False, highlight=True)
+            for col in cols:
+                if col in str_cols:
+                    t.add_column(col, style="cyan", no_wrap=True)
+                else:
+                    t.add_column(col_header(col), justify="right")
+            for _, row in df.iterrows():
+                cells = []
+                for col in cols:
+                    val = row[col]
+                    if col in str_cols:
+                        cells.append(str(val))
+                    elif pd.isna(val):
+                        cells.append("")
+                    else:
+                        scaled, formatted = display_val(col, val)
+                        sp = spec_for(col)
+                        if sp:
+                            if sp.OK(scaled):
+                                formatted = f"[green]{formatted}[/green]"
+                            else:
+                                formatted = f"[bold red]{formatted}[/bold red]"
+                        cells.append(formatted)
+                t.add_row(*cells)
+            return t
+
+        for chunk in chunks:
+            console.print(make_table(key_cols + chunk))
+
     def run(self):
 
         df_all = self.readYaml()
@@ -169,10 +253,10 @@ class CmdResults(cs.Command):
             logger.warning("No results found in yaml file")
             return
 
-        #-Print all results
-        print(df_all.to_markdown(index=False,tablefmt="github",floatfmt=".5g"))
-
         specs = cs.Specification(self.testbench)
+
+        #-Print all results
+        self.printRich(df_all, specs if len(specs) > 0 else None)
 
         if(len(specs) > 0):
             df = df_all[specs.sources + ["name","type","time"]]
