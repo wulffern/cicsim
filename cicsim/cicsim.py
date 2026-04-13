@@ -68,12 +68,14 @@ def cli(ctx,color):
 @click.option("--ignore/--no-ignore", default=False,is_flag=True, help="Ignore error checks")
 @click.option("--sha/--no-sha", default=None, help="Check SHA of input files")
 @click.option("--replace",default=None, help="YAML file with replacements for netlist")
+@click.option("--threads", default=1, help="Number of parallel simulation threads")
+@click.option("--progress/--no-progress", default=False, help="Show progress bar instead of interleaved logs")
 @click.pass_context
-def run(ctx,testbench,run,corner,count,name,ignore,sha,replace):
+def run(ctx,testbench,run,corner,count,name,ignore,sha,replace,threads,progress):
     """Run a ngspice simulation of TESTBENCH
     """
 
-    r = cs.CmdRunNg(testbench,run,corner,name,count,sha)
+    r = cs.CmdRunNg(testbench,run,corner,name,count,sha,threads=threads,progress=progress)
     r.loadReplacements(replace)
 
     r.run(ignore)

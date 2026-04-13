@@ -37,12 +37,13 @@ import hashlib
 import inspect
 import subprocess
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger("cicsim")
 
 class Simulation(cs.CdsConfig):
 
-    def __init__(self,testbench,corner,runsim,config,index,sha=None):
+    def __init__(self,testbench,corner,runsim,config,index,sha=None,progress=False):
          #- Permutation variables
         self.runsim = runsim
         self.runmeas = True
@@ -52,6 +53,7 @@ class Simulation(cs.CdsConfig):
         self.pyscript = testbench + ".py"
         self.rundir = f"output_{self.testbench}"
         self.sha = sha
+        self.progress = progress
 
         #- Store sha128 checksums for files
         self.shas = dict()
@@ -94,7 +96,8 @@ class Simulation(cs.CdsConfig):
             with open(fpath,"rb") as f:
                 self.shas[filename] = hashlib.sha256(f.read()).hexdigest()
         else:
-            logger.warning(f"Could not find referenced file {fpath}")
+            if not self.progress:
+                logger.warning(f"Could not find referenced file {fpath}")
 
     def loadSha(self):
         shafile = self.oname + ".sha"
@@ -143,7 +146,8 @@ class Simulation(cs.CdsConfig):
 
         #- Maybe run sim if no input files have changed
         if(self.sha and self.matchAllSha()):
-            logger.warning("No spice files have changed")
+            if not self.progress:
+                logger.warning("No spice files have changed")
             self.runsim = False
 
         #- Run simulation, or not, depends on runsim
@@ -157,7 +161,8 @@ class Simulation(cs.CdsConfig):
 
         #- Run measurement if it exists, check sha though
         if(self.sha and not self.runsim and self.matchSha(self.name + ".meas")):
-            logger.warning("No meas files have changed")
+            if not self.progress:
+                logger.warning("No meas files have changed")
             self.runmeas = False
         measOk = self.ngspiceMeas(ignore)
 
@@ -167,7 +172,8 @@ class Simulation(cs.CdsConfig):
             if(self.runsim):
                 self.saveSha()
             else:
-                logger.warning("Not storing sha file, no simulation run")
+                if not self.progress:
+                    logger.warning("Not storing sha file, no simulation run")
 
         if(simOk and measOk):
             self.parseLog()
@@ -202,7 +208,10 @@ class Simulation(cs.CdsConfig):
             self.removeFile(self.oname + ".yaml")
 
             # Run NGSPICE
-            cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
+            if self.progress:
+                cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw > {self.name}.log 2>&1"
+            else:
+                cmd = f"cd {self.rundir}; ngspice {options} {includes} {self.name}.spi -r {self.name}.raw 2>&1 |tee {self.name}.log"
             logger.debug("Cmd: " + cmd)
             try:
                 result = subprocess.run(cmd, shell=True)
@@ -219,7 +228,8 @@ class Simulation(cs.CdsConfig):
             logger.info("Corner simulation time: " + str(nextTime - tickTime))
             tickTime = nextTime
         else:
-            logger.warning(f"Skipping simulation of {self.name}.spi")
+            if not self.progress:
+                logger.warning(f"Skipping simulation of {self.name}.spi")
 
          #- Check logfile. ngspice does not always exit cleanly
         errors = list()
@@ -369,11 +379,15 @@ class Simulation(cs.CdsConfig):
 
         #- Run measurement
         if(self.runmeas):
-            cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
+            if self.progress:
+                cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas > {self.name}.logm 2>&1"
+            else:
+                cmd = f"cd {self.rundir}; ngspice -b {self.name}.meas  2>&1 | tee {self.name}.logm"
             logger.debug("Cmd: " + cmd)
             subprocess.run(cmd, shell=True)
         else:
-            logger.warning(f"Skipping measurement run of {self.name}.meas")
+            if not self.progress:
+                logger.warning(f"Skipping measurement run of {self.name}.meas")
 
         #- Check meas logfile. ngspice does not always exit cleanly
         errors = list()
@@ -515,13 +529,15 @@ class CmdRunNg(cs.CdsConfig):
     """ Run ngspice
     """
 
-    def __init__(self,testbench,runsim,corners,cornername,count,sha):
+    def __init__(self,testbench,runsim,corners,cornername,count,sha,threads=1,progress=False):
         self.testbench = testbench
         self.count = count
         self.runsim = runsim
         self.corners = corners
         self.cornername = cornername
         self.sha = sha
+        self.threads = max(1, threads)
+        self.progress = progress
         self.replace = None
 
         super().__init__()
@@ -545,7 +561,7 @@ class CmdRunNg(cs.CdsConfig):
 
     def run(self,ignore=False):
         startTime = datetime.datetime.now()
-        
+
         self.filename = self.testbench + ".spi"
 
         if(not os.path.exists(self.filename)):
@@ -553,36 +569,62 @@ class CmdRunNg(cs.CdsConfig):
             return
 
         permutations = self.getPermutations(self.corners)
+
+        # Build ordered list of (corner, index) jobs
+        jobs = [(corner, index) for corner in permutations for index in range(self.count)]
+
+        def run_one(job):
+            corner, index = job
+            c = Simulation(self.testbench, corner, self.runsim, self.config, index, self.sha,
+                           progress=self.progress)
+            c.loadReplace(self.replace)
+            ok = c.run(ignore)
+            return c, bool(ok)
+
+        if self.progress:
+            from tqdm import tqdm
+            from cicsim.command import suppress_console_logging
+            with suppress_console_logging():
+                if self.threads > 1:
+                    with ThreadPoolExecutor(max_workers=self.threads) as executor:
+                        results = list(tqdm(executor.map(run_one, jobs),
+                                           total=len(jobs), desc=self.testbench, unit="sim"))
+                else:
+                    results = list(tqdm((run_one(job) for job in jobs),
+                                       total=len(jobs), desc=self.testbench, unit="sim"))
+        elif self.threads > 1:
+            logger.info(f"Running {len(jobs)} simulation(s) with {self.threads} threads")
+            with ThreadPoolExecutor(max_workers=self.threads) as executor:
+                results = list(executor.map(run_one, jobs))
+        else:
+            results = [run_one(job) for job in jobs]
+
         pyRunLater = list()
         files = list()
         simOk = True
+        failed_names = []
 
-        for corner in permutations:
-            for index in range(0,self.count):
-                if(not simOk):
-                    logger.error(f"Previous simulation failed, skipping {index}")
-                    continue
-
-                #- Run a simulation for a corner
-                c = Simulation(self.testbench,corner,self.runsim,self.config,index,self.sha)
-
-                #- Setup additional replacements
-                c.loadReplace(self.replace)
-
-                #- Run simulation
-                if(not c.run(ignore)):
-                    simOk = False
-                    continue
-
+        for c, ok in results:
+            if not ok:
+                simOk = False
+                failed_names.append(c.name)
+                if not self.progress:
+                    logger.error(f"Simulation {c.name} failed")
+            else:
                 files.append(c.oname)
-
-                #- Run python post parsing if py file exist and simulation is OK
-                if(simOk and os.path.exists(c.pyscript)):
+                if os.path.exists(c.pyscript):
                     pyRunLater.append(c)
 
-
         endTime = datetime.datetime.now()
-        logger.info("Total simulation time: " + str(endTime - startTime))
+        elapsed = str(endTime - startTime)
+
+        if self.progress:
+            passed = len(results) - len(failed_names)
+            print(f"Done: {passed}/{len(results)} passed  [{elapsed}]")
+            for name in failed_names:
+                print(f"  FAILED: {name}")
+        else:
+            logger.info("Total simulation time: " + elapsed)
 
         #- Make runfile
         if(self.cornername):
@@ -607,7 +649,7 @@ class CmdRunNg(cs.CdsConfig):
                     else:
                         tb.main(c.oname)
             #- Extract results
-            r = cs.CmdResults(runfile)
+            r = cs.CmdResults(runfile, progress=self.progress)
             r.run()
         else:
             logger.warning("Skipping post processing, one simulation failed")

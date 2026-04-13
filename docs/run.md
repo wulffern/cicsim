@@ -18,13 +18,15 @@ Usage: cicsim run [OPTIONS] TESTBENCH [CORNER]...
   Run a ngspice simulation of TESTBENCH
 
 Options:
-  --run / --no-run        Run simulator
-  --count INTEGER         Run each corner count times, useful for Monte-Carlo
-  --name TEXT             Control name of run file
-  --ignore / --no-ignore  Ignore error checks
-  --sha / --no-sha        Check SHA of input files
-  --replace TEXT          YAML file with replacements for netlist
-  --help                  Show this message and exit.
+  --run / --no-run            Run simulator
+  --count INTEGER             Run each corner count times, useful for Monte-Carlo
+  --name TEXT                 Control name of run file
+  --ignore / --no-ignore      Ignore error checks
+  --sha / --no-sha            Check SHA of input files
+  --replace TEXT              YAML file with replacements for netlist
+  --threads INTEGER           Number of parallel simulation threads
+  --progress / --no-progress  Show progress bar instead of interleaved logs
+  --help                      Show this message and exit.
 
 ```
 
@@ -296,6 +298,49 @@ then, inside `tran.spi` you would reference the `xdut.spi` with
 
 ```
 .include "../xdut.spi"
+```
+
+## Parallel simulation with `--threads`
+
+By default `cicsim run` simulates one corner at a time. If you have many
+corners (e.g. a Monte-Carlo run of 30 samples), you can run them in parallel
+by passing `--threads N`:
+
+```bash
+cicsim run --threads 8 --name Sch_mc tran Sch Gt Kttmm Tt Vt --count 30
+```
+
+Each corner is an independent ngspice process, so `--threads` maps directly to
+the number of concurrent ngspice processes. A good default is the number of
+physical CPU cores on your machine.
+
+## Progress bar with `--progress`
+
+When running many corners — especially in parallel — the log output from
+multiple ngspice processes becomes interleaved and hard to read. Use
+`--progress` to replace the log stream with a clean progress bar:
+
+```bash
+cicsim run --threads 8 --progress --name Sch_mc tran Sch Gt Kttmm Tt Vt --count 30
+```
+
+```
+tran  [████████████████████████████] 30/30 sim
+Done: 30/30 passed  [0:00:14.231]
+```
+
+All ngspice output is still written to the per-corner `.log` and `.logm` files
+in `output_<testbench>/`. Nothing is lost — the terminal just stays clean.
+
+A typical Makefile setup:
+
+```makefile
+THREADS = 8
+PROGRESS = --progress
+
+mc: netlist
+	cicsim run --threads $(THREADS) $(PROGRESS) --replace replace.yaml \
+	    --name $(VIEW)_mc --count 30 $(TB) $(OPT) $(VIEW) Gt Kttmm Tt Vt
 ```
 
 ## The simulation run 
