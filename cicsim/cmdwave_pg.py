@@ -367,6 +367,7 @@ class PgWaveBrowser(QWidget):
     styleChanged = Signal(str)
     fileRemoveRequested = Signal(str)
     wavePlotAllRequested = Signal(str)
+    wavePlotAllVisibleRequested = Signal()
 
     def __init__(self, xaxis, parent=None):
         super().__init__(parent)
@@ -539,16 +540,23 @@ class PgWaveBrowser(QWidget):
             return [name]
         return [name]
 
+    def _visible_wave_names(self):
+        """Wave names that match the regex filter (shown in the browser tree)."""
+        f = self.files.getSelected()
+        if f is None:
+            return []
+        pattern = self.search.text()
+        return [n for n in f.getWaveNames()
+                if not pattern or re.search(pattern, n, re.IGNORECASE)]
+
     def _fill_waves(self):
         self.wave_tree.clear()
         self._tag_to_item = {}
         f = self.files.getSelected()
         if f is None:
             return
-        pattern = self.search.text()
 
-        names = [n for n in f.getWaveNames()
-                 if not pattern or re.search(pattern, n, re.IGNORECASE)]
+        names = self._visible_wave_names()
 
         if self._flat_mode:
             for name in sorted(names):
@@ -628,12 +636,29 @@ class PgWaveBrowser(QWidget):
 
     def _wave_context(self, pos):
         item = self.wave_tree.itemAt(pos)
-        if not item:
+        f = self.files.getSelected()
+        if f is None:
             return
+        visible = self._visible_wave_names()
+        if not visible:
+            return
+
+        def _plot_all_visible():
+            self.wavePlotAllVisibleRequested.emit()
+
+        if not item:
+            menu = QMenu(self)
+            menu.addAction("Plot all visible waves", _plot_all_visible)
+            menu.exec(self.wave_tree.viewport().mapToGlobal(pos))
+            return
+
         yname = item.data(0, Qt.UserRole)
         if not yname:
+            menu = QMenu(self)
+            menu.addAction("Plot all visible waves", _plot_all_visible)
+            menu.exec(self.wave_tree.viewport().mapToGlobal(pos))
             return
-        f = self.files.getSelected()
+
         tag = f.getTag(yname)
 
         if tag not in self._wave_cache:
@@ -647,6 +672,7 @@ class PgWaveBrowser(QWidget):
         menu.addAction(
             "Plot for all files",
             lambda n=yname: self.wavePlotAllRequested.emit(n))
+        menu.addAction("Plot all visible waves", _plot_all_visible)
         if wave.curve:
             menu.addAction("Remove from plot",
                            lambda: self.waveRemoveRequested.emit(wave))
@@ -1674,6 +1700,8 @@ class PgWaveWindow(QMainWindow):
         self.browser.styleChanged.connect(self._on_style_changed)
         self.browser.fileRemoveRequested.connect(self._on_file_remove)
         self.browser.wavePlotAllRequested.connect(self._plot_wave_all_files)
+        self.browser.wavePlotAllVisibleRequested.connect(
+            self._plot_all_visible_waves)
 
         self._drops_delegate_trees = (
             self.browser.file_tree,
@@ -1893,6 +1921,25 @@ class PgWaveWindow(QMainWindow):
             tag = wf.getTag(yname)
             if tag not in self.browser._wave_cache:
                 self.browser._wave_cache[tag] = PgWave(wf, yname, self.browser.xaxis)
+            wave = self.browser._wave_cache[tag]
+            wave.reload()
+            result = p.show_wave(wave, style=style)
+            if result:
+                tag2, color = result
+                self.browser.setWaveColor(tag2, color)
+
+    def _plot_all_visible_waves(self):
+        p = self._current()
+        if not isinstance(p, PgWavePlot):
+            return
+        f = self.browser.files.getSelected()
+        if f is None:
+            return
+        style = self.browser.plotStyle
+        for yname in sorted(self.browser._visible_wave_names()):
+            tag = f.getTag(yname)
+            if tag not in self.browser._wave_cache:
+                self.browser._wave_cache[tag] = PgWave(f, yname, self.browser.xaxis)
             wave = self.browser._wave_cache[tag]
             wave.reload()
             result = p.show_wave(wave, style=style)
