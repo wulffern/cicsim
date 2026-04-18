@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sys
+import os
 from .command import *
 import math
 from .ngraw import *
@@ -47,14 +48,18 @@ def plot(df,xname,yname,ptype=None,ax=None,label=""):
 
 def rawplot(fraw,xname,yname,ptype=None,axes=None,fname=None):
 
-
-    dfs = toDataFrames(ngRawRead(fraw))
-
-
-    if(len(dfs) == 0):
-        raise ValueError("No plots found in .raw file")
-
-    df = dfs[0]
+    ext = os.path.splitext(fraw)[1].lower()
+    if ext == '.raw':
+        dfs = toDataFrames(ngRawRead(fraw))
+        if len(dfs) == 0:
+            raise ValueError("No plots found in .raw file")
+        df = dfs[0]
+    else:
+        from .wavefiles import WaveFile
+        wf = WaveFile(fraw, xaxis=xname)
+        df = wf.df
+        if df is None or df.empty:
+            raise ValueError("No data found in %s" % fraw)
 
     if("," in yname):
         names = yname.split(",")

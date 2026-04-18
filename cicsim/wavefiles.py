@@ -2,6 +2,7 @@
 
 import cicsim as cs
 import os
+import re
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import EngFormatter
@@ -133,6 +134,7 @@ class WaveFile():
                 self.modified = newmodified
 
     PANDAS_READERS = {
+        '.prn':     lambda self: self._read_prn(),
         '.csv':     lambda self: self._read_csv(','),
         '.tsv':     lambda self: self._read_csv('\t'),
         '.txt':     lambda self: self._read_csv('\t'),
@@ -174,6 +176,66 @@ class WaveFile():
         df = pd.read_excel(self.fname, sheet_name=self.sheet_name)
         df.columns = [c.strip() for c in df.columns]
         return df
+
+    def _read_prn(self):
+        """Parse Xyce .prn (print) waveform file into a DataFrame."""
+        sweep_var = "time"
+        var_names = []
+        times = []
+        data_rows = []
+
+        with open(self.fname, 'r') as f:
+            in_header = False
+            in_nodes = False
+            pending_time = None
+
+            for line in f:
+                line_s = line.strip()
+
+                if line_s.startswith('#H'):
+                    in_header = True
+                    in_nodes = False
+                    continue
+
+                if line_s.startswith('#N'):
+                    in_header = False
+                    in_nodes = True
+                    continue
+
+                if line_s.startswith('#C'):
+                    in_nodes = False
+                    in_header = False
+                    parts = line_s.split()
+                    pending_time = float(parts[1])
+                    continue
+
+                if line_s.startswith('#'):
+                    in_header = False
+                    in_nodes = False
+                    pending_time = None
+                    continue
+
+                if in_header:
+                    m = re.search(r"SWEEPVAR='([^']+)'", line_s)
+                    if m:
+                        sweep_var = m.group(1).lower()
+                    continue
+
+                if in_nodes:
+                    var_names.extend(re.findall(r"'([^']+)'", line_s))
+                    continue
+
+                if pending_time is not None and line_s:
+                    vals = [float(v.split(':')[0]) for v in line_s.split()]
+                    if vals:
+                        times.append(pending_time)
+                        data_rows.append(vals)
+                    pending_time = None
+
+        n_vars = len(var_names)
+        cols = [sweep_var] + [v.lower() for v in var_names]
+        rows = [[t] + d[:n_vars] for t, d in zip(times, data_rows)]
+        return pd.DataFrame(rows, columns=cols)
 
     @staticmethod
     def excel_sheet_names(fname):
