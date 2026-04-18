@@ -18,6 +18,8 @@ dependencies = [
   "tabulate",
   "rich",
   "tqdm",
+  "PySide6",
+  "pyqtgraph",
 ]
 description = "Custom IC Creator Simulation Tools"
 readme = "README.md"
@@ -34,9 +36,6 @@ classifiers = [
     "Topic :: Utilities",
     "Topic :: Scientific/Engineering",
 ]
-
-[project.optional-dependencies]
-pg = ["PySide6", "pyqtgraph"]
 
 [project.scripts]
 cicsim = "cicsim.cicsim:cli"
