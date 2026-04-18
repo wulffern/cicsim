@@ -63,7 +63,7 @@ class SpiceParser():
         cktstr = ""
         for line in cktbuff:
             line = re.sub(r"[\+\\]\n$","",line)
-
+            line = re.sub(r"^\+\s*"," ",line)
             cktstr += line
 
         cktstr = re.sub(r"\s+"," ",cktstr)
