@@ -3,12 +3,8 @@
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import sys
 import os
-from .command import *
-import math
-from .ngraw import *
+from .ngraw import ngRawRead, toDataFrames
 
 logger = logging.getLogger("cicsim")
 

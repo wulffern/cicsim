@@ -31,9 +31,7 @@ import cicsim as cs
 import re
 import os
 import yaml
-import glob
 import pandas as pd
-import numpy as np
 import time
 from rich.console import Console
 from rich.table import Table
@@ -75,7 +73,6 @@ class CmdResults(cs.Command):
 
                 for ind,df in dfg:
 
-                    smin = ""
                     fo.write("|%s|%s | Spec | %s | %s | %s |\n" % (spec.name,c.replace("_","\\_"),spec.string(spec.min),spec.string(spec.typ),spec.string(spec.max)))
                     #print("|%s | %s|%0.4g | %0.4g | %0.4g |" % (c,ind,df[c].min(),df[c].mean(),df[c].max()))
                     fo.write("| | | %s|%s | %s | %s |\n" % (ind,spec.string(df[c].min()),spec.string(df[c].median()),spec.string(df[c].max())))
@@ -114,9 +111,9 @@ class CmdResults(cs.Command):
     def readYaml(self):
         files = list()
         with open(self.runfile) as fi:
-            for l in fi:
-                l = re.sub("\n","",l)
-                files.append(l + ".yaml")
+            for line in fi:
+                line = re.sub("\n","",line)
+                files.append(line + ".yaml")
 
         frames = []
         for f in files:

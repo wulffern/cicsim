@@ -5,7 +5,6 @@ from __future__ import division
 #import division
 import numpy as np
 import pandas as pd
-import glob
 BSIZE_SP = 512 # Max size of a line of data; we don't want to read the
                # whole file to find a line, in case file does not have
                # expected structure.
@@ -33,7 +32,6 @@ def ngRawRead(fname: str):
     # Binary:
     with open(fname, 'rb') as fp:
         plot = {}
-        count = 0
         arrs = []
         plots = []
         names = dict()

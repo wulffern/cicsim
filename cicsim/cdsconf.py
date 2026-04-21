@@ -114,7 +114,7 @@ class CdsConfig(cs.Command):
             with open(filename,"r") as fi:
                 ys = yaml.safe_load(fi)
 
-                if(ys == None):
+                if ys is None:
                     return
 
                 if(self.config is None):
@@ -157,13 +157,6 @@ class CdsConfig(cs.Command):
         else:
             logger.error(f"Argument cadence->{key} is not specified, specify either on command line or in config file")
 
-
-    def getShortName(self,corner):
-        sname = ""
-        for c in corner:
-            c = c.replace(",","")
-            sname += c
-        return sname
 
     def getPermutations(self,corner):
         data = []
