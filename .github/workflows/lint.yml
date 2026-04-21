@@ -7,4 +7,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/ruff-action@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed Python files
+        id: changed-python-files
+        shell: bash
+        run: |
+          base_ref="origin/${{ github.base_ref }}"
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          files=$(git diff --name-only --diff-filter=ACMR "$base_ref...HEAD" -- '*.py' | tr '\n' ' ')
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Run Ruff on changed Python files
+        if: steps.changed-python-files.outputs.files != ''
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: check ${{ steps.changed-python-files.outputs.files }}
+
+      - name: No Python changes
+        if: steps.changed-python-files.outputs.files == ''
+        run: echo "No Python files changed, skipping Ruff."
