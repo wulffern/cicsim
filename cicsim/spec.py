@@ -28,7 +28,6 @@
 #!/usr/bin/env python3
 
 import ast
-import cicsim as cs
 import os
 import yaml
 

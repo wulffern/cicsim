@@ -26,7 +26,6 @@
 ######################################################################
 import pandas as pd
 import yaml
-import sys
 import os
 import numpy as np
 import cicsim as cs
@@ -50,7 +49,6 @@ class SimCalc():
         y = y/(M/2)
         ydB = 20*np.log10(np.abs(y))
 
-        sig = np.max(ydB)
         fbin = np.argmax(ydB)
 
         sigbins = [ 0] +fbin
@@ -83,13 +81,10 @@ class SimCalc():
         y = np.fft.fft(np.multiply(h,x))
         y = y[:int(M/2)]*2
 
-        sigpow = 1.2
-        
         #- Normalize amplitude
         y = y/(M/2)
         ydB = 20*np.log10(np.abs(y))
         
-        sig = np.max(y)
         fbin = np.argmax(y)
 
         if(fbin < 3):

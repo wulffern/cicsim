@@ -29,12 +29,10 @@
 import yaml
 import click
 import sys
-import re
 import os
 import cicsim as cs
 from cicsim.command import setup_logging
 import importlib
-import pandas as pd
 import matplotlib.pyplot as plt
 
 

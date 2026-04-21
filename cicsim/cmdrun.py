@@ -31,7 +31,6 @@ import cicsim as cs
 import re
 import os
 import subprocess
-import yaml
 import sys
 import importlib
 
@@ -81,8 +80,8 @@ END
             if("options" in self.config["spectre"]):
                 options = self.config["spectre"]["options"]
             if("includes" in self.config["spectre"]):
-                for I in self.config["spectre"]["includes"]:
-                    includes += " -I" + I
+                for include_path in self.config["spectre"]["includes"]:
+                    includes += " -I" + include_path
 
         psf = self.fname.replace(".scs",".psf")
         psf = self.rundir + os.path.sep +psf
@@ -170,9 +169,9 @@ END
 
                         m = re.search(r";\s*yamlprint\s(.*)$",line)
                         if(m):
-                            ll = re.split(r"\s*,\s*",m.group(1))
-                            for l in ll:
-                                yamlprint.append(l)
+                            yaml_vars = re.split(r"\s*,\s*",m.group(1))
+                            for yaml_var in yaml_vars:
+                                yamlprint.append(yaml_var)
                         buffer += line
 
                     if(len(yamlprint) > 0):
@@ -210,7 +209,7 @@ END
             with open(focean_all,"w") as fo:
                 fo.write(buff)
             logger.info(f"Running ocean {focean_all}")
-            subprocess.run(f"ocean -nograph -replay {focean_all} -log {focean_all}.log", shell=True)
+            subprocess.run("ocean -nograph -replay " + focean_all + " -log " + focean_all + ".log", shell=True)
 
 
         #- Run python
