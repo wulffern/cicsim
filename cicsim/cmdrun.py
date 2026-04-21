@@ -209,7 +209,7 @@ END
             with open(focean_all,"w") as fo:
                 fo.write(buff)
             logger.info(f"Running ocean {focean_all}")
-            subprocess.run("ocean -nograph -replay " + focean_all + " -log " + focean_all + ".log", shell=True)
+            subprocess.run(f"ocean -nograph -replay {focean_all} -log {focean_all}.log", shell=True)
 
 
         #- Run python
