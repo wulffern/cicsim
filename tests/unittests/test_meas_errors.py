@@ -6,18 +6,39 @@ ngspiceMeas must return False when the .logm file contains "Error:" or "failed"
 lines, True when clean, and ignore "incomplete or empty netlist" errors.
 """
 
+import importlib.util
 import os
+import pathlib
+import sys
 import tempfile
+import types
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+MODULE_PATH = REPO_ROOT / "cicsim" / "cmdrunng.py"
+
+
+def load_simulation_class():
+    stub = types.ModuleType("cicsim")
+    stub.__path__ = [str(REPO_ROOT / "cicsim")]
+    stub.CdsConfig = type("CdsConfig", (), {})
+    sys.modules["cicsim"] = stub
+
+    spec = importlib.util.spec_from_file_location("cicsim.cmdrunng", MODULE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.Simulation
+
+
+Simulation = load_simulation_class()
 
 
 class TestMeasErrorDetection(unittest.TestCase):
 
     def _make_simulation(self, tmpdir, log_content):
         """Create a minimal Simulation-like object with a real logm file."""
-        from cicsim.cmdrunng import Simulation
-
         oname = os.path.join(tmpdir, "tran_TtVt")
         logm_path = oname + ".logm"
         with open(logm_path, "w") as f:
@@ -60,7 +81,6 @@ class TestMeasErrorDetection(unittest.TestCase):
 
     def test_returns_true_when_logm_missing(self):
         with tempfile.TemporaryDirectory() as d:
-            from cicsim.cmdrunng import Simulation
             with patch.object(Simulation, "__init__", lambda self, *a, **kw: None):
                 sim = Simulation.__new__(Simulation)
                 sim.name = "tran_TtVt"
