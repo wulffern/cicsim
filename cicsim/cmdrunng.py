@@ -37,7 +37,6 @@ import hashlib
 import inspect
 import subprocess
 import signal
-import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger("cicsim")
