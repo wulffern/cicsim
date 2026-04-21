@@ -21,6 +21,7 @@ MODULE_PATH = REPO_ROOT / "cicsim" / "cmdrunng.py"
 
 
 def load_simulation_class():
+    original = sys.modules.get("cicsim")
     stub = types.ModuleType("cicsim")
     stub.__path__ = [str(REPO_ROOT / "cicsim")]
     stub.CdsConfig = type("CdsConfig", (), {})
@@ -29,6 +30,12 @@ def load_simulation_class():
     spec = importlib.util.spec_from_file_location("cicsim.cmdrunng", MODULE_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+
+    if original is not None:
+        sys.modules["cicsim"] = original
+    else:
+        del sys.modules["cicsim"]
+
     return module.Simulation
 
 
