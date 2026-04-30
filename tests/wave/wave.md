@@ -99,6 +99,51 @@ Open an Excel file with a specific sheet:
 cicwave data.xlsx --sheet "Sheet2"
 ```
 
+Open many files at once with a glob pattern (useful on PowerShell, which
+doesn't auto-expand globs). The pattern is repeatable and supports `**`
+for recursion:
+
+```bash
+cicwave --glob "results/*.csv"
+cicwave --glob "out/**/*.raw" --glob "extras/*.csv"
+```
+
+## Loading large file sets
+
+Files are opened lazily: only the column header is read on open, and the
+full data is parsed (with `pyarrow` when available) the first time a wave
+is actually plotted. This makes it practical to drop hundreds of large
+CSV/TSV/Excel files into the viewer at once. Selecting "Plot all visible
+waves" or "Plot for all files" then triggers the full parse only for the
+files you actually plot.
+
+When `PyOpenGL` is installed (it is by default), the pyqtgraph backend
+uses GPU-accelerated rendering, which keeps zoom/pan responsive even
+with hundreds of curves on screen. Display-time downsampling (lossless,
+viewport-aware) is enabled automatically.
+
+## Automatic unit detection
+
+When a column name carries a unit suffix, `cicwave` picks it up so axis
+labels and engineering-notation tick formatting work without any manual
+configuration. Recognised forms (separator may be `_`, ` `, `/`, `[]`,
+`()`, or `{}`):
+
+| Column name | Detected unit | Data scaling | Axis label |
+|-------------|---------------|--------------|------------|
+| `Frequency_MHz` | `Hz` | × 1e6 | "Frequency" |
+| `Amplitude [dBm]` | `dBm` | × 1.0 | "Amplitude" |
+| `delay_ps` | `s` | × 1e-12 | "delay" |
+| `I_uA` | `A` | × 1e-6 | "I" |
+| `phase / deg` | `deg` | × 1.0 | "phase" |
+
+SI-prefixed base units (`Hz, V, A, s, W, F, H, Ω/ohm`) with prefixes
+`y/z/a/f/p/n/u/µ/m/k/K/M/G/T/P/E` are rescaled to the base unit so
+ticks display nice prefixes (e.g. "5.726 GHz") regardless of the unit
+the data was stored in. Log-domain units (`dB, dBm, dBV, dBuV, dBc,
+dBFS, dBi, dBA`) are kept as the literal string and never rescaled.
+SPICE-style names like `v(out)` and `i(M1.d)` are left untouched.
+
 ## Examples
 
 There is example test data in `tests/wave`. Navigate to that directory.
@@ -190,8 +235,9 @@ slope, and derivative values at both cursor positions.
 |--------|--------|
 | Scroll | Zoom x-axis |
 | Shift+Scroll | Zoom y-axis |
-| Shift+Right-drag | Zoom x-axis |
-| Ctrl+Right-drag | Zoom y-axis |
+| Right-drag | Rubber-band zoom rectangle |
+| Shift+Right-drag | Pan x-axis |
+| Ctrl+Right-drag | Pan y-axis |
 | Left-drag | Pan |
 | Click cursor line | Drag to reposition |
 

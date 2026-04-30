@@ -43,6 +43,7 @@ This is a script package I use to control ngspice, it can
 | 0.2.5   | cicwave: fixed grid in light mode, improved zoom performance, fixed font warning |
 | 0.2.6   | cicwave: drag-and-drop files, file menu, improved A/B cursor readout and X vs Y picker. Added GitHub release workflow |
 | 0.2.7   | `cicsim run`: added `--threads` for parallel simulations, `--progress` for tqdm progress bar, `--timeout` to kill hung sims, rich terminal results table. Bug fixes: uninitialized error state, float parse errors in log, silent measurement failures, dead code removed. CI: dependabot, ruff lint on PRs, pinned action versions, automated PyPI publish |
+| 0.2.8   | cicwave: lazy file loading (header-only on open) and pyarrow CSV reader for ~5× faster bulk loads, `--glob` option (repeatable, recursive), display-time downsampling and OpenGL acceleration for smoother zoom with many curves, right-drag rubber-band zoom, automatic unit detection from column suffixes (`_MHz`, `[dBm]`, `(V)`, ...), proper x/y axis labels on plot-all |
 
 
 # Install this module
@@ -84,7 +85,16 @@ Supported file formats: `.raw` (ngspice), `.csv`, `.tsv`, `.txt`, `.xlsx`,
 # Open CSV / Excel files
 cicwave data.csv
 cicwave data.xlsx --sheet "Sheet2"
+
+# Open many files via a glob (works on PowerShell too; supports **)
+cicwave --glob "results/*.csv"
+cicwave --glob "out/**/*.raw"
 ```
+
+Files are opened lazily (header-only) and parsed with `pyarrow`, so dropping
+hundreds of large CSV files into the viewer is fast. Column-name unit
+suffixes like `_MHz`, `[dBm]`, `(V)` are detected automatically and used
+for axis labels and engineering-notation tick formatting.
 
 ![](wave.png)
 
@@ -105,6 +115,9 @@ cicwave data.xlsx --sheet "Sheet2"
 | `Ctrl+Q` | Quit |
 | Scroll | Zoom x-axis |
 | Shift+Scroll | Zoom y-axis |
+| Right-drag | Rubber-band zoom rectangle (pg) |
+| Shift+Right-drag | Pan x-axis (pg) |
+| Ctrl+Right-drag | Pan y-axis (pg) |
 
 ## Analysis functions (pg backend, right-click menu)
 
@@ -159,8 +172,13 @@ Usage: cicwave [OPTIONS] [FILES]...
   Waveform viewer (standalone). Defaults to the pyqtgraph backend.
 
 Options:
+  --glob TEXT             Glob pattern (repeatable, supports ** for recursion)
   --x TEXT                Specify x-axis
   --backend [tk|pg]       GUI backend (default: pg)
   --sheet TEXT            Sheet name for Excel files
+  --pivot TEXT            Pivot spec file (YAML/JSON)
+  --pivot-info            Print pivot dimensions and exit
+  --session TEXT          Load session file (.cicwave.yaml)
+  --export TEXT           Export plot to file (PDF/PNG/SVG) and exit
   --help                  Show this message and exit.
 ```

@@ -43,8 +43,9 @@ Usage: cicsim wave [OPTIONS] [FILES]...
   Mouse (pg backend):
     Scroll             Zoom x-axis
     Shift+Scroll       Zoom y-axis
-    Shift+Right-drag   Zoom x-axis
-    Ctrl+Right-drag    Zoom y-axis
+    Right-drag         Zoom to rubber-band rectangle
+    Shift+Right-drag   Pan x-axis
+    Ctrl+Right-drag    Pan y-axis
     Left-drag          Pan
 
   Browser (pg backend):
@@ -67,8 +68,16 @@ Usage: cicsim wave [OPTIONS] [FILES]...
     --export plot.pdf                   Export to file and exit (no GUI)
     --session s.yaml --export out.pdf   Restore session and export
 
+  Globs:
+    --glob 'data/*.csv'             Repeatable, supports ** for recursion
+    --glob '**/*.raw'               Useful on PowerShell which doesn't
+                                     auto-expand patterns
+
 Options:
-  --x TEXT           Specify x-axis
+  --glob TEXT        Glob pattern (repeatable). Supports ** for recursion.
+                     Useful on shells like PowerShell that don't auto-expand.
+  --x TEXT           X-axis column; else CICWAVE_X / CICSIM_X_AXIS; else saved
+                     default (pg); else auto
   --backend [tk|pg]  GUI backend: tk (tkinter+matplotlib) or pg
                      (PySide6+pyqtgraph)
   --sheet TEXT       Sheet name for Excel files (default: first sheet)
@@ -168,6 +177,51 @@ Open an Excel file with a specific sheet:
 cicwave data.xlsx --sheet "Sheet2"
 ```
 
+Open many files at once with a glob pattern (useful on PowerShell, which
+doesn't auto-expand globs). The pattern is repeatable and supports `**`
+for recursion:
+
+```bash
+cicwave --glob "results/*.csv"
+cicwave --glob "out/**/*.raw" --glob "extras/*.csv"
+```
+
+## Loading large file sets
+
+Files are opened lazily: only the column header is read on open, and the
+full data is parsed (with `pyarrow` when available) the first time a wave
+is actually plotted. This makes it practical to drop hundreds of large
+CSV/TSV/Excel files into the viewer at once. Selecting "Plot all visible
+waves" or "Plot for all files" then triggers the full parse only for the
+files you actually plot.
+
+When `PyOpenGL` is installed (it is by default), the pyqtgraph backend
+uses GPU-accelerated rendering, which keeps zoom/pan responsive even
+with hundreds of curves on screen. Display-time downsampling (lossless,
+viewport-aware) is enabled automatically.
+
+## Automatic unit detection
+
+When a column name carries a unit suffix, `cicwave` picks it up so axis
+labels and engineering-notation tick formatting work without any manual
+configuration. Recognised forms (separator may be `_`, ` `, `/`, `[]`,
+`()`, or `{}`):
+
+| Column name | Detected unit | Data scaling | Axis label |
+|-------------|---------------|--------------|------------|
+| `Frequency_MHz` | `Hz` | × 1e6 | "Frequency" |
+| `Amplitude [dBm]` | `dBm` | × 1.0 | "Amplitude" |
+| `delay_ps` | `s` | × 1e-12 | "delay" |
+| `I_uA` | `A` | × 1e-6 | "I" |
+| `phase / deg` | `deg` | × 1.0 | "phase" |
+
+SI-prefixed base units (`Hz, V, A, s, W, F, H, Ω/ohm`) with prefixes
+`y/z/a/f/p/n/u/µ/m/k/K/M/G/T/P/E` are rescaled to the base unit so
+ticks display nice prefixes (e.g. "5.726 GHz") regardless of the unit
+the data was stored in. Log-domain units (`dB, dBm, dBV, dBuV, dBc,
+dBFS, dBi, dBA`) are kept as the literal string and never rescaled.
+SPICE-style names like `v(out)` and `i(M1.d)` are left untouched.
+
 ## Examples
 
 There is example test data in `tests/wave`. Navigate to that directory.
@@ -206,17 +260,8 @@ cat session_dual.cicwave.yaml
 ```
 
 ```bash
-files:
-  - path: test.csv
-plots:
-  - name: Dual Y-axes
-    waves:
-      - file: 0
-        name: "v(vp)"
-        style: Lines
-      - file: 0
-        name: "i(ibias)"
-        style: Lines
+'cat' is not recognized as an internal or external command,
+operable program or batch file.
 
 ```
 
@@ -275,8 +320,9 @@ slope, and derivative values at both cursor positions.
 |--------|--------|
 | Scroll | Zoom x-axis |
 | Shift+Scroll | Zoom y-axis |
-| Shift+Right-drag | Zoom x-axis |
-| Ctrl+Right-drag | Zoom y-axis |
+| Right-drag | Rubber-band zoom rectangle |
+| Shift+Right-drag | Pan x-axis |
+| Ctrl+Right-drag | Pan y-axis |
 | Left-drag | Pan |
 | Click cursor line | Drag to reposition |
 
@@ -449,37 +495,8 @@ cat pivot_data.csv
 ```
 
 ```bash
-Parameter,Frequency,Measurement,Temp
-Gain,1000,42.1,27
-Gain,10000,41.8,27
-Gain,100000,40.2,27
-Gain,1000000,32.5,27
-Gain,10000000,12.3,27
-Gain,1000,43.0,-40
-Gain,10000,42.7,-40
-Gain,100000,41.1,-40
-Gain,1000000,33.8,-40
-Gain,10000000,13.1,-40
-Gain,1000,41.2,125
-Gain,10000,40.9,125
-Gain,100000,39.3,125
-Gain,1000000,31.2,125
-Gain,10000000,11.5,125
-Phase,1000,-1.2,27
-Phase,10000,-5.8,27
-Phase,100000,-45.3,27
-Phase,1000000,-120.7,27
-Phase,10000000,-170.2,27
-Phase,1000,-1.0,-40
-Phase,10000,-5.2,-40
-Phase,100000,-42.1,-40
-Phase,1000000,-115.3,-40
-Phase,10000000,-168.5,-40
-Phase,1000,-1.4,125
-Phase,10000,-6.5,125
-Phase,100000,-48.7,125
-Phase,1000000,-125.9,125
-Phase,10000000,-172.1,125
+'cat' is not recognized as an internal or external command,
+operable program or batch file.
 
 ```
 
@@ -491,11 +508,8 @@ cat pivot_spec.yaml
 ```
 
 ```bash
-index: Parameter
-columns: Frequency
-values: Measurement
-conditions:
-  - Temp
+'cat' is not recognized as an internal or external command,
+operable program or batch file.
 
 ```
 

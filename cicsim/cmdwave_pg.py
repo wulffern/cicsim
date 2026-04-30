@@ -19,13 +19,13 @@ from PySide6.QtWidgets import (
     QInputDialog, QMenu, QComboBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView)
 from PySide6 import QtCore
-from PySide6.QtCore import Qt, Signal, QEvent, QSettings
+from PySide6.QtCore import Qt, Signal, QEvent, QSettings, QTimer
 from PySide6.QtGui import (QKeySequence, QFont, QFontDatabase, QShortcut,
                            QPainter, QColor, QPalette)
 
 import pyqtgraph as pg
 
-from .wavefiles import WaveFile, WaveFiles
+from .wavefiles import WaveFile, WaveFiles, parse_unit_from_name
 from .theme import THEMES, _get_theme, _set_active_theme
 from matplotlib.ticker import EngFormatter
 
@@ -221,8 +221,10 @@ class PgWave:
         self.y = None
         self.xlabel = "Samples"
         self.xunit = ""
-        self.yunit = self._infer_yunit(key)
-        self.ylabel = "%s (%s)" % (key, wfile.name)
+        self.yunit, self._yscale, self._yclean = self._infer_unit(
+            key, default="V" if self._is_v(key)
+            else "A" if self._is_i(key) else "")
+        self.ylabel = "%s (%s)" % (self._yclean or key, wfile.name)
         self.logx = False
         self.tag = wfile.getTag(key)
         self.curve = None
@@ -232,51 +234,107 @@ class PgWave:
         self.reload()
 
     @staticmethod
+    def _is_v(key):
+        kl = (key or "").lower()
+        return kl.startswith("v(") or kl.startswith("v-")
+
+    @staticmethod
+    def _is_i(key):
+        kl = (key or "").lower()
+        return kl.startswith("i(") or kl.startswith("i-")
+
+    @staticmethod
+    def _infer_unit(key, default=""):
+        """Return ``(unit, scale, clean_label)`` for ``key``.
+
+        Tries the suffix parser first (handles ``Foo_dBm``, ``Bar [MHz]``,
+        ``Baz (V)`` etc); falls back to ``default`` when no suffix is
+        recognised.
+        """
+        parsed = parse_unit_from_name(key)
+        if parsed is not None:
+            scale, unit, clean = parsed
+            return unit, scale, clean
+        return default, 1.0, key
+
+    @staticmethod
     def _infer_yunit(key):
-        kl = key.lower()
-        if kl.startswith("v(") or kl.startswith("v-"):
-            return "V"
-        if kl.startswith("i(") or kl.startswith("i-"):
-            return "A"
-        return ""
+        # Kept for backwards compatibility (used by older code paths /
+        # tests). Prefer ``_infer_unit``.
+        unit, _scale, _clean = PgWave._infer_unit(
+            key, default="V" if PgWave._is_v(key)
+            else "A" if PgWave._is_i(key) else "")
+        return unit
+
+    def _set_x_from_column(self, col, label, unit, logx=False):
+        arr = self.wfile.df[col].to_numpy()
+        # Auto-rescale prefixed-SI columns so EngFormatter shows nice
+        # prefixes regardless of the unit the data was stored in.
+        parsed = parse_unit_from_name(col)
+        if parsed is not None:
+            scale, base_unit, clean = parsed
+            arr = arr * scale if scale != 1.0 else arr
+            self.x = arr
+            self.xlabel = clean or label
+            self.xunit = base_unit
+        else:
+            self.x = arr
+            self.xlabel = label
+            self.xunit = unit
+        self.logx = logx
 
     def reload(self):
         self.wfile.reload()
         keys = self.wfile.df.columns
 
         if "time" in keys:
-            self.x = self.wfile.df["time"].to_numpy()
-            self.xlabel = "Time"
-            self.xunit = "s"
+            self._set_x_from_column("time", "Time", "s")
         elif "frequency" in keys:
-            self.x = self.wfile.df["frequency"].to_numpy()
-            self.xlabel = "Frequency"
-            self.xunit = "Hz"
-            self.logx = True
+            self._set_x_from_column("frequency", "Frequency", "Hz",
+                                    logx=True)
         elif "v(v-sweep)" in keys:
-            self.x = self.wfile.df["v(v-sweep)"].to_numpy()
-            self.xlabel = "Voltage"
-            self.xunit = "V"
+            self._set_x_from_column("v(v-sweep)", "Voltage", "V")
         elif "i(i-sweep)" in keys:
-            self.x = self.wfile.df["i(i-sweep)"].to_numpy()
-            self.xlabel = "Current"
-            self.xunit = "A"
+            self._set_x_from_column("i(i-sweep)", "Current", "A")
         elif "temp-sweep" in keys:
-            self.x = self.wfile.df["temp-sweep"].to_numpy()
-            self.xlabel = "Temperature"
-            self.xunit = "°C"
-        elif self.xaxis in keys:
-            self.x = self.wfile.df[self.xaxis].to_numpy()
-            self.xlabel = self.xaxis
-            self.xunit = ""
+            self._set_x_from_column("temp-sweep", "Temperature", "°C")
+        elif self.xaxis and self.xaxis in keys:
+            self._set_x_from_column(self.xaxis, self.xaxis, "")
+        else:
+            # No known x-axis name; pick the first column that carries a
+            # parseable unit suffix and isn't the y-key itself.
+            for col in keys:
+                if col == self.key:
+                    continue
+                if parse_unit_from_name(col) is not None:
+                    self._set_x_from_column(col, col, "")
+                    break
 
         if self.key in keys:
-            self.y = self.wfile.df[self.key].to_numpy()
+            y = self.wfile.df[self.key].to_numpy()
+            if self._yscale != 1.0:
+                y = y * self._yscale
+            self.y = y
 
         if self.curve and self.x is not None and self.y is not None:
             x, _ = _to_numeric(self.x)
             y, _ = _to_numeric(self.y)
             self.curve.setData(x, y)
+
+    @staticmethod
+    def _apply_render_opts(curve):
+        """Lossless render-time optimizations for dense waveforms.
+
+        ``method='subsample'`` (every-Nth-point) is significantly cheaper to
+        recompute on each viewport change than ``'peak'`` and the visual
+        difference is negligible once ``clipToView`` is on, especially with
+        many curves stacked together.
+        """
+        curve.opts['clipToView'] = True
+        try:
+            curve.setDownsampling(auto=True, method='subsample')
+        except Exception:
+            pass
 
     def plot(self, target, color='w', style='Lines', width=2):
         """Plot on a PlotItem or ViewBox. Returns the curve or None."""
@@ -290,7 +348,7 @@ class PgWave:
         kw = _style_kwargs(color, style, width=width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         target.addItem(self.curve)
-        self.curve.opts['clipToView'] = True
+        self._apply_render_opts(self.curve)
         return self.curve
 
     def setStyle(self, style):
@@ -304,7 +362,7 @@ class PgWave:
         kw = _style_kwargs(self.color, style, width=self._width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         vb.addItem(self.curve)
-        self.curve.opts['clipToView'] = True
+        self._apply_render_opts(self.curve)
 
     def setWidth(self, width):
         if self.curve is None:
@@ -317,7 +375,7 @@ class PgWave:
         kw = _style_kwargs(self.color, self.style, width=width)
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         vb.addItem(self.curve)
-        self.curve.opts['clipToView'] = True
+        self._apply_render_opts(self.curve)
 
     def remove(self):
         if self.curve:
@@ -750,6 +808,17 @@ class PgWavePlot(QWidget):
         self.custom_ylabel = None
         self.custom_title = None
 
+        # Wheel-zoom coalescing: rapid wheel ticks (touchpad / high-rate
+        # mice) are accumulated into a single deferred range update so we
+        # don't trigger per-curve downsampling re-computation on every tick.
+        self._wheel_pending_x_scale = 1.0
+        self._wheel_pending_y_scale = 1.0
+        self._wheel_pending_pos = None
+        self._wheel_timer = QTimer(self)
+        self._wheel_timer.setSingleShot(True)
+        self._wheel_timer.setInterval(16)  # ~one frame at 60 Hz
+        self._wheel_timer.timeout.connect(self._apply_pending_wheel_zoom)
+
         self.gw.scene().sigMouseMoved.connect(self._on_mouse_moved)
 
     def _apply_panel_style(self):
@@ -769,15 +838,20 @@ class PgWavePlot(QWidget):
             vbs.append(self._right_vb)
         return vbs
 
-    def _get_or_create_vb(self, yunit):
-        """Return the ViewBox for a given yunit, creating axes as needed."""
+    def _get_or_create_vb(self, yunit, ylabel_text=""):
+        """Return the ViewBox for a given yunit, creating axes as needed.
+
+        ``ylabel_text`` is the descriptive name used as the axis title text
+        (e.g. ``"Amplitude"`` cleaned from ``"Amplitude_dBm"``). If empty
+        the axis shows only the unit, as before.
+        """
         if yunit in self._unit_vb:
             return self._unit_vb[yunit]
 
         if not self._unit_vb:
             self._unit_vb[yunit] = self.plot.vb
-            if yunit:
-                self.plot.setLabel('left', units=yunit)
+            if yunit or ylabel_text:
+                self.plot.setLabel('left', ylabel_text, units=yunit)
             return self.plot.vb
 
         if self._right_vb is None:
@@ -792,8 +866,8 @@ class PgWavePlot(QWidget):
             self._right_vb.mouseDragEvent = self._on_mouse_drag
 
         self._unit_vb[yunit] = self._right_vb
-        if yunit:
-            self.plot.setLabel('right', units=yunit)
+        if yunit or ylabel_text:
+            self.plot.setLabel('right', ylabel_text, units=yunit)
 
         self._ensure_cursors_on_right_vb()
         return self._right_vb
@@ -829,15 +903,19 @@ class PgWavePlot(QWidget):
             return None
 
         yunit = wave.yunit or ""
+        # Cleaned-up name (e.g. "Amplitude" from "Amplitude_dBm"); falls
+        # back to the raw key.
+        yname = getattr(wave, "_yclean", None) or wave.key
 
         if not self.wave_data:
-            if wave.xunit:
-                self.plot.setLabel('bottom', wave.xlabel, units=wave.xunit)
+            xlabel = wave.xlabel or ""
+            if wave.xunit or xlabel:
+                self.plot.setLabel('bottom', xlabel, units=wave.xunit or "")
             if wave.logx:
                 self.plot.setLogMode(x=True)
                 self._logx = True
 
-        vb = self._get_or_create_vb(yunit)
+        vb = self._get_or_create_vb(yunit, ylabel_text=yname)
 
         theme = _get_theme()
         wcolors = theme['wave_colors']
@@ -1182,7 +1260,7 @@ class PgWavePlot(QWidget):
         self._update_readout()
         self._update_delta_texts()
 
-    # --- Scroll zoom (matches tk implementation) ---
+    # --- Scroll zoom (coalesced; matches tk implementation) ---
 
     def _on_wheel(self, event, axis=None):
         delta = event.delta()
@@ -1190,28 +1268,50 @@ class PgWavePlot(QWidget):
             return
 
         scale = 1.0 / ZOOM_FACTOR if delta > 0 else ZOOM_FACTOR
-        pos = event.pos()
-        mouse_point = self.plot.vb.mapSceneToView(pos)
-
         modifiers = event.modifiers()
+
+        # Anchor the zoom on the position of the FIRST event in a burst so
+        # accumulated scaling happens around a stable point.
+        if not self._wheel_timer.isActive():
+            self._wheel_pending_pos = event.pos()
+            self._wheel_pending_x_scale = 1.0
+            self._wheel_pending_y_scale = 1.0
+
         if modifiers & Qt.ShiftModifier:
+            self._wheel_pending_y_scale *= scale
+        else:
+            self._wheel_pending_x_scale *= scale
+
+        self._wheel_timer.start()
+        event.accept()
+
+    def _apply_pending_wheel_zoom(self):
+        pos = self._wheel_pending_pos
+        if pos is None:
+            return
+        sx = self._wheel_pending_x_scale
+        sy = self._wheel_pending_y_scale
+        self._wheel_pending_x_scale = 1.0
+        self._wheel_pending_y_scale = 1.0
+
+        if sy != 1.0:
             for vb in self._all_viewboxes():
                 vr = vb.viewRange()
                 ylo, yhi = vr[1]
                 pt = vb.mapSceneToView(pos)
                 ydata = pt.y()
-                new_lo = ydata - (ydata - ylo) * scale
-                new_hi = ydata + (yhi - ydata) * scale
+                new_lo = ydata - (ydata - ylo) * sy
+                new_hi = ydata + (yhi - ydata) * sy
                 vb.setYRange(new_lo, new_hi, padding=0)
-        else:
+
+        if sx != 1.0:
+            mouse_point = self.plot.vb.mapSceneToView(pos)
             vr = self.plot.vb.viewRange()
             xlo, xhi = vr[0]
             xdata = mouse_point.x()
-            new_lo = xdata - (xdata - xlo) * scale
-            new_hi = xdata + (xhi - xdata) * scale
+            new_lo = xdata - (xdata - xlo) * sx
+            new_hi = xdata + (xhi - xdata) * sx
             self.plot.vb.setXRange(new_lo, new_hi, padding=0)
-
-        event.accept()
 
     def _on_mouse_drag(self, ev, axis=None):
         mods = ev.modifiers()
@@ -1238,8 +1338,40 @@ class PgWavePlot(QWidget):
                     yspan = yhi - ylo
                     vbox.setYRange(ylo - dy * yspan, yhi + dy * yspan,
                                    padding=0)
+        elif ev.button() == Qt.RightButton:
+            self._right_drag_rubber_band(ev)
         else:
             self._orig_mouseDragEvent(ev, axis)
+
+    def _right_drag_rubber_band(self, ev):
+        """Right-drag draws a rubber-band rectangle and zooms to it on
+        release. Reuses pyqtgraph's built-in scale-box machinery so the
+        rectangle styling and zoom history match RectMode."""
+        ev.accept()
+        vb = self.plot.vb
+        if ev.isFinish():
+            try:
+                vb.rbScaleBox.hide()
+            except Exception:
+                pass
+            down_pos = ev.buttonDownPos(Qt.RightButton)
+            from PySide6.QtCore import QRectF
+            from pyqtgraph import Point
+            ax = QRectF(Point(down_pos), Point(ev.pos()))
+            # Ignore tiny rectangles (treat as a click, not a drag).
+            if abs(ax.width()) < 3 or abs(ax.height()) < 3:
+                return
+            ax = vb.childGroup.mapRectFromParent(ax)
+            vb.showAxRect(ax)
+            # Push onto the built-in axis history so View > "axis history"
+            # navigation still works as expected.
+            try:
+                vb.axHistoryPointer += 1
+                vb.axHistory = (vb.axHistory[:vb.axHistoryPointer] + [ax])
+            except Exception:
+                pass
+        else:
+            vb.updateScaleBox(ev.buttonDownPos(), ev.pos())
 
     # --- Delta text on plot ---
 
@@ -2531,10 +2663,24 @@ def _apply_theme(app, theme_name='dark'):
                         foreground=theme['pg_foreground'])
 
 
+def _detect_opengl():
+    """Return True if PyOpenGL is importable. pyqtgraph needs it for the
+    GL-accelerated renderer; without it we stay on the raster backend."""
+    try:
+        import OpenGL  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
 class CmdWavePg:
     def __init__(self, xaxis, theme='dark'):
         self.app = QApplication.instance() or QApplication(sys.argv)
-        pg.setConfigOptions(antialias=False, useOpenGL=False)
+        # Enable OpenGL when available: gives a large speedup when many
+        # curves are on screen (e.g. one curve per file across hundreds of
+        # files). Falls back silently to raster when PyOpenGL is missing.
+        use_gl = _detect_opengl()
+        pg.setConfigOptions(antialias=False, useOpenGL=use_gl)
         _apply_theme(self.app, theme)
         effective = xaxis
         if not effective:

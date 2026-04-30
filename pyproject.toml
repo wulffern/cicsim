@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cicsim"
-version = "0.2.7"
+version = "0.2.8"
 authors = [
   { name="Carsten Wulff", email="carsten@wulff.no" },
 ]
 dependencies = [
   "numpy",
   "pandas",
+  "pyarrow",
   "jinja2",
   "matplotlib",
   "click",
@@ -20,6 +21,7 @@ dependencies = [
   "tqdm",
   "PySide6",
   "pyqtgraph",
+  "PyOpenGL",
 ]
 description = "Custom IC Creator Simulation Tools"
 readme = "README.md"

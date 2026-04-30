@@ -30,6 +30,7 @@ import yaml
 import click
 import sys
 import os
+import glob as _glob
 import cicsim as cs
 from cicsim.command import setup_logging
 import importlib
@@ -92,6 +93,9 @@ def archive(ctx,name,runfiles):
 
 @cli.command()
 @click.argument("files",nargs=-1)
+@click.option("--glob","globs",multiple=True,
+              help="Glob pattern (repeatable). Supports ** for recursion. "
+                   "Useful on shells like PowerShell that don't auto-expand.")
 @click.option("--x", default=None,
               help="X-axis column; else CICWAVE_X / CICSIM_X_AXIS; else saved default (pg); else auto")
 @click.option("--backend",default="tk",type=click.Choice(["tk","pg"]),
@@ -101,7 +105,7 @@ def archive(ctx,name,runfiles):
 @click.option("--pivot-info",is_flag=True,default=False,help="Print pivot dimensions and exit")
 @click.option("--session",default=None,help="Load session file (.cicwave.yaml)")
 @click.option("--export",default=None,help="Export plot to file (PDF/PNG/SVG) and exit")
-def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
+def wave(files,globs,x,backend,sheet,pivot,pivot_info,session,export):
     """Open waveform viewer.
 
     Interactive waveform viewer for SPICE simulation results (.raw files).
@@ -132,8 +136,9 @@ def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
     Mouse (pg backend):
       Scroll             Zoom x-axis
       Shift+Scroll       Zoom y-axis
-      Shift+Right-drag   Zoom x-axis
-      Ctrl+Right-drag    Zoom y-axis
+      Right-drag         Zoom to rubber-band rectangle
+      Shift+Right-drag   Pan x-axis
+      Ctrl+Right-drag    Pan y-axis
       Left-drag          Pan
 
     \b
@@ -159,8 +164,14 @@ def wave(files,x,backend,sheet,pivot,pivot_info,session,export):
       --session plot.cicwave.yaml         Load saved session
       --export plot.pdf                   Export to file and exit (no GUI)
       --session s.yaml --export out.pdf   Restore session and export
-    """
 
+    \b
+    Globs:
+      --glob 'data/*.csv'             Repeatable, supports ** for recursion
+      --glob '**/*.raw'               Useful on PowerShell which doesn't
+                                       auto-expand patterns
+    """
+    files = _expand_glob_patterns(files, globs)
     _run_wave(files, x, backend, sheet, pivot, pivot_info,
               session_path=session, export_path=export)
 
@@ -173,6 +184,33 @@ def _resolve_wave_x_from_cli_env(cli_x):
     if v and str(v).strip():
         return str(v).strip()
     return None
+
+
+def _expand_glob_patterns(files, patterns):
+    """Merge positional ``files`` with files matched by --glob ``patterns``.
+
+    Each pattern is expanded with ``glob.glob(..., recursive=True)`` so that
+    ``**`` works. Order: positional first, then each pattern in order. Files
+    are de-duplicated while preserving first-seen order. Patterns that match
+    nothing are reported on stderr but not fatal.
+    """
+    out = []
+    seen = set()
+    for f in files:
+        if f not in seen:
+            seen.add(f)
+            out.append(f)
+    for pat in patterns or ():
+        matches = sorted(_glob.glob(pat, recursive=True))
+        if not matches:
+            print("warning: --glob '%s' matched no files" % pat,
+                  file=sys.stderr)
+            continue
+        for m in matches:
+            if m not in seen:
+                seen.add(m)
+                out.append(m)
+    return tuple(out)
 
 
 def _run_wave(files, x, backend, sheet, pivot_spec=None,
@@ -237,6 +275,9 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None,
 
 @click.command()
 @click.argument("files", nargs=-1)
+@click.option("--glob", "globs", multiple=True,
+              help="Glob pattern (repeatable). Supports ** for recursion. "
+                   "Useful on shells like PowerShell that don't auto-expand.")
 @click.option("--x", default=None,
               help="X-axis column; else CICWAVE_X / CICSIM_X_AXIS; else saved default; else auto")
 @click.option("--backend", default="pg", type=click.Choice(["tk", "pg"]),
@@ -246,7 +287,7 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None,
 @click.option("--pivot-info", is_flag=True, default=False, help="Print pivot dimensions and exit")
 @click.option("--session", default=None, help="Load session file (.cicwave.yaml)")
 @click.option("--export", default=None, help="Export plot to file (PDF/PNG/SVG) and exit")
-def cicwave(files, x, backend, sheet, pivot, pivot_info, session, export):
+def cicwave(files, globs, x, backend, sheet, pivot, pivot_info, session, export):
     """Waveform viewer (standalone).
 
     Shortcut for 'cicsim wave --backend pg'. Opens the pyqtgraph-based
@@ -265,7 +306,14 @@ def cicwave(files, x, backend, sheet, pivot, pivot_info, session, export):
       --session plot.cicwave.yaml         Load saved session
       --export plot.pdf                   Export to file and exit (no GUI)
       --session s.yaml --export out.pdf   Restore session and export
+
+    \b
+    Globs:
+      --glob 'data/*.csv'             Repeatable, supports ** for recursion
+      --glob '**/*.raw'               Useful on PowerShell which doesn't
+                                       auto-expand patterns
     """
+    files = _expand_glob_patterns(files, globs)
     _run_wave(files, x, backend, sheet, pivot, pivot_info,
               session_path=session, export_path=export)
 
