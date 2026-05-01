@@ -26,8 +26,9 @@ Usage: cicsim wave [OPTIONS] [FILES]...
     F              Auto scale (fit all)
     R              Reload all waveforms
     L              Toggle legend
-    Shift+Z        Zoom in
-    Ctrl+Z         Zoom out
+    D              Toggle focused wave between analog and digital pane
+    Z              Zoom in
+    Shift+Z        Zoom out (Ctrl+Z also works)
     Ctrl+O         Open raw file
     Ctrl+S         Save session
     Ctrl+P         Export to PDF
@@ -43,9 +44,9 @@ Usage: cicsim wave [OPTIONS] [FILES]...
   Mouse (pg backend):
     Scroll             Zoom x-axis
     Shift+Scroll       Zoom y-axis
-    Right-drag         Zoom to rubber-band rectangle
-    Shift+Right-drag   Pan x-axis
-    Ctrl+Right-drag    Pan y-axis
+    Right-drag         Rubber-band zoom (2D)
+    Shift+Right-drag   Rubber-band zoom (X only)
+    Ctrl+Right-drag    Rubber-band zoom (Y only)
     Left-drag          Pan
 
   Browser (pg backend):
@@ -112,6 +113,7 @@ functions, and GPU-accelerated rendering.
 | Format | Extensions | Notes |
 |--------|-----------|-------|
 | ngspice raw | `.raw` | Binary raw files (transient, AC, DC) |
+| VCD | `.vcd` | Value Change Dump (digital simulation traces) |
 | CSV | `.csv` | Comma-separated values |
 | TSV | `.tsv`, `.txt` | Tab-separated values |
 | Excel | `.xlsx`, `.xls`, `.ods` | Use `--sheet` to pick sheet |
@@ -289,8 +291,9 @@ operable program or batch file.
 | Ctrl+T | Add annotation (pg) |
 | R | Reload all waveforms |
 | F | Auto scale (fit all) |
-| Shift+Z | Zoom in |
-| Ctrl+Z | Zoom out |
+| Z | Zoom in |
+| Shift+Z | Zoom out (Ctrl+Z also works) |
+| D | Toggle focused wave between analog and digital pane (pg) |
 | Delete | Remove selected wave (tk) |
 
 ### Cursors
@@ -320,9 +323,9 @@ slope, and derivative values at both cursor positions.
 |--------|--------|
 | Scroll | Zoom x-axis |
 | Shift+Scroll | Zoom y-axis |
-| Right-drag | Rubber-band zoom rectangle |
-| Shift+Right-drag | Pan x-axis |
-| Ctrl+Right-drag | Pan y-axis |
+| Right-drag | Rubber-band zoom (2D) |
+| Shift+Right-drag | Rubber-band zoom (X only) |
+| Ctrl+Right-drag | Rubber-band zoom (Y only) |
 | Left-drag | Pan |
 | Click cursor line | Drag to reposition |
 
@@ -342,7 +345,40 @@ slope, and derivative values at both cursor positions.
 - Use the **regex filter** to search for signals
 - Plotted waves are colored in the browser to match their plot line
 
-## Sessions (pg backend)
+## Digital signals (pg backend)
+
+The pg backend has a dedicated **digital pane** that appears below the
+analog plot whenever any wave is shown as digital. Traces are rendered
+gtkwave/surfer-style: 0/1 step lines for single-bit signals, hexagonal
+bus outlines with value labels for vectors. The digital pane shares the
+analog x-axis so panning and zooming stay in sync.
+
+### VCD files
+
+`.vcd` files (Verilog Value Change Dump) are loaded directly. Every
+signal is parsed, hierarchy is preserved (the `.` separator becomes
+tree levels in the wave browser), and signals are tagged as `bit` or
+`vector` based on their declared width. Real-valued VCD signals are
+loaded as ordinary analog waves.
+
+```bash
+cicwave dump.vcd
+```
+
+### Showing analog waves as digital
+
+Any waveform — including signals from `.raw` files — can be displayed
+on the digital pane. A 0/1 trace is synthesized from the analog data
+using a `(max + min) / 2` threshold with small hysteresis to suppress
+noise around the cross point. Useful for quickly visualising clock or
+oscillator outputs from a transient simulation.
+
+Toggle digital mode for the focused wave with the **D** key, or via
+the wave browser's right-click menu (**Show as digital**). For vector
+signals the menu also offers a **Digital format** sub-menu (Hex / Dec
+/ Bin).
+
+
 
 A session file captures the full viewer state so you can save a view and
 restore it later, or generate plots from the command line without opening

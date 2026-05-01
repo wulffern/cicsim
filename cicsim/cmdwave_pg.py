@@ -213,6 +213,9 @@ class _SignalPickerDialog(QDialog):
 class PgWave:
     """Associates a WaveFile column with a pyqtgraph PlotDataItem."""
 
+    #- Display formats for vector digital signals.
+    DIGITAL_FORMATS = ('hex', 'dec', 'bin')
+
     def __init__(self, wfile, key, xaxis):
         self.wfile = wfile
         self.key = key
@@ -221,6 +224,21 @@ class PgWave:
         self.y = None
         self.xlabel = "Samples"
         self.xunit = ""
+        #- Digital metadata, populated from df.attrs['cicsim_vcd'] when
+        #- the source is a VCD file. ``digital_kind`` is one of
+        #- 'bit' / 'vector' / None; ``digital_width`` is the bit width
+        #- (1 for bits); ``digital_format`` selects how vector samples
+        #- are displayed in tooltips/labels ('hex' / 'dec' / 'bin').
+        self.digital_kind = None
+        self.digital_width = 1
+        self.digital_format = 'hex'
+        #- Whether to render this wave in the dedicated digital pane
+        #- (one row per signal, gtkwave/surfer-style). Off by default;
+        #- the user opts in via the wave-tree right-click menu.
+        self.show_as_digital = False
+        #- Original (string/int) values for digital signals, kept so we
+        #- can re-render labels when the format changes.
+        self._digital_raw = None
         self.yunit, self._yscale, self._yclean = self._infer_unit(
             key, default="V" if self._is_v(key)
             else "A" if self._is_i(key) else "")
@@ -312,29 +330,196 @@ class PgWave:
 
         if self.key in keys:
             y = self.wfile.df[self.key].to_numpy()
-            if self._yscale != 1.0:
-                y = y * self._yscale
+            if self._yscale != 1.0 and self._yscale != 1:
+                try:
+                    y = y * self._yscale
+                except TypeError:
+                    pass  # non-numeric (digital) data; ignore scale
             self.y = y
+
+        self._maybe_apply_digital_kind()
 
         if self.curve and self.x is not None and self.y is not None:
             x, _ = _to_numeric(self.x)
             y, _ = _to_numeric(self.y)
             self.curve.setData(x, y)
 
+    def _maybe_apply_digital_kind(self):
+        """If this signal comes from a digital source (VCD), record the
+        kind/width and convert ``self.y`` into a numeric step trace.
+
+        The original strings/ints are kept on ``self._digital_raw`` so
+        we can re-render labels when the user switches hex/dec/bin.
+        """
+        attrs = getattr(self.wfile.df, 'attrs', {}) or {}
+        meta = attrs.get('cicsim_vcd')
+        if not meta:
+            return
+        kinds = meta.get('kinds', {}) or {}
+        widths = meta.get('widths', {}) or {}
+        kind = kinds.get(self.key)
+        if kind not in ('bit', 'vector'):
+            return
+
+        self.digital_kind = kind
+        self.digital_width = int(widths.get(self.key, 1) or 1)
+        self._digital_raw = self.y
+
+        if kind == 'bit':
+            #- Map '0' -> 0.0, '1' -> 1.0, anything else (x/z/h/l) -> NaN
+            #- so the curve has visible breaks for unknown states.
+            yn = np.full(len(self.y), np.nan, dtype=np.float64)
+            for i, v in enumerate(self.y):
+                if v == '1' or v == 1:
+                    yn[i] = 1.0
+                elif v == '0' or v == 0:
+                    yn[i] = 0.0
+            self.y = yn
+            self.yunit = "bit"
+            self._yclean = self.key
+            self.ylabel = "%s (bit, %s)" % (self.key, self.wfile.name)
+        else:
+            #- Vector: numeric value (or NaN for unknown).
+            yn = np.full(len(self.y), np.nan, dtype=np.float64)
+            for i, v in enumerate(self.y):
+                if isinstance(v, (int, np.integer)):
+                    yn[i] = float(v)
+                elif isinstance(v, float) and not np.isnan(v):
+                    yn[i] = v
+            self.y = yn
+            unit = "u%d" % self.digital_width  # e.g. "u8"
+            self.yunit = unit
+            self._yclean = self.key
+            self.ylabel = "%s [%s, %s]" % (
+                self.key, unit, self.wfile.name)
+
+    def setDigitalFormat(self, fmt):
+        """Switch how vector samples are displayed (hex/dec/bin)."""
+        if fmt not in self.DIGITAL_FORMATS:
+            return
+        self.digital_format = fmt
+
+    def synthesizeDigitalBits(self, hysteresis_frac=0.05):
+        """Return a ``"0"/"1"/"x"`` array derived from analog ``self.y``.
+
+        The mid-amplitude threshold ``(min+max)/2`` decides high vs low.
+        A small hysteresis band (default 5% of the peak-to-peak swing)
+        on either side of the threshold prevents repeated false
+        transitions from noise crossing the line. Samples that fall
+        inside the hysteresis band hold the previous state. NaN /
+        non-finite samples become ``"x"``.
+
+        Caches the result on ``self._digital_raw`` so the digital pane
+        doesn't recompute on every redraw.
+        """
+        y = self.y
+        if y is None or len(y) == 0:
+            return np.array([], dtype=object)
+        try:
+            yf = np.asarray(y, dtype=float)
+        except (TypeError, ValueError):
+            return np.array(['x'] * len(y), dtype=object)
+        finite_mask = np.isfinite(yf)
+        if not finite_mask.any():
+            return np.array(['x'] * len(yf), dtype=object)
+        ymin = float(np.min(yf[finite_mask]))
+        ymax = float(np.max(yf[finite_mask]))
+        span = ymax - ymin
+        if span <= 0:
+            #- Constant signal: report a single state.
+            out = np.array(['1' if ymax > 0 else '0'] * len(yf),
+                           dtype=object)
+            return out
+        mid = (ymin + ymax) / 2.0
+        hyst = max(span * float(hysteresis_frac), 0.0)
+        hi_th = mid + hyst
+        lo_th = mid - hyst
+
+        out = np.empty(len(yf), dtype=object)
+        state = 'x'  # before the first finite sample
+        for i, v in enumerate(yf):
+            if not np.isfinite(v):
+                out[i] = 'x'
+                continue
+            if state == 'x':
+                state = '1' if v >= mid else '0'
+            elif state == '0' and v >= hi_th:
+                state = '1'
+            elif state == '1' and v <= lo_th:
+                state = '0'
+            #- else: inside the hysteresis band -> hold state.
+            out[i] = state
+        return out
+
+    def formatDigitalValue(self, raw):
+        """Render a raw vector sample with the current format.
+
+        ``raw`` may be the original VCD string ('x', 'z', '0', '1') or
+        the numeric value we put in ``self.y`` (0.0 / 1.0 / NaN / int).
+        """
+        if raw is None or (isinstance(raw, float) and np.isnan(raw)):
+            return "x"
+        if isinstance(raw, str):
+            return raw  # 'x' / 'z' / lowercase bits
+        if self.digital_kind == 'bit':
+            try:
+                return "1" if int(round(float(raw))) else "0"
+            except (TypeError, ValueError):
+                return str(raw)
+        try:
+            iv = int(round(float(raw)))
+        except (TypeError, ValueError):
+            return str(raw)
+        w = max(1, int(self.digital_width or 1))
+        if self.digital_format == 'hex':
+            digits = max(1, (w + 3) // 4)
+            return ("%0*x" % (digits, iv & ((1 << w) - 1))).lower() + "h"
+        if self.digital_format == 'bin':
+            return ("{:0%db}" % w).format(iv & ((1 << w) - 1)) + "b"
+        return str(iv)
+
     @staticmethod
     def _apply_render_opts(curve):
-        """Lossless render-time optimizations for dense waveforms.
+        """Hook for per-curve options applied at construction time.
 
-        ``method='subsample'`` (every-Nth-point) is significantly cheaper to
-        recompute on each viewport change than ``'peak'`` and the visual
-        difference is negligible once ``clipToView`` is on, especially with
-        many curves stacked together.
+        Intentionally a no-op for view-dependent options. Both
+        ``autoDownsample=True`` and ``clipToView=True`` use the
+        ViewBox's current view rect to decide what to display, but at
+        construction the ViewBox still holds its default
+        ``(-0.5, -0.5, 1, 1)`` rect (autoRange has not run yet because
+        the first curve is still being added). With a 7e-6 s data span
+        and a 1.0 unit view rect, autoDownsample picks a downsample
+        factor of ~300 000, collapsing the curve to a single point;
+        clipToView then keeps it that way. The resulting empty plot is
+        what users saw on macOS.
+
+        Performance options that need a real view rect are applied by
+        :meth:`_enable_view_dependent_opts` after ``autoRange()``.
         """
-        curve.opts['clipToView'] = True
+        return
+
+    @staticmethod
+    def _enable_view_dependent_opts(curve):
+        """Enable ``setDownsampling(auto=True)`` and ``clipToView`` once
+        the ViewBox has a real view rect.
+
+        Must be invoked after ``autoRange()`` so the visible-range slice
+        actually contains data; otherwise the curve renders empty.
+        Silently no-ops on items that don't support these options
+        (e.g. ``InfiniteLine``, ``PlotCurveItem``).
+        """
+        if curve is None:
+            return
         try:
             curve.setDownsampling(auto=True, method='subsample')
         except Exception:
             pass
+        try:
+            curve.setClipToView(True)
+        except Exception:
+            opts = getattr(curve, 'opts', None)
+            if isinstance(opts, dict):
+                opts['clipToView'] = True
 
     def plot(self, target, color='w', style='Lines', width=2):
         """Plot on a PlotItem or ViewBox. Returns the curve or None."""
@@ -346,6 +531,11 @@ class PgWave:
         self.style = style
         self._width = width
         kw = _style_kwargs(color, style, width=width)
+        if self.digital_kind is not None:
+            #- Digital signals look right only as left-step plots; we
+            #- also disable antialiasing so transitions stay sharp.
+            kw['stepMode'] = 'left'
+            kw['connect'] = 'finite'
         self.curve = pg.PlotDataItem(x, y, name=self.ylabel, **kw)
         target.addItem(self.curve)
         self._apply_render_opts(self.curve)
@@ -440,6 +630,10 @@ class PgWaveBrowser(QWidget):
         self.file_tree = _DropUrlTree()
         self.file_tree.setHeaderLabel("Files")
         self.file_tree.currentItemChanged.connect(self._file_selected)
+        #- Allow shift/ctrl/cmd-click multi-select so the user can close
+        #- many files at once via the context menu.
+        self.file_tree.setSelectionMode(
+            QAbstractItemView.ExtendedSelection)
         self.file_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.file_tree.customContextMenuRequested.connect(
             self._file_context_menu)
@@ -541,13 +735,28 @@ class PgWaveBrowser(QWidget):
         item = self.file_tree.itemAt(pos)
         if not item:
             return
-        key = item.data(0, Qt.UserRole)
-        if not key:
+        #- If the user right-clicks on an unselected item, treat it as
+        #- a single-item action (don't carry over a stale selection).
+        #- If they right-click on one of several already-selected items,
+        #- act on the whole selection.
+        selected = self.file_tree.selectedItems()
+        if item not in selected:
+            self.file_tree.clearSelection()
+            item.setSelected(True)
+            selected = [item]
+
+        keys = [it.data(0, Qt.UserRole) for it in selected
+                if it.data(0, Qt.UserRole)]
+        if not keys:
             return
+
         menu = QMenu(self)
+        label = ("Close" if len(keys) == 1
+                 else "Close %d files" % len(keys))
         menu.addAction(
-            "Remove from list",
-            lambda k=key: self.fileRemoveRequested.emit(k))
+            label,
+            lambda ks=tuple(keys): [
+                self.fileRemoveRequested.emit(k) for k in ks])
         menu.exec(self.file_tree.viewport().mapToGlobal(pos))
 
     def _purge_wave_cache_for_wfile(self, wf):
@@ -583,9 +792,16 @@ class PgWaveBrowser(QWidget):
 
     @staticmethod
     def _parse_hierarchy(name):
-        """Split 'v(xdut.x1.node)' → ['xdut', 'x1', 'v(node)'].
+        """Split a hierarchical signal name into its scope path.
 
-        The instance path forms the hierarchy; the leaf keeps v()/i().
+        Examples:
+            ``v(xdut.x1.node)``       -> ``['xdut', 'x1', 'v(node)']``
+            ``i(M1.d)``               -> ``['M1', 'i(d)']``
+            ``test.dut_ana.PWRUP_1V8`` -> ``['test', 'dut_ana', 'PWRUP_1V8']``
+            ``count``                 -> ``['count']``
+
+        Plain dot-separated names (VCD-style scoped signals) are split
+        the same way. Names with no dots stay at the top level.
         """
         m = re.match(r'^([vi])\((.+)\)$', name)
         if m:
@@ -596,6 +812,13 @@ class PgWaveBrowser(QWidget):
                 leaf = "%s(%s)" % (prefix, parts[-1])
                 return parts[:-1] + [leaf]
             return [name]
+        if '.' in name and not any(c in name for c in '()/[] '):
+            #- Plain dotted path (VCD/Verilog-style hierarchy). We only
+            #- treat it as hierarchy when there are no parens/brackets/
+            #- spaces, so SPICE-style names like ``v(net.node)`` aren't
+            #- accidentally split a second time.
+            parts = name.split('.')
+            return parts
         return [name]
 
     def _visible_wave_names(self):
@@ -692,6 +915,35 @@ class PgWaveBrowser(QWidget):
         wave.reload()
         self.waveSelected.emit(wave)
 
+    def currentWave(self):
+        """Return the wave currently focused in the wave tree, or
+        ``None`` if no signal row is selected."""
+        item = self.wave_tree.currentItem()
+        if item is None:
+            return None
+        yname = item.data(0, Qt.UserRole)
+        if not yname:
+            return None
+        f = self.files.getSelected()
+        if f is None:
+            return None
+        tag = f.getTag(yname)
+        if tag not in self._wave_cache:
+            self._wave_cache[tag] = PgWave(f, yname, self.xaxis)
+        return self._wave_cache[tag]
+
+    def togglePlotAsDigital(self):
+        """Toggle ``show_as_digital`` on the focused wave and request
+        a re-plot. Triggered by the ``D`` keyboard shortcut."""
+        wave = self.currentWave()
+        if wave is None:
+            return
+        wave.show_as_digital = not wave.show_as_digital
+        #- Bounce off the current pane (no-op if it wasn't plotted)
+        #- and re-add: routing is decided by show_as_digital.
+        self.waveRemoveRequested.emit(wave)
+        self.waveSelected.emit(wave)
+
     def _wave_context(self, pos):
         item = self.wave_tree.itemAt(pos)
         f = self.files.getSelected()
@@ -743,6 +995,35 @@ class PgWaveBrowser(QWidget):
                     self.style_cb.setCurrentText(st)
                     self.waveSelected.emit(wave)
             style_menu.addAction(s, _set_style)
+        #- "Show as digital" toggles routing to the dedicated digital
+        #- pane. Always offered: VCD bit/vector signals plot with their
+        #- true sampled values; analog signals (e.g. SPICE .raw) get a
+        #- synthesized bit trace based on a (min+max)/2 threshold +
+        #- small hysteresis to suppress noise around the cross point.
+        digi_label = ("✓ Show as digital" if wave.show_as_digital
+                      else "Show as digital")
+
+        def _toggle_digital(w=wave):
+            w.show_as_digital = not w.show_as_digital
+            #- If the wave is already on a plot, re-route it to the
+            #- other pane by removing then re-adding it. The plot
+            #- knows whether it has the wave via ``wave_data`` so
+            #- both analog and digital removals are handled.
+            self.waveRemoveRequested.emit(w)
+            self.waveSelected.emit(w)
+        menu.addAction(digi_label, _toggle_digital)
+        if wave.digital_kind == 'vector':
+            #- Hex / Dec / Bin only matter for multi-bit digital signals.
+            digital_menu = menu.addMenu("Digital format")
+            for fmt in PgWave.DIGITAL_FORMATS:
+                fmt_label = fmt.capitalize()
+                if wave.digital_format == fmt:
+                    fmt_label = "● " + fmt_label
+
+                def _set_fmt(w=wave, f=fmt):
+                    w.setDigitalFormat(f)
+                    self.waveSelected.emit(w)
+                digital_menu.addAction(fmt_label, _set_fmt)
         menu.addSeparator()
         for label, atype in [("FFT / PSD", "fft"),
                              ("Histogram", "histogram"),
@@ -784,7 +1065,24 @@ class PgWavePlot(QWidget):
         self._orig_mouseDragEvent = self.plot.vb.mouseDragEvent
         self.plot.vb.mouseDragEvent = self._on_mouse_drag
 
+        #- Digital pane below the analog plot. One row per digital
+        #- signal, fixed pixel height per row, x-axis linked to the
+        #- analog plot. Hidden when no digital signals are plotted.
+        self._digital_row_height = 28          # pixels per signal row
+        self._digital_row_spacing = 4          # pixels between rows
+        self._digital_padding = 8              # top/bottom padding
+        self.digital_plot = self.gw.addPlot(row=1, col=0)
+        self._init_digital_plot()
+        #- One entry per visible digital wave: (wave, items_dict)
+        #- where items_dict has the curve / labels / row index.
+        self._digital_waves = {}
+
         self._unit_vb = {}
+        #- Per-unit bookkeeping so we can demote the descriptive part of
+        #- an axis label when a second curve with a different name is
+        #- added to the same axis (only the unit is meaningful then).
+        self._unit_axis_side = {}
+        self._unit_axis_label = {}
         self._right_vb = None
         self._logx = False
         self._has_rotated_x = False
@@ -844,12 +1142,20 @@ class PgWavePlot(QWidget):
         ``ylabel_text`` is the descriptive name used as the axis title text
         (e.g. ``"Amplitude"`` cleaned from ``"Amplitude_dBm"``). If empty
         the axis shows only the unit, as before.
+
+        When a second wave with a *different* descriptive name lands on
+        an existing axis, the descriptive part of the label is dropped
+        so the axis only shows the unit (it would otherwise look like
+        the axis only describes the first curve, which is misleading).
         """
         if yunit in self._unit_vb:
+            self._maybe_demote_axis_label(yunit, ylabel_text)
             return self._unit_vb[yunit]
 
         if not self._unit_vb:
             self._unit_vb[yunit] = self.plot.vb
+            self._unit_axis_side[yunit] = 'left'
+            self._unit_axis_label[yunit] = ylabel_text or ""
             if yunit or ylabel_text:
                 self.plot.setLabel('left', ylabel_text, units=yunit)
             return self.plot.vb
@@ -866,11 +1172,27 @@ class PgWavePlot(QWidget):
             self._right_vb.mouseDragEvent = self._on_mouse_drag
 
         self._unit_vb[yunit] = self._right_vb
+        self._unit_axis_side[yunit] = 'right'
+        self._unit_axis_label[yunit] = ylabel_text or ""
         if yunit or ylabel_text:
             self.plot.setLabel('right', ylabel_text, units=yunit)
 
         self._ensure_cursors_on_right_vb()
         return self._right_vb
+
+    def _maybe_demote_axis_label(self, yunit, new_label):
+        """If a second curve on the same axis has a different name, drop
+        the descriptive label so the axis only shows the unit."""
+        side = self._unit_axis_side.get(yunit)
+        if side is None:
+            return
+        existing = self._unit_axis_label.get(yunit, "")
+        new_label = new_label or ""
+        if not existing or existing == "<unit-only>":
+            return
+        if new_label and new_label != existing:
+            self.plot.setLabel(side, "", units=yunit)
+            self._unit_axis_label[yunit] = "<unit-only>"
 
     def _sync_right_vb(self):
         if self._right_vb:
@@ -894,11 +1216,415 @@ class PgWavePlot(QWidget):
                 self._cursor_b_lines.append(line)
 
     # ------------------------------------------------------------------
+    # Digital pane (under the analog x-axis)
+    # ------------------------------------------------------------------
+
+    def _init_digital_plot(self):
+        """Set up the digital pane: link x to the analog plot, hide most
+        chrome, and start hidden until a digital signal is added."""
+        dp = self.digital_plot
+        dp.hideButtons()
+        dp.showAxis('left')
+        dp.showAxis('bottom', False)
+        dp.getAxis('left').setStyle(showValues=False)
+        dp.getAxis('left').setTicks([])
+        dp.getAxis('left').setWidth(self.plot.getAxis('left').width())
+        dp.setMouseEnabled(x=True, y=False)
+        dp.setMenuEnabled(False)
+        dp.setXLink(self.plot)
+        dp.vb.setLimits(yMin=0)  # rows live in [0, n_rows]
+        dp.setVisible(False)
+        #- Forward our wheel/drag handlers so the digital pane behaves
+        #- like the analog plot for x-axis interaction.
+        dp.vb.wheelEvent = lambda ev: self._on_wheel(ev)
+        dp.vb.mouseDragEvent = self._on_mouse_drag
+        #- Throttled label refresh on x-range changes: a wide view of
+        #- a 16k-transition vector would otherwise create 16k TextItems
+        #- and freeze the UI. We render at most ``_DIGITAL_MAX_LABELS``
+        #- labels per signal, only for transitions inside the current
+        #- view rect, and refresh on demand.
+        from PySide6.QtCore import QTimer as _QT
+        self._digital_label_timer = _QT()
+        self._digital_label_timer.setSingleShot(True)
+        self._digital_label_timer.setInterval(60)
+        self._digital_label_timer.timeout.connect(
+            self._update_visible_digital_labels)
+        dp.vb.sigXRangeChanged.connect(
+            lambda *_: self._digital_label_timer.start())
+
+    #- Maximum number of value labels to draw per vector signal. A
+    #- handful is plenty at any zoom level; more would only overlap.
+    _DIGITAL_MAX_LABELS = 80
+
+    def _digital_total_rows(self):
+        return len(self._digital_waves)
+
+    def _digital_row_pixel_height(self):
+        n = self._digital_total_rows()
+        if n == 0:
+            return 0
+        return (n * self._digital_row_height
+                + max(0, n - 1) * self._digital_row_spacing
+                + 2 * self._digital_padding)
+
+    def _refresh_digital_pane_geometry(self):
+        """Resize the digital pane to ``rows * row_height`` (pixels)."""
+        n = self._digital_total_rows()
+        dp = self.digital_plot
+        if n == 0:
+            dp.setVisible(False)
+            return
+        dp.setVisible(True)
+        h = self._digital_row_pixel_height()
+        dp.setMaximumHeight(h)
+        dp.setMinimumHeight(h)
+        dp.setYRange(0, n, padding=0)
+
+    def _add_digital_wave(self, wave, color):
+        """Place a digital signal in its own row in the digital pane."""
+        row_idx = self._digital_total_rows()  # bottom-up new row
+        slot_top = row_idx + 1
+        slot_bot = row_idx
+        items = self._build_digital_items(wave, slot_bot, slot_top, color)
+        self._digital_waves[wave.tag] = {
+            'wave': wave, 'row': row_idx, 'items': items,
+            'color': color, 'slot': (slot_bot, slot_top),
+        }
+        self._refresh_digital_pane_geometry()
+        self._refresh_digital_left_axis()
+        #- Re-apply view-dependent rendering opts now that the digital
+        #- pane has a real y-range; otherwise auto-downsample would
+        #- have computed a bogus factor against the default unit rect.
+        for it in items.get('lines', []):
+            PgWave._enable_view_dependent_opts(it)
+        #- Render initial labels for the current view immediately so the
+        #- user doesn't have to wait for the throttle timer.
+        self._update_visible_digital_labels()
+
+    _DIGITAL_AXIS_MAX_CHARS = 14
+
+    def _refresh_digital_left_axis(self):
+        """Show signal names on the left axis of the digital pane,
+        one tick per row, centered vertically in the row.
+
+        Names longer than ``_DIGITAL_AXIS_MAX_CHARS`` are truncated
+        with an ellipsis ("…") so the axis stays narrow but every
+        signal still gets *some* label. The axis width grows enough
+        to comfortably fit the longest (truncated) label."""
+        ax = self.digital_plot.getAxis('left')
+        ticks = []
+        max_len = 0
+        for info in self._digital_waves.values():
+            row = info['row']
+            wave = info['wave']
+            short = self._short_signal_name(wave.key)
+            short = self._truncate_axis_label(short)
+            max_len = max(max_len, len(short))
+            ticks.append(((row + 0.5), short))
+        ax.setTicks([ticks])
+        ax.setStyle(showValues=True)
+        #- ~7 px per char for the default axis font + padding.
+        wanted = 12 + 7 * max_len
+        ax.setWidth(max(80, wanted, self.plot.getAxis('left').width()))
+
+    @classmethod
+    def _truncate_axis_label(cls, name):
+        """Truncate ``name`` to ``_DIGITAL_AXIS_MAX_CHARS`` keeping the
+        leading and trailing characters. ``osc_temp_1v8`` (12 chars)
+        passes through; ``a_very_long_signal_name`` becomes
+        ``a_very_…name``. The trailing chars are usually the most
+        identifying part (numeric suffix, leaf name)."""
+        n = cls._DIGITAL_AXIS_MAX_CHARS
+        if len(name) <= n:
+            return name
+        head = (n - 1) // 2
+        tail = n - 1 - head
+        return name[:head] + "…" + name[-tail:]
+
+    @staticmethod
+    def _short_signal_name(name):
+        """Compact label for the digital pane left axis.
+
+        ``test.dut_ana.osc`` -> ``osc``
+        ``v(xdut.done)``     -> ``done``
+        ``v(out)``           -> ``out``
+        ``i(vdd)``           -> ``i(vdd)``  (current probes keep prefix)
+
+        For digital rows we strip the ``v(...)`` wrapper entirely --
+        the analog/voltage distinction is meaningless when we're
+        showing 0/1 transitions, and the bare leaf name reads better
+        next to gtkwave-style traces. Current probes (``i(...)``)
+        keep their prefix because the ``i`` carries information.
+        """
+        m = re.match(r'^([vi])\((.+)\)$', name)
+        if m:
+            inner = m.group(2)
+            leaf = inner.rsplit('.', 1)[-1]
+            if m.group(1) == 'v':
+                return leaf
+            return "%s(%s)" % (m.group(1), leaf)
+        if '.' in name:
+            return name.rsplit('.', 1)[-1]
+        return name
+
+    def _build_digital_items(self, wave, y_lo, y_hi, color):
+        """Construct the GraphicsItems for a digital wave row.
+
+        Returns a dict with the items (so they can be removed later).
+
+        Three cases:
+        - true bit signal (VCD): use ``wave._digital_raw`` directly.
+        - true vector signal (VCD): bus shape with on-demand labels.
+        - any other waveform: synthesize a 0/1 trace from the analog
+          data via :meth:`PgWave.synthesizeDigitalBits` and treat it
+          as a bit signal.
+
+        The ``color`` argument is ignored for the digital pane: traces
+        are drawn in the theme's foreground color (white on dark,
+        black on light) so the gtkwave/surfer-style waveforms read at
+        a glance and don't compete with the analog rainbow above.
+        """
+        synth_kind = wave.digital_kind
+        raw = wave._digital_raw
+        if synth_kind not in ('bit', 'vector'):
+            #- Analog wave: synthesize a bit trace.
+            raw = wave.synthesizeDigitalBits()
+            wave._digital_raw = raw  # cache for label refreshes
+            synth_kind = 'bit'
+
+        x_arr, _ = _to_numeric(wave.x) if wave.x is not None else (
+            np.arange(len(raw or [])), None)
+        items = {'lines': [], 'labels': []}
+        if x_arr is None or len(x_arr) == 0 or raw is None:
+            return items
+
+        theme = _get_theme()
+        mono = theme.get('pg_foreground', 'w')
+
+        if synth_kind == 'bit':
+            #- Bit row: standard step trace from y_lo (=0) to y_lo+0.8
+            #- of the slot, with NaN for x/z so the line breaks.
+            yvals = np.full(len(raw), np.nan, dtype=np.float64)
+            mid = y_lo + 0.5
+            top = y_lo + 0.85
+            bot = y_lo + 0.15
+            for i, v in enumerate(raw):
+                if v == '1' or v == 1:
+                    yvals[i] = top
+                elif v == '0' or v == 0:
+                    yvals[i] = bot
+                #- x/z/h/l left as NaN -> draws a gap.
+            curve = pg.PlotDataItem(
+                x_arr, yvals,
+                pen=pg.mkPen(mono, width=1.0),
+                stepMode='left', connect='finite')
+            self.digital_plot.addItem(curve)
+            PgWave._enable_view_dependent_opts(curve)
+            items['lines'].append(curve)
+            #- Mid baseline so the row is visible even if all-x.
+            base = pg.InfiniteLine(
+                pos=mid, angle=0,
+                pen=pg.mkPen(mono, width=0.5,
+                             style=Qt.DotLine))
+            self.digital_plot.addItem(base)
+            items['lines'].append(base)
+        else:
+            #- Vector row: bus shape (two parallel lines forming a
+            #- hexagon-like outline). Labels and vertical ticks are
+            #- NOT drawn here; they are created on demand by
+            #- :meth:`_update_visible_digital_labels` so we never
+            #- materialise more than _DIGITAL_MAX_LABELS items per
+            #- signal regardless of the underlying transition count.
+            top = y_lo + 0.85
+            bot = y_lo + 0.15
+            top_y = np.full(len(raw), top, dtype=np.float64)
+            bot_y = np.full(len(raw), bot, dtype=np.float64)
+            #- Mark unknown ranges with NaN so the outline breaks.
+            for i, v in enumerate(raw):
+                if v is None or isinstance(v, str):
+                    top_y[i] = np.nan
+                    bot_y[i] = np.nan
+            top_curve = pg.PlotDataItem(
+                x_arr, top_y, pen=pg.mkPen(mono, width=1.0),
+                stepMode='left', connect='finite')
+            bot_curve = pg.PlotDataItem(
+                x_arr, bot_y, pen=pg.mkPen(mono, width=1.0),
+                stepMode='left', connect='finite')
+            self.digital_plot.addItem(top_curve)
+            self.digital_plot.addItem(bot_curve)
+            PgWave._enable_view_dependent_opts(top_curve)
+            PgWave._enable_view_dependent_opts(bot_curve)
+            items['lines'].append(top_curve)
+            items['lines'].append(bot_curve)
+            #- Single curve carrying ALL transition ticks via
+            #- ``connect='pairs'``: x = [t0_lo, t0_hi, t1_lo, t1_hi,...]
+            #- with the y-array alternating bot/top. This replaces N
+            #- per-tick PlotDataItems (which made pan/zoom slow when
+            #- there are tens of thousands of transitions).
+            ticks_curve = pg.PlotCurveItem(
+                x=np.array([], dtype=np.float64),
+                y=np.array([], dtype=np.float64),
+                pen=pg.mkPen(mono, width=0.6),
+                connect='pairs')
+            self.digital_plot.addItem(ticks_curve)
+            items['lines'].append(ticks_curve)
+            items['ticks_curve'] = ticks_curve
+            #- Pre-compute the transition index list so label refresh
+            #- is just a binary search per refresh.
+            items['transitions'] = self._vector_transitions(raw)
+            items['x_arr'] = x_arr
+            items['raw'] = raw
+            items['y_mid'] = (top + bot) / 2.0
+            items['y_lo'] = bot
+            items['y_hi'] = top
+            items['color'] = mono
+            items['label_pool'] = []  # reused TextItems
+
+        return items
+
+    @staticmethod
+    def _vector_transitions(raw):
+        """Indices in ``raw`` where the vector value changes (incl. 0)."""
+        out = [0]
+        prev = raw[0] if len(raw) else None
+        for i in range(1, len(raw)):
+            v = raw[i]
+            if v != prev:
+                out.append(i)
+                prev = v
+        return out
+
+    def _remove_digital_wave(self, tag):
+        info = self._digital_waves.pop(tag, None)
+        if info is None:
+            return
+        self._destroy_digital_items(info)
+        #- Re-pack remaining rows so there are no gaps.
+        remaining = list(self._digital_waves.values())
+        self._digital_waves = {}
+        for old in remaining:
+            self._destroy_digital_items(old)
+            self._add_digital_wave(old['wave'], old['color'])
+        if not self._digital_waves:
+            self._refresh_digital_pane_geometry()
+        else:
+            self._update_visible_digital_labels()
+
+    def _destroy_digital_items(self, info):
+        d = info.get('items') or {}
+        for it in d.get('lines', []):
+            self.digital_plot.removeItem(it)
+        for lbl in d.get('label_pool', []):
+            self.digital_plot.removeItem(lbl)
+
+    def _refresh_digital_labels(self, wave):
+        """Re-render value labels for a digital vector wave (after a
+        format change). Just retriggers the on-demand label updater so
+        every visible label gets rebuilt with the new format."""
+        info = self._digital_waves.get(wave.tag)
+        if info is None or wave.digital_kind != 'vector':
+            return
+        self._update_visible_digital_labels()
+
+    def _update_visible_digital_labels(self):
+        """Render value labels and transition ticks for the transitions
+        currently inside the digital pane's view rect.
+
+        - Vertical ticks for ALL visible transitions are drawn as a
+          single ``PlotCurveItem`` with ``connect='pairs'`` (one buffer
+          update vs N item creations -- much faster on pan/zoom).
+        - Value labels are pooled and capped at
+          ``_DIGITAL_MAX_LABELS`` per signal; pool entries past the
+          visible count are hidden, never destroyed.
+        """
+        if not self._digital_waves:
+            return
+        try:
+            xlo, xhi = self.digital_plot.vb.viewRange()[0]
+        except Exception:
+            return
+        theme = _get_theme()
+        label_color = theme.get('text_color', 'w')
+        for tag, info in self._digital_waves.items():
+            wave = info['wave']
+            if wave.digital_kind != 'vector':
+                continue
+            d = info['items']
+            transitions = d.get('transitions') or []
+            x_arr = d.get('x_arr')
+            raw = d.get('raw')
+            ticks_curve = d.get('ticks_curve')
+            if (x_arr is None or raw is None or not transitions
+                    or ticks_curve is None):
+                continue
+
+            #- Find transitions inside [xlo, xhi]. Each transition is
+            #- an index into x_arr; transitions are sorted, so use a
+            #- numpy search rather than scanning.
+            t_x = x_arr[np.asarray(transitions, dtype=np.int64)]
+            lo_i = int(np.searchsorted(t_x, xlo, side='left'))
+            hi_i = int(np.searchsorted(t_x, xhi, side='right'))
+            visible_full = transitions[lo_i:hi_i]
+
+            y_mid = d['y_mid']
+            y_lo = d['y_lo']
+            y_hi = d['y_hi']
+
+            #- Update the vertical-ticks curve: 2 points per transition,
+            #- alternating (x, y_lo) / (x, y_hi). This handles thousands
+            #- of ticks in a single draw call.
+            if visible_full:
+                vis_x = x_arr[np.asarray(visible_full, dtype=np.int64)]
+                xs = np.repeat(vis_x, 2)
+                ys = np.tile([y_lo, y_hi], len(visible_full))
+                ticks_curve.setData(xs, ys, connect='pairs')
+            else:
+                ticks_curve.setData([], [])
+
+            #- Always render up to _DIGITAL_MAX_LABELS visible
+            #- transitions in order. We deliberately do NOT filter by
+            #- segment-vs-text width: a too-aggressive width filter
+            #- silently dropped every long label (e.g. multi-digit
+            #- hex), which was the user-visible "long text doesn't
+            #- show" bug. Letting wide labels overhang into the next
+            #- cell matches gtkwave/surfer behaviour and is what users
+            #- expect.
+            pool = d.setdefault('label_pool', [])
+            font = _mono_font(self._font_size - 1)
+
+            visible_lbl = []
+            for ti in visible_full[:self._DIGITAL_MAX_LABELS]:
+                visible_lbl.append((ti, wave.formatDigitalValue(raw[ti])))
+
+            #- Grow the pool lazily.
+            while len(pool) < len(visible_lbl):
+                lbl = pg.TextItem(text="", color=label_color,
+                                  anchor=(0, 0.5))
+                lbl.setFont(font)
+                self.digital_plot.addItem(lbl)
+                pool.append(lbl)
+
+            for i, (ti, txt) in enumerate(visible_lbl):
+                xv = float(x_arr[ti])
+                lbl = pool[i]
+                lbl.setText(txt)
+                lbl.setPos(xv, y_mid)
+                lbl.show()
+            for i in range(len(visible_lbl), len(pool)):
+                pool[i].hide()
+
+    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def show_wave(self, wave, style='Lines'):
-        """Plot a wave. Returns (tag, color) on success, else None."""
+        """Plot a wave. Returns (tag, color) on success, else None.
+
+        Digital signals (bit / vector, detected from VCD metadata) are
+        placed in the dedicated digital pane below the analog x-axis
+        rather than on the analog Y axes; everything else uses the
+        usual axis-per-unit logic.
+        """
         if wave.tag in self.wave_data:
             return None
 
@@ -915,12 +1641,29 @@ class PgWavePlot(QWidget):
                 self.plot.setLogMode(x=True)
                 self._logx = True
 
-        vb = self._get_or_create_vb(yunit, ylabel_text=yname)
-
         theme = _get_theme()
         wcolors = theme['wave_colors']
         color = wcolors[self._color_index % len(wcolors)]
         self._color_index += 1
+
+        if wave.show_as_digital:
+            #- Route to the digital pane when the user has explicitly
+            #- requested it (right-click "Show as digital"). Works for
+            #- both true digital signals (VCD bit/vector) and analog
+            #- waveforms (a synthesized bit trace is computed via a
+            #- mid-amplitude threshold + small hysteresis to suppress
+            #- noise around the cross point).
+            self._add_digital_wave(wave, color)
+            self.wave_data[wave.tag] = (wave, yunit)
+            try:
+                xr = self.plot.vb.viewRange()[0]
+                self.digital_plot.vb.setXRange(*xr, padding=0)
+            except Exception:
+                pass
+            self._update_readout()
+            return (wave.tag, color)
+
+        vb = self._get_or_create_vb(yunit, ylabel_text=yname)
 
         if vb is self.plot.vb:
             curve = wave.plot(self.plot, color=color, style=style,
@@ -947,6 +1690,13 @@ class PgWavePlot(QWidget):
         else:
             vb.enableAutoRange()
             vb.autoRange()
+
+        #- Enable autoDownsample and clipToView only AFTER autoRange so
+        #- the curve has a valid view rect; otherwise the first display
+        #- would clip / over-downsample against the empty default rect
+        #- (~300 000x downsample for transient data) and render no
+        #- points -- the bug that made macOS plots appear blank.
+        PgWave._enable_view_dependent_opts(curve)
 
         self._update_readout()
         return (wave.tag, color)
@@ -980,9 +1730,51 @@ class PgWavePlot(QWidget):
         return tags
 
     def autoSize(self):
-        for vb in self._all_viewboxes():
-            vb.enableAutoRange()
-            vb.autoRange()
+        """Fit every axis to its full data extent.
+
+        ``clipToView`` and ``autoDownsample`` both make
+        :meth:`PlotCurveItem.dataBounds` report only the *currently
+        displayed* slice, so a naive ``autoRange()`` after a zoom-in
+        would just refit to that slice (looking like a one-step undo).
+        Temporarily disable both options on every curve, refit, then
+        restore them so the next viewport change still gets the
+        rendering optimisations.
+        """
+        curves = []
+        for tag, (wave, _) in self.wave_data.items():
+            if wave.curve is not None:
+                curves.append(wave.curve)
+
+        saved = []
+        for c in curves:
+            saved.append((c,
+                          c.opts.get('clipToView', False),
+                          c.opts.get('autoDownsample', False)))
+            try:
+                c.setClipToView(False)
+            except Exception:
+                c.opts['clipToView'] = False
+            try:
+                c.setDownsampling(auto=False)
+            except Exception:
+                pass
+
+        try:
+            for vb in self._all_viewboxes():
+                vb.enableAutoRange()
+                vb.autoRange()
+        finally:
+            for c, clip, ads in saved:
+                if ads:
+                    try:
+                        c.setDownsampling(auto=True, method='subsample')
+                    except Exception:
+                        pass
+                if clip:
+                    try:
+                        c.setClipToView(True)
+                    except Exception:
+                        c.opts['clipToView'] = True
 
     def zoomIn(self):
         self._keyboard_zoom(1.0 / ZOOM_FACTOR)
@@ -1052,16 +1844,31 @@ class PgWavePlot(QWidget):
     def _export_matplotlib(self, fname):
         import matplotlib.pyplot as plt
         from matplotlib.ticker import EngFormatter
+        from matplotlib.gridspec import GridSpec
 
         if not self.wave_data:
             return
 
-        fig, ax = plt.subplots(figsize=(10, 5))
+        #- Two-pane layout: analog on top, digital strip below (only
+        #- if there are digital waves). Height ratio mirrors the live
+        #- viewer where each digital row is a thin strip.
+        n_digital = len(self._digital_waves)
+        if n_digital > 0:
+            digital_h = 0.35 * n_digital  # inches per row
+            fig = plt.figure(figsize=(10, 5 + digital_h))
+            gs = GridSpec(2, 1, height_ratios=[5, digital_h], figure=fig,
+                          hspace=0.05)
+            ax = fig.add_subplot(gs[0, 0])
+            ax_dig = fig.add_subplot(gs[1, 0], sharex=ax)
+        else:
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax_dig = None
 
         units_left = set()
         units_right = set()
         ax_right = None
-        tags = list(self.wave_data.keys())
+        tags = [t for t in self.wave_data.keys()
+                if t not in self._digital_waves]
 
         theme = _get_theme()
         ecolors = theme['export_colors']
@@ -1165,11 +1972,152 @@ class PgWavePlot(QWidget):
             ax.legend(lines, labels, fontsize=7, loc='best')
 
         ax.grid(True, alpha=0.3)
+
+        #- Mirror the live viewer's zoom: read the X (and Y) ranges
+        #- from the analog ViewBox and apply them to the matplotlib
+        #- axes. Without this, matplotlib auto-ranges to the full
+        #- data extent and the export ignores whatever the user had
+        #- panned/zoomed to.
+        try:
+            xr = self.plot.vb.viewRange()[0]
+            yr = self.plot.vb.viewRange()[1]
+            ax.set_xlim(xr[0], xr[1])
+            ax.set_ylim(yr[0], yr[1])
+        except Exception:
+            pass
+        if ax_right is not None and self._right_vb is not None:
+            try:
+                yrr = self._right_vb.viewRange()[1]
+                ax_right.set_ylim(yrr[0], yrr[1])
+            except Exception:
+                pass
+
+        if ax_dig is not None:
+            self._export_digital_pane(ax_dig, ax)
+            #- Hide the analog x-tick labels because they're shown on
+            #- the digital pane (which sits below and shares the axis).
+            plt.setp(ax.get_xticklabels(), visible=False)
+            ax.set_xlabel("")
+
         fig.tight_layout()
         fig.subplots_adjust(bottom=max(0.15, fig.subplotpars.bottom))
         dpi = 150 if fname.lower().endswith('.png') else None
         fig.savefig(fname, dpi=dpi, facecolor='white')
         plt.close(fig)
+
+    def _export_digital_pane(self, ax, ax_main):
+        """Render the digital pane into ``ax`` for export.
+
+        Mirrors the live viewer: bit signals as 0/1 step traces,
+        vectors as bus outlines with value labels at every transition
+        inside the current x-view.
+        """
+        if not self._digital_waves:
+            return
+        theme = _get_theme()
+        mono = 'black'  # export background is white -> use black ink
+
+        #- Use the analog axis x-range so the two panes align even if
+        #- the user had zoomed the live view. matplotlib will sync via
+        #- sharex once we set it on the main axis below.
+        try:
+            xlo, xhi = ax_main.get_xlim()
+            if xhi <= xlo:
+                xlo, xhi = self.plot.vb.viewRange()[0]
+        except Exception:
+            xlo, xhi = self.plot.vb.viewRange()[0]
+
+        ax.set_xlim(xlo, xhi)
+        n_rows = len(self._digital_waves)
+        ax.set_ylim(0, n_rows)
+        ax.set_yticks([])
+        ax.grid(True, axis='x', alpha=0.2)
+        for spine in ('top', 'right'):
+            ax.spines[spine].set_visible(False)
+
+        yticks = []
+        yticklabels = []
+        for info in self._digital_waves.values():
+            wave = info['wave']
+            row = info['row']
+            slot_bot = row
+            slot_top = row + 1
+            yticks.append(row + 0.5)
+            yticklabels.append(self._truncate_axis_label(
+                self._short_signal_name(wave.key)))
+            self._export_one_digital(ax, wave, slot_bot, slot_top, mono,
+                                     xlo, xhi)
+
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(yticklabels, fontsize=8)
+
+        #- Forward x-axis formatting from the analog axis so units
+        #- (e.g. seconds) show up the same way on the bottom strip.
+        try:
+            xfmt = ax_main.xaxis.get_major_formatter()
+            ax.xaxis.set_major_formatter(xfmt)
+        except Exception:
+            pass
+
+    def _export_one_digital(self, ax, wave, y_lo, y_hi, color, xlo, xhi):
+        """Draw a single digital row into ``ax``."""
+        synth_kind = wave.digital_kind
+        raw = wave._digital_raw
+        if synth_kind not in ('bit', 'vector'):
+            raw = wave.synthesizeDigitalBits()
+            synth_kind = 'bit'
+        if raw is None or wave.x is None:
+            return
+        x_arr, _ = _to_numeric(wave.x)
+        if x_arr is None or len(x_arr) == 0:
+            return
+
+        if synth_kind == 'bit':
+            top = y_lo + 0.85
+            bot = y_lo + 0.15
+            yvals = np.full(len(raw), np.nan, dtype=np.float64)
+            for i, v in enumerate(raw):
+                if v == '1' or v == 1:
+                    yvals[i] = top
+                elif v == '0' or v == 0:
+                    yvals[i] = bot
+            ax.step(x_arr, yvals, where='post', color=color, linewidth=1.0)
+            ax.axhline((top + bot) / 2.0, xmin=0, xmax=1,
+                       color=color, linewidth=0.4, linestyle=':')
+            return
+
+        #- Vector: draw bus outline + transition ticks + labels.
+        top = y_lo + 0.85
+        bot = y_lo + 0.15
+        mid = (top + bot) / 2.0
+        top_y = np.full(len(raw), top, dtype=np.float64)
+        bot_y = np.full(len(raw), bot, dtype=np.float64)
+        for i, v in enumerate(raw):
+            if v is None or isinstance(v, str):
+                top_y[i] = np.nan
+                bot_y[i] = np.nan
+        ax.step(x_arr, top_y, where='post', color=color, linewidth=1.0)
+        ax.step(x_arr, bot_y, where='post', color=color, linewidth=1.0)
+
+        transitions = self._vector_transitions(raw)
+        if not transitions:
+            return
+        t_x = x_arr[np.asarray(transitions, dtype=np.int64)]
+        lo_i = int(np.searchsorted(t_x, xlo, side='left'))
+        hi_i = int(np.searchsorted(t_x, xhi, side='right'))
+        visible = list(range(max(0, lo_i - 1), min(len(transitions), hi_i)))
+
+        fontsize = 6
+        for vi in visible[:self._DIGITAL_MAX_LABELS]:
+            idx = transitions[vi]
+            tx = float(x_arr[idx])
+            ax.plot([tx, tx], [bot, top], color=color, linewidth=0.5)
+            txt = wave.formatDigitalValue(raw[idx])
+            #- Anchor at the left edge of the segment (matches the
+            #- live viewer's ``anchor=(0, 0.5)``). ``clip_on=False`` so
+            #- a wide label can overhang the cell and still render.
+            ax.text(tx, mid, " " + txt, fontsize=fontsize, color=color,
+                    ha='left', va='center', clip_on=False)
 
     def clearCursors(self):
         for line in self._cursor_a_lines:
@@ -1198,11 +2146,19 @@ class PgWavePlot(QWidget):
     def _remove_wave(self, tag):
         if tag in self.wave_data:
             wave, _ = self.wave_data[tag]
-            wave.remove()
+            #- Dispatch on actual placement, not digital_kind: a
+            #- synthesized digital trace (analog source, show_as_digital
+            #- on) lives in the digital pane but has digital_kind=None.
+            if tag in self._digital_waves:
+                self._remove_digital_wave(tag)
+            else:
+                wave.remove()
             del self.wave_data[tag]
 
     def _reset_axes(self):
         self._unit_vb.clear()
+        self._unit_axis_side.clear()
+        self._unit_axis_label.clear()
         if self._right_vb is not None:
             self.plot.scene().removeItem(self._right_vb)
             self._right_vb = None
@@ -1315,63 +2271,111 @@ class PgWavePlot(QWidget):
 
     def _on_mouse_drag(self, ev, axis=None):
         mods = ev.modifiers()
-        if ev.button() == Qt.RightButton and (
-                mods & Qt.ShiftModifier or mods & Qt.ControlModifier):
-            ev.accept()
-            if ev.isFinish():
-                return
-            delta = ev.pos() - ev.lastPos()
-            vb = self.plot.vb
-            vr = vb.viewRange()
-            w = vb.width()
-            h = vb.height()
+        if ev.button() == Qt.RightButton:
+            #- Right-drag always draws a rubber band. Modifiers constrain
+            #- the resulting zoom to a single axis:
+            #-   plain                -> rectangle, zoom both x and y
+            #-   Shift                -> band spans full plot height, zoom x only
+            #-   Ctrl (or Cmd on Mac) -> band spans full plot width,  zoom y only
+            #- On macOS Qt swaps the physical Ctrl and Meta keys by
+            #- default, so accept either modifier to mean "y-only".
+            ctrl_like = (Qt.ControlModifier | Qt.MetaModifier)
             if mods & Qt.ShiftModifier:
-                dx = delta.x() / w
-                xlo, xhi = vr[0]
-                xspan = xhi - xlo
-                vb.setXRange(xlo + dx * xspan, xhi - dx * xspan, padding=0)
-            elif mods & Qt.ControlModifier:
-                dy = delta.y() / h
-                for vbox in self._all_viewboxes():
-                    yr = vbox.viewRange()[1]
-                    ylo, yhi = yr
-                    yspan = yhi - ylo
-                    vbox.setYRange(ylo - dy * yspan, yhi + dy * yspan,
-                                   padding=0)
-        elif ev.button() == Qt.RightButton:
-            self._right_drag_rubber_band(ev)
+                self._right_drag_rubber_band(ev, constrain='x')
+            elif mods & ctrl_like:
+                self._right_drag_rubber_band(ev, constrain='y')
+            else:
+                self._right_drag_rubber_band(ev, constrain=None)
         else:
             self._orig_mouseDragEvent(ev, axis)
 
-    def _right_drag_rubber_band(self, ev):
+    def _right_drag_rubber_band(self, ev, constrain=None):
         """Right-drag draws a rubber-band rectangle and zooms to it on
         release. Reuses pyqtgraph's built-in scale-box machinery so the
-        rectangle styling and zoom history match RectMode."""
+        rectangle styling and zoom history match RectMode.
+
+        ``constrain`` restricts the zoom (and the visible band) to one
+        axis: ``'x'`` extends the band over the full plot height and
+        only zooms x; ``'y'`` extends it over the full width and only
+        zooms y; ``None`` is the original two-axis behaviour.
+        """
         ev.accept()
         vb = self.plot.vb
+        from PySide6.QtCore import QRectF, QPointF
+        from pyqtgraph import Point
+
+        down_pos = ev.buttonDownPos(Qt.RightButton)
+        cur_pos = ev.pos()
+
+        #- Build the on-screen (parent-coords) rectangle with the chosen
+        #- constraint applied. We extend the band to the full vb extent
+        #- on the locked axis so the user sees what's being kept.
+        vb_rect = vb.rect()  # in vb's parent coords (item-local origin)
+        if constrain == 'x':
+            top = vb_rect.top()
+            bot = vb_rect.bottom()
+            screen_rect = QRectF(QPointF(down_pos.x(), top),
+                                 QPointF(cur_pos.x(), bot))
+        elif constrain == 'y':
+            left = vb_rect.left()
+            right = vb_rect.right()
+            screen_rect = QRectF(QPointF(left, down_pos.y()),
+                                 QPointF(right, cur_pos.y()))
+        else:
+            screen_rect = QRectF(Point(down_pos), Point(cur_pos))
+
         if ev.isFinish():
             try:
                 vb.rbScaleBox.hide()
             except Exception:
                 pass
-            down_pos = ev.buttonDownPos(Qt.RightButton)
-            from PySide6.QtCore import QRectF
-            from pyqtgraph import Point
-            ax = QRectF(Point(down_pos), Point(ev.pos()))
-            # Ignore tiny rectangles (treat as a click, not a drag).
-            if abs(ax.width()) < 3 or abs(ax.height()) < 3:
-                return
-            ax = vb.childGroup.mapRectFromParent(ax)
-            vb.showAxRect(ax)
-            # Push onto the built-in axis history so View > "axis history"
-            # navigation still works as expected.
-            try:
-                vb.axHistoryPointer += 1
-                vb.axHistory = (vb.axHistory[:vb.axHistoryPointer] + [ax])
-            except Exception:
-                pass
+            #- Ignore tiny rectangles (treat as a click, not a drag).
+            min_extent = 3
+            if constrain == 'x':
+                if abs(screen_rect.width()) < min_extent:
+                    return
+            elif constrain == 'y':
+                if abs(screen_rect.height()) < min_extent:
+                    return
+            else:
+                if (abs(screen_rect.width()) < min_extent or
+                        abs(screen_rect.height()) < min_extent):
+                    return
+
+            data_rect = vb.childGroup.mapRectFromParent(screen_rect)
+
+            if constrain == 'x':
+                #- Keep current y range, zoom only x.
+                vb.setXRange(data_rect.left(), data_rect.right(), padding=0)
+                #- Apply the same x-zoom to any linked viewbox so a
+                #- right-axis curve stays in sync.
+                for vbox in self._all_viewboxes():
+                    if vbox is vb:
+                        continue
+                    vbox.setXRange(data_rect.left(), data_rect.right(),
+                                   padding=0)
+            elif constrain == 'y':
+                #- Map y-range through every viewbox individually so each
+                #- axis (left/right) zooms to its own data coordinates.
+                for vbox in self._all_viewboxes():
+                    dr = vbox.childGroup.mapRectFromParent(screen_rect)
+                    vbox.setYRange(dr.top(), dr.bottom(), padding=0)
+            else:
+                vb.showAxRect(data_rect)
+                #- Push onto the built-in axis history so the View menu's
+                #- axis-history navigation still works as expected.
+                try:
+                    vb.axHistoryPointer += 1
+                    vb.axHistory = (vb.axHistory[:vb.axHistoryPointer]
+                                    + [data_rect])
+                except Exception:
+                    pass
         else:
-            vb.updateScaleBox(ev.buttonDownPos(), ev.pos())
+            #- pyqtgraph's updateScaleBox takes two scene/parent points
+            #- and draws a rectangle between them; pass the constrained
+            #- corners so the user sees an axis-aligned band.
+            vb.updateScaleBox(screen_rect.topLeft(),
+                              screen_rect.bottomRight())
 
     # --- Delta text on plot ---
 
@@ -1544,19 +2548,38 @@ class PgWavePlot(QWidget):
             yb = self._interp_y(wave, self.cursor_b)
             ga = self._interp_gradient(wave, self.cursor_a)
             gb = self._interp_gradient(wave, self.cursor_b)
-            if ya is not None:
-                wparts.append("A: %-14s" % _eng(ya, yu))
-            if yb is not None:
-                wparts.append("B: %-14s" % _eng(yb, yu))
-            if ya is not None and yb is not None:
-                wparts.append("Δ: %-14s" % _eng(yb - ya, yu))
-                if xa is not None and xb is not None and (xb - xa) != 0:
-                    slope = (yb - ya) / (xb - xa)
-                    wparts.append("Δ/ΔX: %-14s" % _eng(slope, du))
-            if ga is not None:
-                wparts.append("dA: %-14s" % _eng(ga, du))
-            if gb is not None:
-                wparts.append("dB: %-14s" % _eng(gb, du))
+            if wave.digital_kind == 'vector':
+                #- Show formatted vector samples (hex/dec/bin) instead
+                #- of engineering-notation floats.
+                if ya is not None:
+                    wparts.append("A: %-14s" % wave.formatDigitalValue(ya))
+                if yb is not None:
+                    wparts.append("B: %-14s" % wave.formatDigitalValue(yb))
+                if ya is not None and yb is not None:
+                    try:
+                        d = int(round(yb - ya))
+                        wparts.append("Δ: %-14d" % d)
+                    except (TypeError, ValueError):
+                        pass
+            elif wave.digital_kind == 'bit':
+                if ya is not None:
+                    wparts.append("A: %-14s" % wave.formatDigitalValue(ya))
+                if yb is not None:
+                    wparts.append("B: %-14s" % wave.formatDigitalValue(yb))
+            else:
+                if ya is not None:
+                    wparts.append("A: %-14s" % _eng(ya, yu))
+                if yb is not None:
+                    wparts.append("B: %-14s" % _eng(yb, yu))
+                if ya is not None and yb is not None:
+                    wparts.append("Δ: %-14s" % _eng(yb - ya, yu))
+                    if xa is not None and xb is not None and (xb - xa) != 0:
+                        slope = (yb - ya) / (xb - xa)
+                        wparts.append("Δ/ΔX: %-14s" % _eng(slope, du))
+                if ga is not None:
+                    wparts.append("dA: %-14s" % _eng(ga, du))
+                if gb is not None:
+                    wparts.append("dB: %-14s" % _eng(gb, du))
             lines.append("%s  %s" % ("".join(wparts), wave.wfile.name))
 
         self.readout.setPlainText("\n".join(lines))
@@ -1962,6 +2985,13 @@ class PgWaveWindow(QMainWindow):
             ("Escape", self._clear_cursors),
         ]:
             QShortcut(QKeySequence(seq), self, func)
+        #- Single-letter shortcuts that should fire even while the
+        #- wave/file tree has focus. ``ApplicationShortcut`` context
+        #- bypasses the QTreeWidget's keyboard-search swallowing.
+        from PySide6.QtCore import Qt as _Qt
+        d_sc = QShortcut(QKeySequence("D"), self,
+                         self.browser.togglePlotAsDigital)
+        d_sc.setContext(_Qt.ApplicationShortcut)
 
     def keyPressEvent(self, event):
         if isinstance(self.focusWidget(), QLineEdit):
@@ -1970,9 +3000,14 @@ class PgWaveWindow(QMainWindow):
         p = self._current()
         key = event.text()
         mods = event.modifiers()
-        if p and key == 'Z' and hasattr(p, 'zoomIn'):
+        ctrl_like = (Qt.ControlModifier | Qt.MetaModifier)
+        if p and key == 'z' and not (mods & ctrl_like) and hasattr(p, 'zoomIn'):
             p.zoomIn()
-        elif p and key.lower() == 'z' and mods & Qt.ControlModifier and hasattr(p, 'zoomOut'):
+        elif p and key == 'Z' and hasattr(p, 'zoomOut'):
+            #- Shift+z (uppercase Z) zooms out. Ctrl+z still works as a
+            #- secondary binding for muscle-memory parity with Shift+Z.
+            p.zoomOut()
+        elif p and key.lower() == 'z' and mods & ctrl_like and hasattr(p, 'zoomOut'):
             p.zoomOut()
         elif p and key.lower() == 'a' and hasattr(p, 'placeCursorA'):
             p.placeCursorA()
@@ -2006,6 +3041,14 @@ class PgWaveWindow(QMainWindow):
             if result:
                 tag, color = result
                 self.browser.setWaveColor(tag, color)
+            else:
+                #- Already plotted: still poke the readout so a digital
+                #- format change (or other wave-side option) shows up
+                #- without requiring a cursor move.
+                if hasattr(p, '_refresh_digital_labels'):
+                    p._refresh_digital_labels(wave)
+                if hasattr(p, '_update_readout'):
+                    p._update_readout()
 
     def _on_wave_remove(self, wave):
         p = self._current()
@@ -2087,7 +3130,7 @@ class PgWaveWindow(QMainWindow):
     def _open_file(self):
         fname, _ = QFileDialog.getOpenFileName(
             self, "Open File", os.getcwd(),
-            "All Supported (*.raw *.csv *.tsv *.txt *.xlsx *.xls *.ods *.pkl *.pickle *.json *.parquet *.feather *.h5 *.hdf5);;Raw Files (*.raw);;CSV/TSV (*.csv *.tsv *.txt);;Excel (*.xlsx *.xls *.ods);;Pickle (*.pkl *.pickle);;JSON (*.json);;Parquet (*.parquet);;Feather (*.feather);;HDF5 (*.h5 *.hdf5);;All Files (*)")
+            "All Supported (*.raw *.vcd *.csv *.tsv *.txt *.xlsx *.xls *.ods *.pkl *.pickle *.json *.parquet *.feather *.h5 *.hdf5);;Raw Files (*.raw);;VCD Files (*.vcd);;CSV/TSV (*.csv *.tsv *.txt);;Excel (*.xlsx *.xls *.ods);;Pickle (*.pkl *.pickle);;JSON (*.json);;Parquet (*.parquet);;Feather (*.feather);;HDF5 (*.h5 *.hdf5);;All Files (*)")
         if fname:
             self.browser.openFile(fname)
 
@@ -2206,9 +3249,10 @@ class PgWaveWindow(QMainWindow):
             "  Ctrl+L        Set axis labels\n"
             "  Ctrl+T        Add annotation\n"
             "  R             Reload all waves\n"
-            "  F             Auto scale (fit)\n"
-            "  Shift+Z       Zoom in\n"
-            "  Ctrl+Z        Zoom out\n"
+            "  F             Fit all (auto scale)\n"
+            "  Z             Zoom in\n"
+            "  Shift+Z       Zoom out\n"
+            "  Ctrl+Z        Zoom out (alias)\n"
             "\n"
             "Cursors\n"
             "  A             Set cursor A at mouse\n"
@@ -2218,6 +3262,7 @@ class PgWaveWindow(QMainWindow):
             "\n"
             "View\n"
             "  L             Toggle legend\n"
+            "  D             Toggle focused wave on the digital pane\n"
             "  Ctrl+Up       Increase line width\n"
             "  Ctrl+Down     Decrease line width\n"
             "  Ctrl+=        Increase font size\n"
@@ -2664,13 +3709,40 @@ def _apply_theme(app, theme_name='dark'):
 
 
 def _detect_opengl():
-    """Return True if PyOpenGL is importable. pyqtgraph needs it for the
-    GL-accelerated renderer; without it we stay on the raster backend."""
+    """Return True if pyqtgraph's OpenGL backend should be enabled.
+
+    PyOpenGL must be importable (pyqtgraph needs it for the GL-accelerated
+    renderer); without it we stay on the raster backend.
+
+    OpenGL is enabled by default on every platform when PyOpenGL is
+    available. On macOS we additionally log a one-time warning because
+    some pyqtgraph + Qt + Cocoa combinations render an empty plot
+    canvas; the user can disable GL with ``CICSIM_USE_OPENGL=0`` if
+    they hit that. ``CICSIM_USE_OPENGL=1`` force-enables on any
+    platform (still requires PyOpenGL).
+    """
+    env = os.environ.get("CICSIM_USE_OPENGL")
+    if env == "0":
+        return False
     try:
         import OpenGL  # noqa: F401
-        return True
     except Exception:
         return False
+    if env == "1":
+        return True
+    if sys.platform == "darwin" and not _detect_opengl._mac_warned:
+        import logging
+        logging.getLogger("cicsim").warning(
+            "Enabling pyqtgraph OpenGL backend on macOS. Some Qt/Cocoa "
+            "builds render an empty plot canvas with OpenGL; if you see "
+            "blank plots, run again with CICSIM_USE_OPENGL=0 to fall "
+            "back to the raster renderer."
+        )
+        _detect_opengl._mac_warned = True
+    return True
+
+
+_detect_opengl._mac_warned = False
 
 
 class CmdWavePg:
@@ -2678,7 +3750,8 @@ class CmdWavePg:
         self.app = QApplication.instance() or QApplication(sys.argv)
         # Enable OpenGL when available: gives a large speedup when many
         # curves are on screen (e.g. one curve per file across hundreds of
-        # files). Falls back silently to raster when PyOpenGL is missing.
+        # files). Falls back silently to raster when PyOpenGL is missing
+        # or on platforms where it renders blank plots (macOS).
         use_gl = _detect_opengl()
         pg.setConfigOptions(antialias=False, useOpenGL=use_gl)
         _apply_theme(self.app, theme)

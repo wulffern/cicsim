@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import cicsim as cs
 import os
 import re
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import EngFormatter
+
+from .ngraw import toDataFrame as _ngraw_toDataFrame
 
 # ---------------------------------------------------------------------------
 # Unit auto-detection from column names.
@@ -338,6 +339,7 @@ class WaveFile():
 
     PANDAS_READERS = {
         '.prn':     lambda self: self._read_prn(),
+        '.vcd':     lambda self: read_vcd(self.fname),
         '.csv':     lambda self: self._read_csv(','),
         '.tsv':     lambda self: self._read_csv('\t'),
         '.txt':     lambda self: self._read_csv('\t'),
@@ -365,7 +367,7 @@ class WaveFile():
         reader = self.PANDAS_READERS.get(ext)
         if reader:
             return reader(self)
-        return cs.toDataFrame(self.fname)
+        return _ngraw_toDataFrame(self.fname)
 
     def _read_csv(self, sep):
         # Prefer pyarrow (much faster on large numeric CSVs); fall back to
@@ -509,3 +511,303 @@ class WaveFiles(dict):
     def getSelected(self):
         if(self.current is not None):
             return self[self.current]
+
+
+# ---------------------------------------------------------------------------
+# VCD parser
+# ---------------------------------------------------------------------------
+
+#- VCD timescale unit -> seconds. The standard set per IEEE 1364.
+_VCD_TIMESCALE_UNITS = {
+    's': 1.0, 'ms': 1e-3, 'us': 1e-6, 'µs': 1e-6, 'ns': 1e-9,
+    'ps': 1e-12, 'fs': 1e-15,
+}
+
+
+def _vcd_parse_timescale(text):
+    """Parse a ``$timescale`` body like ``"1 ps"`` / ``"10ns"`` -> seconds.
+
+    Returns the multiplier that converts a raw ``#<n>`` tick into seconds.
+    Falls back to 1.0 if the body is missing or unrecognised.
+    """
+    s = (text or "").strip().lower().replace('\n', ' ')
+    if not s:
+        return 1.0
+    m = re.match(r"\s*([0-9.eE+\-]+)\s*([a-zµ]+)\s*$", s)
+    if m is None:
+        #- Sometimes the number and unit are on separate tokens with extra
+        #- whitespace; do a looser split.
+        toks = s.split()
+        if len(toks) >= 2:
+            num_s, unit_s = toks[0], toks[1]
+        else:
+            return 1.0
+    else:
+        num_s, unit_s = m.group(1), m.group(2)
+    try:
+        num = float(num_s)
+    except ValueError:
+        return 1.0
+    return num * _VCD_TIMESCALE_UNITS.get(unit_s, 1.0)
+
+
+def read_vcd(fname, max_signals=None):
+    """Parse a VCD (Value Change Dump) file into a pandas DataFrame.
+
+    The result has a ``time`` column (in seconds, after applying
+    ``$timescale``) plus one column per signal. Single-bit signals are
+    stored as object arrays of ``"0" / "1" / "x" / "z"``; vector
+    signals are stored as Python ints (or ``None`` for x/z); real
+    signals are stored as floats.
+
+    The DataFrame attaches metadata in ``df.attrs['cicsim_vcd']``:
+        ``{'kinds': {col: 'bit'|'vector'|'real'},
+           'widths': {col: int},
+           'scope':  {col: scoped_name}}``
+
+    Parameters
+    ----------
+    fname : str
+        Path to the VCD file.
+    max_signals : int or None
+        If set, only the first N declared signals are kept (used to
+        bound memory on huge dumps). ``None`` keeps everything.
+
+    Notes
+    -----
+    Only the subset of VCD actually emitted by Icarus / Verilator /
+    ngspice is supported. We follow the structure but don't try to
+    enforce strict compliance.
+    """
+    timescale = 1.0
+    #- id_code -> {'name': scoped_name, 'kind': 'bit'/'vector'/'real',
+    #-             'width': int}
+    sig_info = {}
+    scope_stack = []
+
+    def _parse_decls(fh):
+        nonlocal timescale
+        cur = []
+        in_timescale = False
+        for line in fh:
+            ls = line.strip()
+            if not ls:
+                continue
+            if ls.startswith('$timescale'):
+                in_timescale = True
+                cur = [ls[len('$timescale'):]]
+                if '$end' in ls:
+                    timescale = _vcd_parse_timescale(
+                        ' '.join(cur).replace('$end', ''))
+                    in_timescale = False
+                continue
+            if in_timescale:
+                if '$end' in ls:
+                    cur.append(ls.replace('$end', ''))
+                    timescale = _vcd_parse_timescale(' '.join(cur))
+                    in_timescale = False
+                else:
+                    cur.append(ls)
+                continue
+            if ls.startswith('$scope'):
+                toks = ls.split()
+                #- $scope <type> <name> $end
+                if len(toks) >= 3:
+                    scope_stack.append(toks[2])
+                continue
+            if ls.startswith('$upscope'):
+                if scope_stack:
+                    scope_stack.pop()
+                continue
+            if ls.startswith('$var'):
+                #- $var <type> <width> <id> <name> [<bit-select>] $end
+                toks = ls.split()
+                if len(toks) < 6:
+                    continue
+                vtype = toks[1]
+                try:
+                    width = int(toks[2])
+                except ValueError:
+                    continue
+                idc = toks[3]
+                name = toks[4]
+                if width == 1 and vtype != 'real':
+                    kind = 'bit'
+                elif vtype == 'real':
+                    kind = 'real'
+                else:
+                    kind = 'vector'
+                #- Multiple $var lines can share the same id (alias). Keep
+                #- the first; remember every alias name in ``aliases``.
+                full = '.'.join(scope_stack + [name]) if scope_stack else name
+                if idc in sig_info:
+                    sig_info[idc].setdefault('aliases', []).append(full)
+                else:
+                    sig_info[idc] = {
+                        'name': full, 'kind': kind, 'width': width,
+                        'aliases': [],
+                    }
+                continue
+            if ls.startswith('$enddefinitions'):
+                return
+
+    with open(fname, 'r', errors='replace') as fh:
+        _parse_decls(fh)
+
+        if max_signals is not None and len(sig_info) > max_signals:
+            #- Keep only the first ``max_signals`` declared ids by
+            #- insertion order.
+            keep = set(list(sig_info.keys())[:max_signals])
+            sig_info = {k: v for k, v in sig_info.items() if k in keep}
+
+        ids = list(sig_info.keys())
+        col_names = [sig_info[i]['name'] for i in ids]
+        kind_by_id = {i: sig_info[i]['kind'] for i in ids}
+        width_by_id = {i: sig_info[i]['width'] for i in ids}
+
+        #- Pre-allocate per-signal change lists: list of (time_idx, value).
+        changes = {i: [] for i in ids}
+        times = []
+        cur_t = 0
+        in_dump = False  # inside $dumpvars / $dumpall block
+
+        def _ensure_t0():
+            #- Some VCDs (e.g. our compact unit-test fixtures) emit
+            #- ``$dumpvars`` initial values before any ``#0`` time tick.
+            #- Inject t=0 so those initial values are anchored properly.
+            if not times:
+                times.append(0)
+
+        for line in fh:
+            ls = line.strip()
+            if not ls:
+                continue
+            c0 = ls[0]
+            if c0 == '#':
+                #- Time tick.
+                try:
+                    cur_t = int(ls[1:])
+                except ValueError:
+                    continue
+                if not times or times[-1] != cur_t:
+                    times.append(cur_t)
+                continue
+            if c0 == '$':
+                if ls.startswith('$dumpvars') or ls.startswith('$dumpall'):
+                    in_dump = True
+                    _ensure_t0()
+                elif ls.startswith('$end'):
+                    in_dump = False
+                #- Other directives ($comment etc.) ignored.
+                continue
+            if c0 in ('0', '1', 'x', 'X', 'z', 'Z', 'h', 'H', 'l', 'L'):
+                #- Single-bit change: value char + id (no space).
+                idc = ls[1:].strip()
+                if idc in changes:
+                    changes[idc].append(
+                        (len(times) - 1 if times else 0, c0.lower()))
+                continue
+            if c0 == 'b' or c0 == 'B':
+                #- Vector: b<bits> <id>
+                try:
+                    bits, idc = ls.split(None, 1)
+                except ValueError:
+                    continue
+                idc = idc.strip()
+                bits = bits[1:]  # drop leading 'b'
+                if idc in changes:
+                    if any(c in 'xXzZ' for c in bits):
+                        val = None  # unknown -> store as None
+                        raw = bits.lower()
+                    else:
+                        try:
+                            val = int(bits, 2)
+                            raw = val
+                        except ValueError:
+                            val = None
+                            raw = bits.lower()
+                    changes[idc].append(
+                        (len(times) - 1 if times else 0, raw))
+                continue
+            if c0 == 'r' or c0 == 'R':
+                #- Real: r<float> <id>
+                try:
+                    fval, idc = ls.split(None, 1)
+                except ValueError:
+                    continue
+                idc = idc.strip()
+                try:
+                    rv = float(fval[1:])
+                except ValueError:
+                    continue
+                if idc in changes:
+                    changes[idc].append(
+                        (len(times) - 1 if times else 0, rv))
+                continue
+
+    if not times:
+        #- Pathological: no time markers. Return empty frame with the
+        #- declared column list so the UI still shows the signal names.
+        df = pd.DataFrame({c: [] for c in ['time'] + col_names})
+        df.attrs['cicsim_vcd'] = {
+            'kinds': {sig_info[i]['name']: sig_info[i]['kind'] for i in ids},
+            'widths': {sig_info[i]['name']: sig_info[i]['width'] for i in ids},
+            'scope': {sig_info[i]['name']: sig_info[i]['name'] for i in ids},
+            'timescale_s': timescale,
+        }
+        return df
+
+    #- Build forward-filled per-signal columns.
+    n = len(times)
+    data = {'time': np.asarray(times, dtype=np.float64) * timescale}
+    for idc in ids:
+        kind = kind_by_id[idc]
+        if kind == 'real':
+            col = np.full(n, np.nan, dtype=np.float64)
+            cur = np.nan
+            j = 0
+            ch = changes[idc]
+            for t_idx in range(n):
+                while j < len(ch) and ch[j][0] <= t_idx:
+                    cur = ch[j][1]
+                    j += 1
+                col[t_idx] = cur
+        elif kind == 'bit':
+            col = np.empty(n, dtype=object)
+            cur = 'x'
+            j = 0
+            ch = changes[idc]
+            for t_idx in range(n):
+                while j < len(ch) and ch[j][0] <= t_idx:
+                    cur = ch[j][1]
+                    j += 1
+                col[t_idx] = cur
+        else:  # vector
+            col = np.empty(n, dtype=object)
+            cur = None
+            j = 0
+            ch = changes[idc]
+            for t_idx in range(n):
+                while j < len(ch) and ch[j][0] <= t_idx:
+                    cur = ch[j][1]
+                    j += 1
+                col[t_idx] = cur
+        name = sig_info[idc]['name']
+        data[name] = col
+        for alias in sig_info[idc].get('aliases', []):
+            #- Aliases share data but get their own column for selection.
+            data[alias] = col
+
+    df = pd.DataFrame(data)
+    kinds = {sig_info[i]['name']: sig_info[i]['kind'] for i in ids}
+    widths = {sig_info[i]['name']: sig_info[i]['width'] for i in ids}
+    for i in ids:
+        for alias in sig_info[i].get('aliases', []):
+            kinds[alias] = sig_info[i]['kind']
+            widths[alias] = sig_info[i]['width']
+    df.attrs['cicsim_vcd'] = {
+        'kinds': kinds,
+        'widths': widths,
+        'timescale_s': timescale,
+    }
+    return df
