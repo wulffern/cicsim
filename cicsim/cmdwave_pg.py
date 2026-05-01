@@ -480,22 +480,39 @@ class PgWave:
 
     @staticmethod
     def _apply_render_opts(curve):
-        """Hook for per-curve options applied at construction time.
+        """Per-curve options safe to apply at construction time.
 
-        Intentionally a no-op for view-dependent options. Both
-        ``autoDownsample=True`` and ``clipToView=True`` use the
-        ViewBox's current view rect to decide what to display, but at
+        ``autoDownsample`` and ``clipToView`` are NOT set here -- they
+        slice the data array using the ViewBox's current rect, but at
         construction the ViewBox still holds its default
         ``(-0.5, -0.5, 1, 1)`` rect (autoRange has not run yet because
         the first curve is still being added). With a 7e-6 s data span
         and a 1.0 unit view rect, autoDownsample picks a downsample
         factor of ~300 000, collapsing the curve to a single point;
         clipToView then keeps it that way. The resulting empty plot is
-        what users saw on macOS.
-
-        Performance options that need a real view rect are applied by
+        what users saw on macOS. Those options are applied by
         :meth:`_enable_view_dependent_opts` after ``autoRange()``.
+
+        ``setDynamicRangeLimit`` IS safe at construction: it clamps
+        y-values relative to the view rect at draw time (not at
+        ``setData`` time), so it never collapses the data. Setting it
+        here suppresses Qt's "Painter path exceeds +/-32767 pixels"
+        warnings that fire when a curve has tall spikes (e.g. a power
+        rail transient) and the user zooms in: without dynamic range
+        limiting the painter receives y-coords millions of pixels
+        outside the viewport, which exceeds Qt's int16 path range.
         """
+        if curve is None:
+            return
+        try:
+            #- 1e6 is pyqtgraph's own default; we set it explicitly so
+            #- the limiter is active even on PlotDataItem subclasses
+            #- that may have it disabled, and to make the intent
+            #- visible. Tightening below 1e6 risks visible clipping
+            #- on legitimate large-dynamic-range signals.
+            curve.setDynamicRangeLimit(1e6)
+        except Exception:
+            pass
         return
 
     @staticmethod
@@ -520,6 +537,14 @@ class PgWave:
             opts = getattr(curve, 'opts', None)
             if isinstance(opts, dict):
                 opts['clipToView'] = True
+        #- Dynamic range limit: see ``_apply_render_opts``. Also set
+        #- here so digital-pane PlotDataItems (which skip the
+        #- ``Wave.plot`` path) get the same Qt 16-bit-painter
+        #- protection.
+        try:
+            curve.setDynamicRangeLimit(1e6)
+        except Exception:
+            pass
 
     def plot(self, target, color='w', style='Lines', width=2):
         """Plot on a PlotItem or ViewBox. Returns the curve or None."""
