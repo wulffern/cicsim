@@ -237,13 +237,34 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None,
 
     if backend == "pg":
         try:
-            from cicsim.cmdwave_pg import CmdWavePg
+            # Delegate to standalone cicwave package for PyQtGraph backend
+            import cicwave.cli
+            # Convert arguments to match cicwave CLI expectations
+            cicwave_args = []
+            if files:
+                cicwave_args.extend(files)
+            if x:
+                cicwave_args.extend(['--x', x])
+            if sheet:
+                cicwave_args.extend(['--sheet', sheet])
+            if pivot_spec:
+                cicwave_args.extend(['--pivot', pivot_spec])
+            if pivot_info_flag:
+                cicwave_args.append('--pivot-info')
+            if session_path:
+                cicwave_args.extend(['--session', session_path])
+            if export_path:
+                cicwave_args.extend(['--export', export_path])
+            
+            # Use cicwave's internal _run_wave_pg function directly
+            from cicwave.cli import _run_wave_pg
+            _run_wave_pg(files, x, sheet, pivot_spec, pivot_info_flag, session_path, export_path)
+            return
         except ImportError as e:
-            print("Error: pyqtgraph backend requires PySide6 and pyqtgraph")
-            print("Install with: pip install PySide6 pyqtgraph")
+            print("Error: PyQtGraph backend requires cicwave package")
+            print("Install with: pip install cicwave")
             print(f"  ({e})")
             sys.exit(1)
-        c = CmdWavePg(x)
     else:
         if not importlib.util.find_spec("tkinter"):
             print("Error: Could not find tkinter. Install python3-tk")
@@ -290,8 +311,8 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None,
 def cicwave(files, globs, x, backend, sheet, pivot, pivot_info, session, export):
     """Waveform viewer (standalone).
 
-    Shortcut for 'cicsim wave --backend pg'. Opens the pyqtgraph-based
-    waveform viewer by default.
+    Now delegates to standalone cicwave package for PyQtGraph backend.
+    For backward compatibility, this entry point is preserved in cicsim.
 
     Supports: .raw, .csv, .tsv, .xlsx, .json, .parquet, .feather, .h5,
     .pkl, and more.
@@ -313,9 +334,16 @@ def cicwave(files, globs, x, backend, sheet, pivot, pivot_info, session, export)
       --glob '**/*.raw'               Useful on PowerShell which doesn't
                                        auto-expand patterns
     """
-    files = _expand_glob_patterns(files, globs)
-    _run_wave(files, x, backend, sheet, pivot, pivot_info,
-              session_path=session, export_path=export)
+    try:
+        # Delegate to standalone cicwave package
+        from cicwave.cli import _run_wave_pg
+        files_expanded = _expand_glob_patterns(files, globs)
+        _run_wave_pg(files_expanded, x, sheet, pivot, pivot_info, session, export)
+    except ImportError:
+        print("Error: cicwave package not found")
+        print("For PyQtGraph backend, install with: pip install cicwave")
+        print("Alternatively, use: cicsim wave --backend tk")
+        sys.exit(1)
 
 
 
