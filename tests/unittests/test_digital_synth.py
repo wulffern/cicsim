@@ -42,9 +42,12 @@ class TestSynthesizeDigitalBits(unittest.TestCase):
 
     def test_threshold_uses_min_max_midpoint(self):
         #- Mid-level is 1.4 V (half of 0..2.8). Samples below that map
-        #- to 0, above to 1.
+        #- to 0, above to 1. Disable hysteresis here so the test only
+        #- exercises midpoint thresholding (the hysteresis behaviour has
+        #- its own dedicated test below); 1.3 and 1.5 deliberately sit
+        #- inside the default hysteresis band.
         y = [0.0, 1.0, 1.5, 2.0, 1.3, 2.8]
-        bits = self._make_wave(y).synthesizeDigitalBits()
+        bits = self._make_wave(y).synthesizeDigitalBits(hysteresis_frac=0.0)
         self.assertEqual(list(bits), ['0', '0', '1', '1', '0', '1'])
 
     def test_hysteresis_suppresses_noise(self):
