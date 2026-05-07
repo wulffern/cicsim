@@ -10,6 +10,7 @@ import os
 import sys
 import re
 import numpy as np
+import pandas as pd
 from importlib.metadata import version as _pkg_version
 
 from PySide6.QtWidgets import (
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import (
     QSplitter, QTreeWidget, QTreeWidgetItem, QLineEdit, QTabWidget,
     QPushButton, QLabel, QCheckBox, QTextEdit, QFileDialog, QDialog,
     QInputDialog, QMenu, QComboBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView)
+    QHeaderView, QAbstractItemView, QMessageBox)
 from PySide6 import QtCore
 from PySide6.QtCore import Qt, Signal, QEvent, QSettings, QTimer
 from PySide6.QtGui import (QKeySequence, QFont, QFontDatabase, QShortcut,
@@ -2030,6 +2031,147 @@ class PgWavePlot(QWidget):
         fig.savefig(fname, dpi=dpi, facecolor='white')
         plt.close(fig)
 
+    # ------------------------------------------------------------------
+    # Data export (plotted waveforms -> CSV/TSV/Parquet/Feather/HDF5)
+    # ------------------------------------------------------------------
+
+    #- Extension -> (pandas writer attribute, kwargs, format label)
+    #- HDF5 needs a key; Feather/Parquet are columnar and lossless.
+    _EXPORT_DATA_WRITERS = {
+        '.csv':     ('to_csv',     {'index': False}),
+        '.tsv':     ('to_csv',     {'index': False, 'sep': '\t'}),
+        '.txt':     ('to_csv',     {'index': False, 'sep': '\t'}),
+        '.parquet': ('to_parquet', {'index': False}),
+        '.feather': ('to_feather', {}),
+        '.h5':      ('to_hdf',     {'key': 'cicwave', 'mode': 'w'}),
+        '.hdf5':    ('to_hdf',     {'key': 'cicwave', 'mode': 'w'}),
+    }
+
+    def exportData(self):
+        """Save the currently plotted analog waves to a data file.
+
+        Writes one column per (X, Y) pair side-by-side so heterogeneous
+        x-grids are preserved without resampling. The current x-view
+        range is honoured (zoom in to export a region). Digital pane
+        traces are skipped — those are better viewed than tabulated.
+        """
+        exts = ";;".join([
+            "CSV (*.csv)",
+            "TSV (*.tsv)",
+            "Parquet (*.parquet)",
+            "Feather (*.feather)",
+            "HDF5 (*.h5)",
+        ])
+        fname, _ = QFileDialog.getSaveFileName(
+            self, "Export Plotted Data", os.getcwd(),
+            exts + ";;All Files (*)")
+        if not fname:
+            return
+        try:
+            n_traces, n_rows = self._export_data_to(fname)
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Export failed",
+                "Could not write %s:\n%s" % (fname, e))
+            return
+        QMessageBox.information(
+            self, "Export complete",
+            "Wrote %d trace(s), %d row(s) to:\n%s"
+            % (n_traces, n_rows, fname))
+
+    def _export_data_to(self, fname):
+        """Write plotted-wave data to ``fname``. Returns (n_traces, n_rows).
+
+        ``n_rows`` is the longest column length (others are NaN-padded
+        to fit a rectangular DataFrame; the original arrays are
+        preserved exactly within their length).
+        """
+        ext = os.path.splitext(fname)[1].lower()
+        spec = self._EXPORT_DATA_WRITERS.get(ext)
+        if spec is None:
+            raise ValueError(
+                "Unsupported export extension %r. Use one of: %s"
+                % (ext, ", ".join(sorted(self._EXPORT_DATA_WRITERS))))
+        writer_attr, kwargs = spec
+
+        #- Skip the digital pane: it has its own representation
+        #- (string '0'/'1'/'x' or vector ints) that doesn't round-trip
+        #- cleanly into a numeric data file.
+        tags = [t for t in self.wave_data.keys()
+                if t not in self._digital_waves]
+        if not tags:
+            raise ValueError("No analog waves to export.")
+
+        #- Honour the current x-zoom so "zoom in, export" gives the
+        #- region of interest rather than the whole capture. Wrap in
+        #- try/except: viewRange may raise on freshly-built plots in
+        #- headless tests.
+        try:
+            xlo, xhi = self.plot.vb.viewRange()[0]
+        except Exception:
+            xlo, xhi = (None, None)
+
+        columns = {}  # ordered insertion = preserved column order
+        used_names = set()
+        max_len = 0
+        for tag in tags:
+            wave, _yunit = self.wave_data[tag]
+            if wave.x is None or wave.y is None:
+                continue
+            x = np.asarray(wave.x)
+            y = np.asarray(wave.y)
+            n = min(len(x), len(y))
+            if n == 0:
+                continue
+            x = x[:n]
+            y = y[:n]
+            if xlo is not None and np.issubdtype(x.dtype, np.number):
+                mask = (x >= xlo) & (x <= xhi)
+                if mask.any():
+                    x = x[mask]
+                    y = y[mask]
+
+            #- Make column names unique even if two waves share a key.
+            xname = self._unique_col(
+                wave.xlabel or "x", wave.xunit, used_names)
+            yname = self._unique_col(
+                wave.key or wave.ylabel or "y", wave.yunit, used_names)
+            columns[xname] = x
+            columns[yname] = y
+            max_len = max(max_len, len(x))
+
+        if not columns:
+            raise ValueError("No exportable samples in current view.")
+
+        #- Pad to a rectangular shape. NaN in unused tail rows is the
+        #- least-surprising filler for numeric columns.
+        padded = {}
+        for name, arr in columns.items():
+            if len(arr) < max_len:
+                pad = np.full(max_len - len(arr), np.nan, dtype=float)
+                padded[name] = np.concatenate([arr.astype(float), pad])
+            else:
+                padded[name] = arr
+        df = pd.DataFrame(padded)
+
+        getattr(df, writer_attr)(fname, **kwargs)
+        return len(columns) // 2, max_len
+
+    @staticmethod
+    def _unique_col(base, unit, used):
+        """Build a column name like ``time (s)`` and disambiguate
+        collisions with ``__1``, ``__2``, ... suffixes."""
+        name = base
+        if unit:
+            name = "%s (%s)" % (base, unit)
+        candidate = name
+        i = 1
+        while candidate in used:
+            candidate = "%s__%d" % (name, i)
+            i += 1
+        used.add(candidate)
+        return candidate
+
     def _export_digital_pane(self, ax, ax_main):
         """Render the digital pane into ``ax`` for export.
 
@@ -2955,6 +3097,7 @@ class PgWaveWindow(QMainWindow):
         m.addAction("Load Session", self._load_session)
         m.addSeparator()
         m.addAction("Export PDF        Ctrl+P", self._export_pdf)
+        m.addAction("Export Data...    Ctrl+E", self._export_data)
         m.addSeparator()
         m.addAction("Quit              Ctrl+Q", self.close)
 
@@ -2998,6 +3141,7 @@ class PgWaveWindow(QMainWindow):
             ("Ctrl+O", self._open_file),
             ("Ctrl+S", self._save_session),
             ("Ctrl+P", self._export_pdf),
+            ("Ctrl+E", self._export_data),
             ("Ctrl+Q", self.close),
             ("Ctrl+N", self._add_plot_tab),
             ("Ctrl+W", self._close_current_tab),
@@ -3164,6 +3308,11 @@ class PgWaveWindow(QMainWindow):
         if p and hasattr(p, 'exportPdf'):
             p.exportPdf()
 
+    def _export_data(self):
+        p = self._current()
+        if p and hasattr(p, 'exportData'):
+            p.exportData()
+
     def _reload(self):
         p = self._current()
         if p and hasattr(p, 'reloadAll'):
@@ -3266,6 +3415,7 @@ class PgWaveWindow(QMainWindow):
             "  Ctrl+O        Open file\n"
             "  Ctrl+S        Save session\n"
             "  Ctrl+P        Export PDF/PNG/SVG\n"
+            "  Ctrl+E        Export plotted data (CSV/Parquet/...)\n"
             "  Ctrl+Q        Quit\n"
             "\n"
             "Edit\n"

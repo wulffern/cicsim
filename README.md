@@ -44,7 +44,7 @@ This is a script package I use to control ngspice, it can
 | 0.2.6   | cicwave: drag-and-drop files, file menu, improved A/B cursor readout and X vs Y picker. Added GitHub release workflow |
 | 0.2.7   | `cicsim run`: added `--threads` for parallel simulations, `--progress` for tqdm progress bar, `--timeout` to kill hung sims, rich terminal results table. Bug fixes: uninitialized error state, float parse errors in log, silent measurement failures, dead code removed. CI: dependabot, ruff lint on PRs, pinned action versions, automated PyPI publish |
 | 0.2.8   | cicwave: lazy file loading (header-only on open) and pyarrow CSV reader for ~5× faster bulk loads, `--glob` option (repeatable, recursive), display-time downsampling and OpenGL acceleration for smoother zoom with many curves, right-drag rubber-band zoom, automatic unit detection from column suffixes (`_MHz`, `[dBm]`, `(V)`, ...), proper x/y axis labels on plot-all |
-| 0.2.9   | cicwave: LitePoint `.iqvsa` IQ capture support; Windows desktop shortcut generator (`scripts/make-cicwave-shortcut.ps1`); `cicwavew` GUI entry point (no console window when launched from a shortcut) |
+| 0.2.9   | cicwave: LitePoint `.iqvsa` IQ capture support; Windows desktop shortcut generator (`scripts/make-cicwave-shortcut.ps1`); `cicwavew` GUI entry point (no console window when launched from a shortcut); `File -> Export Data...` (Ctrl+E) writes plotted traces to CSV / TSV / Parquet / Feather / HDF5, honouring the current x-zoom |
 
 
 # Install this module
@@ -130,7 +130,8 @@ over `cicwave.exe` and uses `cicsim/cicwave.ico` as the icon. Pass
 | `R` | Reload all waves |
 | `L` | Toggle legend |
 | `Ctrl+O` | Open file |
-| `Ctrl+P` | Export PDF |
+| `Ctrl+P` | Export PDF / PNG / SVG |
+| `Ctrl+E` | Export plotted data (CSV / TSV / Parquet / Feather / HDF5) |
 | `Ctrl+N` | New plot tab (pg) |
 | `Ctrl+W` | Close current tab (pg) |
 | `Ctrl+Q` | Quit |
