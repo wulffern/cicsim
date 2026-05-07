@@ -13,7 +13,12 @@
 
 .PARAMETER CicwavePath
     Override auto-discovery and point the shortcut at a specific
-    cicwave.exe.
+    cicwave executable.
+
+.PARAMETER WithConsole
+    Use cicwave.exe (which opens a console window) instead of the
+    silent cicwavew.exe wrapper. Handy when you want to see startup
+    log output for debugging.
 
 .PARAMETER IconPath
     Override the default icon (cicsim/cicwave.ico shipped with the repo).
@@ -30,6 +35,7 @@
 [CmdletBinding()]
 param(
     [switch]$OnDesktop,
+    [switch]$WithConsole,
     [string]$CicwavePath,
     [string]$IconPath
 )
@@ -41,11 +47,17 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot  = Split-Path -Parent $scriptDir
 $defaultIcon = Join-Path $repoRoot 'cicsim\cicwave.ico'
 
-# 1) Resolve cicwave.exe.
+# 1) Resolve the cicwave executable. Prefer cicwavew.exe (no console
+#    window) for shortcut launches; fall back to cicwave.exe if the
+#    GUI wrapper isn't installed (older cicsim versions).
 if (-not $CicwavePath) {
-    $cmd = Get-Command cicwave.exe -ErrorAction SilentlyContinue
-    if (-not $cmd) {
-        $cmd = Get-Command cicwave -ErrorAction SilentlyContinue
+    $names = if ($WithConsole) { @('cicwave.exe', 'cicwave') }
+             else              { @('cicwavew.exe', 'cicwavew',
+                                    'cicwave.exe', 'cicwave') }
+    $cmd = $null
+    foreach ($n in $names) {
+        $cmd = Get-Command $n -ErrorAction SilentlyContinue
+        if ($cmd) { break }
     }
     if (-not $cmd) {
         throw "cicwave not found on PATH. Install with 'pip install -e .' " +
@@ -55,6 +67,14 @@ if (-not $CicwavePath) {
 }
 if (-not (Test-Path -LiteralPath $CicwavePath)) {
     throw "cicwave executable does not exist: $CicwavePath"
+}
+
+$exeName = [System.IO.Path]::GetFileName($CicwavePath)
+if ($exeName -ieq 'cicwave.exe' -and -not $WithConsole) {
+    Write-Warning ("Using cicwave.exe - a console window will appear when " +
+                   "the shortcut is double-clicked. Reinstall cicsim " +
+                   ">= 0.2.9 to get cicwavew.exe (silent), or pass " +
+                   "-WithConsole to suppress this warning.")
 }
 
 # 2) Resolve icon.

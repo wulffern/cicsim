@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cicsim"
-version = "0.2.8"
+version = "0.2.9"
 authors = [
   { name="Carsten Wulff", email="carsten@wulff.no" },
 ]
@@ -42,6 +42,13 @@ classifiers = [
 [project.scripts]
 cicsim = "cicsim.cicsim:cli"
 cicwave = "cicsim.cicsim:cicwave"
+
+# GUI-script entry points get a *w.exe wrapper on Windows that uses
+# pythonw.exe, so launching from a Start-menu / Desktop shortcut does
+# not pop up a console window. Keep the plain cicwave above for use
+# from a terminal (where stdout/stderr are visible).
+[project.gui-scripts]
+cicwavew = "cicsim.cicsim:cicwave"
 
 [project.urls]
 "Homepage" = "https://github.com/wulffern/cicsim"
