@@ -77,7 +77,8 @@ cicsim wave output_tran/tran_SchGtTtKffVh_*              # tkinter backend
 cicsim wave --backend pg output_tran/tran_SchGtTtKffVh_*  # pyqtgraph backend
 ```
 
-Supported file formats: `.raw` (ngspice), `.csv`, `.tsv`, `.txt`, `.xlsx`,
+Supported file formats: `.raw` (ngspice), `.vcd`, `.prn` (Xyce),
+`.iqvsa` (LitePoint VSA capture), `.csv`, `.tsv`, `.txt`, `.xlsx`,
 `.xls`, `.ods`, `.json`, `.parquet`, `.feather`, `.h5`, `.hdf5`, `.pkl`,
 `.pickle`, `.html`, `.xml`, `.fwf`, `.dta`, `.sas7bdat`, `.sav`.
 
@@ -97,6 +98,23 @@ suffixes like `_MHz`, `[dBm]`, `(V)` are detected automatically and used
 for axis labels and engineering-notation tick formatting.
 
 ![](wave.png)
+
+## Windows desktop shortcut
+
+To launch `cicwave` without opening a terminal, generate a Windows
+shortcut from the repo:
+
+``` powershell
+# From the repo root
+powershell -ExecutionPolicy Bypass -File scripts\make-cicwave-shortcut.ps1
+# -> creates scripts\cicwave.lnk; drag it to Desktop / Start menu / taskbar.
+
+# Or drop it straight onto the Desktop:
+powershell -ExecutionPolicy Bypass -File scripts\make-cicwave-shortcut.ps1 -OnDesktop
+```
+
+The script resolves `cicwave.exe` from `PATH` and points the shortcut at
+it, using `cicsim/cicwave.ico` as the icon.
 
 ## Wave viewer keyboard shortcuts
 
