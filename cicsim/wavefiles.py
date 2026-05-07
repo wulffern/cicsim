@@ -340,6 +340,7 @@ class WaveFile():
     PANDAS_READERS = {
         '.prn':     lambda self: self._read_prn(),
         '.vcd':     lambda self: read_vcd(self.fname),
+        '.iqvsa':   lambda self: read_iqvsa(self.fname),
         '.csv':     lambda self: self._read_csv(','),
         '.tsv':     lambda self: self._read_csv('\t'),
         '.txt':     lambda self: self._read_csv('\t'),
@@ -809,5 +810,126 @@ def read_vcd(fname, max_signals=None):
         'kinds': kinds,
         'widths': widths,
         'timescale_s': timescale,
+    }
+    return df
+
+
+# ---------------------------------------------------------------------------
+# LitePoint .iqvsa parser
+# ---------------------------------------------------------------------------
+
+#- LitePoint VSA capture: ASCII XML header terminated by ``</LPHeader>``
+#- followed by interleaved little-endian float32 I,Q samples (volts at the
+#- instrument port). Header carries sample rate, sample count, center
+#- frequency and the full SCPI module configuration.
+_IQVSA_HEADER_END = b'</LPHeader>'
+_IQVSA_HEADER_SCAN_LIMIT = 1 << 20  # 1 MiB is plenty; real headers are < 4 KiB
+
+
+def _iqvsa_parse_module_config(text):
+    """Parse the SCPI-style ``<ModuleConfiguration>`` block into a dict.
+    Lines look like ``FREQuency:CENTer 2.412000e+09;`` — keep the key as
+    written and try to coerce the value to float, else keep the string."""
+    out = {}
+    for raw in (text or "").splitlines():
+        line = raw.strip().rstrip(';').strip()
+        if not line or ';' in line and line.endswith(';'):
+            line = line.rstrip(';').strip()
+        if not line or line.endswith(';') or ' ' not in line:
+            continue
+        key, _, val = line.partition(' ')
+        val = val.strip()
+        try:
+            out[key] = float(val)
+        except ValueError:
+            out[key] = val
+    return out
+
+
+def read_iqvsa(fname):
+    """Parse a LitePoint ``.iqvsa`` IQ capture into a pandas DataFrame.
+
+    Columns: ``time`` (s), ``I (V)``, ``Q (V)``, ``mag (V)``. Header
+    metadata is stashed in ``df.attrs['cicsim_iqvsa']`` (sample rate,
+    center frequency, sample count, raw XML header, parsed SCPI config).
+
+    Only the v0.3 ``DataFormat=IQ`` / float32 layout we have a sample of
+    is supported; other variants raise ``ValueError``.
+    """
+    import xml.etree.ElementTree as ET
+
+    with open(fname, 'rb') as fh:
+        head = fh.read(_IQVSA_HEADER_SCAN_LIMIT)
+        idx = head.find(_IQVSA_HEADER_END)
+        if idx < 0:
+            raise ValueError(
+                "iqvsa: no </LPHeader> found in first %d bytes of %s"
+                % (_IQVSA_HEADER_SCAN_LIMIT, fname))
+        header_end = idx + len(_IQVSA_HEADER_END)
+        header_xml = head[:header_end].decode('ascii', errors='replace')
+        fh.seek(header_end)
+        payload = fh.read()
+
+    try:
+        root = ET.fromstring(header_xml)
+    except ET.ParseError as e:
+        raise ValueError("iqvsa: malformed XML header in %s: %s" % (fname, e))
+
+    def _txt(path, default=None):
+        node = root.find(path)
+        return node.text.strip() if node is not None and node.text else default
+
+    fmt = _txt('General/DataFormat', 'IQ')
+    if fmt.upper() != 'IQ':
+        raise ValueError("iqvsa: unsupported DataFormat=%r (only 'IQ')" % fmt)
+
+    try:
+        fs = float(_txt('DataInfo/SamplingRate'))
+        n_declared = int(_txt('DataInfo/SampleCount'))
+    except (TypeError, ValueError) as e:
+        raise ValueError("iqvsa: missing/bad SamplingRate or SampleCount in %s"
+                         % fname) from e
+
+    #- Format inference: payload should be n_declared * 2 * itemsize bytes.
+    #- We only know float32 for sure; sniff but require an exact match.
+    bytes_per_pair = len(payload) // n_declared if n_declared else 0
+    if bytes_per_pair == 8 and len(payload) == n_declared * 8:
+        iq = np.frombuffer(payload, dtype='<f4').reshape(-1, 2)
+    elif bytes_per_pair == 4 and len(payload) == n_declared * 4:
+        #- int16 IQ — not seen in the wild yet, but plausible. Treat as
+        #- raw counts; downstream can scale.
+        iq = np.frombuffer(payload, dtype='<i2').reshape(-1, 2).astype(
+            np.float32)
+    else:
+        raise ValueError(
+            "iqvsa: payload size %d does not match SampleCount=%d for "
+            "float32 (%d) or int16 (%d) IQ in %s"
+            % (len(payload), n_declared, n_declared * 8, n_declared * 4,
+               fname))
+
+    I = iq[:, 0]
+    Q = iq[:, 1]
+    n = I.shape[0]
+    t = np.arange(n, dtype=np.float64) / fs
+    mag = np.hypot(I, Q)
+
+    df = pd.DataFrame({
+        'time': t,
+        'I (V)': I,
+        'Q (V)': Q,
+        'mag (V)': mag,
+    })
+
+    cfg_text = _txt('ModuleConfiguration', '')
+    cfg = _iqvsa_parse_module_config(cfg_text)
+    df.attrs['cicsim_iqvsa'] = {
+        'sampling_rate_hz': fs,
+        'sample_count': n,
+        'center_freq_hz': cfg.get('FREQuency:CENTer'),
+        'capture_time_s': cfg.get('CAPTure:TIME'),
+        'idn': _txt('General/IDN'),
+        'datetime': _txt('General/DateTime'),
+        'header_xml': header_xml,
+        'config': cfg,
     }
     return df
