@@ -33,47 +33,80 @@ class SpiceParser():
     def __init__(self):
         pass
 
+    def logicalLines(self,fi):
+        """Yield logical spice lines, with continuations folded in
+
+        Spice marks a continuation with a leading '+' on the next line. Some
+        tools instead mark it with a trailing '\\' on the current line. Handle
+        both, otherwise the '+' style silently truncates the port list.
+        """
+        current = None
+        #- Did the previous line end with a backslash?
+        pending = False
+
+        for line in fi:
+            line = line.rstrip("\n")
+
+            #- Full line comments
+            if(re.match(r"\s*\*",line)):
+                continue
+
+            isCont = pending or line.strip().startswith("+")
+
+            pending = bool(re.search(r"\\\s*$",line))
+            line = re.sub(r"\\\s*$","",line)
+            line = re.sub(r"^\s*\+\s*"," ",line)
+
+            if(isCont and current is not None):
+                current += " " + line.strip()
+            else:
+                if(current is not None):
+                    yield current
+                current = line
+
+        if(current is not None):
+            yield current
+
+    def portsFromHeader(self,header):
+        """Pull the port names out of a folded .SUBCKT header line"""
+
+        #- '$' and ';' start an inline comment, but only after whitespace,
+        #- since net names are allowed to contain '$'
+        header = re.split(r"(?:\s|^)[$;]",header)[0]
+
+        tokens = header.split()
+        #- Remove .SUBCKT and the subckt name
+        tokens = tokens[2:]
+
+        ports = []
+        for t in tokens:
+            #- The parameter list ends the ports, in either spelling
+            if(t.lower() == "params:" or "=" in t):
+                break
+            ports.append(t)
+
+        return ports
+
     def fastGetPortsFromFile(self,spicefile,subckt):
-        cktbuff = []
         ckts = []
+        header = None
+
         with open(f"{spicefile}","r") as fi:
-            match = False
+            for line in self.logicalLines(fi):
+                m = re.match(r"\s*\.SUBCKT\s+(\S+)",line,re.IGNORECASE)
+                if(m is None):
+                    continue
 
-            for line in fi:
-                if(match):
-                    cktbuff.append(line)
+                ckts.append(m.group(1))
 
-                if(re.search(fr"\s*.?SUBCKT\s+{subckt}\s+",line,re.IGNORECASE)):
-                    match = True
-                    cktbuff.append(line)
+                #- Compare as tokens, not as a regex, so that a name which is
+                #- a prefix of another, or contains regex characters, is safe
+                if(header is None and m.group(1).lower() == subckt.lower()):
+                    header = line
 
-                if(not re.search(r"\s*[\+\\]\n?$",line)):
-                    match = False
-
-                m = re.search(r"\s*.?SUBCKT\s+([^\s]+)",line,re.IGNORECASE)
-                if(m is not None):
-                    ckts.append(m.group(1))
-
-        if not cktbuff:
+        if header is None:
             cktopt= difflib.get_close_matches(subckt,ckts)
             print(f"Error: Could not find '{subckt}', maybe you meant " + str(cktopt))
             return
 
-        cktstr = ""
-        for line in cktbuff:
-            line = re.sub(r"[\+\\]\n$","",line)
-            line = re.sub(r"^\+\s*"," ",line)
-            cktstr += line
-
-        cktstr = re.sub(r"\s+"," ",cktstr)
-
-
-        ports = cktstr.split(" ")
-        #- Remove .SUBCKT
-        ports.pop(0)
-        #- Remove subckt name
-        ports.pop(0)
-
-        ports = [p for p in ports if p]
-
-        return ports
+        return self.portsFromHeader(header)
