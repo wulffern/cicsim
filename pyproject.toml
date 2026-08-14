@@ -39,10 +39,13 @@ classifiers = [
 [project.optional-dependencies]
 # Advanced waveform viewer with PyQtGraph backend
 wave = ["cicwave"]
+# MCP server exposing the read-only result/raw inspection tools
+mcp = ["mcp[cli]"]
 
 [project.scripts]
 cicsim = "cicsim.cicsim:cli"
 cicwave = "cicsim.cicsim:cicwave"
+cicsim-mcp = "cicsim.mcp_server:main"
 
 # GUI-script entry points get a *w.exe wrapper on Windows that uses
 # pythonw.exe, so launching from a Start-menu / Desktop shortcut does
