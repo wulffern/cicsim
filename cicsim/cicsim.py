@@ -294,59 +294,6 @@ def _run_wave(files, x, backend, sheet, pivot_spec=None,
         c.run()
 
 
-@click.command()
-@click.argument("files", nargs=-1)
-@click.option("--glob", "globs", multiple=True,
-              help="Glob pattern (repeatable). Supports ** for recursion. "
-                   "Useful on shells like PowerShell that don't auto-expand.")
-@click.option("--x", default=None,
-              help="X-axis column; else CICWAVE_X / CICSIM_X_AXIS; else saved default; else auto")
-@click.option("--backend", default="pg", type=click.Choice(["tk", "pg"]),
-              help="GUI backend (default: pg)")
-@click.option("--sheet", default=None, help="Sheet name for Excel files (default: first sheet)")
-@click.option("--pivot", default=None, help="Pivot spec file (YAML/JSON)")
-@click.option("--pivot-info", is_flag=True, default=False, help="Print pivot dimensions and exit")
-@click.option("--session", default=None, help="Load session file (.cicwave.yaml)")
-@click.option("--export", default=None, help="Export plot to file (PDF/PNG/SVG) and exit")
-def cicwave(files, globs, x, backend, sheet, pivot, pivot_info, session, export):
-    """Waveform viewer (standalone).
-
-    Now delegates to standalone cicwave package for PyQtGraph backend.
-    For backward compatibility, this entry point is preserved in cicsim.
-
-    Supports: .raw, .csv, .tsv, .xlsx, .json, .parquet, .feather, .h5,
-    .pkl, and more.
-
-    \b
-    Pivot:
-      --pivot spec.yaml     Reshape data using pivot spec before viewing
-      --pivot-info          Print unique values per pivot dimension and exit
-
-    \b
-    Session:
-      --session plot.cicwave.yaml         Load saved session
-      --export plot.pdf                   Export to file and exit (no GUI)
-      --session s.yaml --export out.pdf   Restore session and export
-
-    \b
-    Globs:
-      --glob 'data/*.csv'             Repeatable, supports ** for recursion
-      --glob '**/*.raw'               Useful on PowerShell which doesn't
-                                       auto-expand patterns
-    """
-    try:
-        # Delegate to standalone cicwave package
-        from cicwave.cli import _run_wave_pg
-        files_expanded = _expand_glob_patterns(files, globs)
-        _run_wave_pg(files_expanded, x, sheet, pivot, pivot_info, session, export)
-    except ImportError:
-        print("Error: cicwave package not found")
-        print("For PyQtGraph backend, install with: pip install cicwave")
-        print("Alternatively, use: cicsim wave --backend tk")
-        sys.exit(1)
-
-
-
 @cli.command()
 @click.argument("testbench")
 @click.argument("corner",nargs=-1)

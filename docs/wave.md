@@ -134,8 +134,9 @@ degrees).
 
 ## Standalone command
 
-A standalone `cicwave` command is available that defaults to the pyqtgraph
-backend. It is equivalent to `cicsim wave --backend pg`.
+The `cicwave` command comes from the separate
+[cicwave](https://github.com/wulffern/cicwave) package, `pip install cicwave`.
+It is equivalent to `cicsim wave --backend pg`.
 
 ```bash
 cicwave output_tran/tran_SchTtVt.raw

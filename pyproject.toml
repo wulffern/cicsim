@@ -44,15 +44,7 @@ mcp = ["mcp[cli]"]
 
 [project.scripts]
 cicsim = "cicsim.cicsim:cli"
-cicwave = "cicsim.cicsim:cicwave"
 cicsim-mcp = "cicsim.mcp_server:main"
-
-# GUI-script entry points get a *w.exe wrapper on Windows that uses
-# pythonw.exe, so launching from a Start-menu / Desktop shortcut does
-# not pop up a console window. Keep the plain cicwave above for use
-# from a terminal (where stdout/stderr are visible).
-[project.gui-scripts]
-cicwavew = "cicsim.cicsim:cicwave"
 
 [project.urls]
 "Homepage" = "https://github.com/wulffern/cicsim"
