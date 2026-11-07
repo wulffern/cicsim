@@ -45,6 +45,7 @@ This is a script package I use to control ngspice, it can
 | 0.2.7   | `cicsim run`: added `--threads` for parallel simulations, `--progress` for tqdm progress bar, `--timeout` to kill hung sims, rich terminal results table. Bug fixes: uninitialized error state, float parse errors in log, silent measurement failures, dead code removed. CI: dependabot, ruff lint on PRs, pinned action versions, automated PyPI publish |
 | 0.2.8   | cicwave: lazy file loading (header-only on open) and pyarrow CSV reader for ~5× faster bulk loads, `--glob` option (repeatable, recursive), display-time downsampling and OpenGL acceleration for smoother zoom with many curves, right-drag rubber-band zoom, automatic unit detection from column suffixes (`_MHz`, `[dBm]`, `(V)`, ...), proper x/y axis labels on plot-all |
 | 0.2.9   | cicwave: LitePoint `.iqvsa` IQ capture support; Windows desktop shortcut generator (`scripts/make-cicwave-shortcut.ps1`); `cicwavew` GUI entry point (no console window when launched from a shortcut); `File -> Export Data...` (Ctrl+E) writes plotted traces to CSV / TSV / Parquet / Feather / HDF5, honouring the current x-zoom |
+| 0.3.0   | The `cicwave` command moved to the standalone cicwave package; `cicsim wave` still delegates to it. MCP server for results and raw files |
 
 
 # Install this module
@@ -66,11 +67,11 @@ Head over to [Sky130nm tutorial](https://analogicus.com/aic2026/sky130nm_tutoria
 
 # Get started with waveform viewer
 
-A standalone `cicwave` command is available that defaults to the pyqtgraph
-backend. It is equivalent to `cicsim wave --backend pg`.
+The waveform viewer is the separate [cicwave](https://github.com/wulffern/cicwave)
+package.
 
 ``` bash
-# Standalone command (defaults to pg backend)
+python3 -m pip install cicwave
 cicwave output_tran/tran_SchGtTtKffVh_*
 
 # Or via cicsim subcommand

@@ -46,9 +46,11 @@ Commands:
 
 ```
 
-There is also a standalone command for the waveform viewer:
+The waveform viewer is the separate [cicwave](https://github.com/wulffern/cicwave)
+package:
 
 ```bash
+python3 -m pip install cicwave
 cicwave [FILES]...
 
 ```
